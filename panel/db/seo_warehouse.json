@@ -1,0 +1,1520 @@
+{
+    "businesses": [
+        {
+            "id": "biz_red_style",
+            "slug": "red-style",
+            "name": "Red Style (رد استایل)",
+            "domain": "red-style.ir",
+            "industry": "Fashion & Streetwear",
+            "currency": "تومان",
+            "created_at": "2025-01-10 09:00:00",
+            "status": "active"
+        },
+        {
+            "id": "biz_tanedorost",
+            "slug": "tanedorost",
+            "name": "Tanedorost (تن‌درست)",
+            "domain": "tanedorost.ir",
+            "industry": "Natural Linen & Sport Clothes",
+            "currency": "تومان",
+            "created_at": "2025-02-01 10:30:00",
+            "status": "active"
+        }
+    ],
+    "integrations": [
+        {
+            "slug": "composio",
+            "name": "Composio Engine",
+            "icon": "⚡",
+            "category": "core",
+            "description": "هسته یکپارچه‌ساز ایجنت‌های Composio"
+        },
+        {
+            "slug": "google_search_console",
+            "name": "Google Search Console",
+            "icon": "🔍",
+            "category": "seo",
+            "description": "تحلیل کوئری‌ها، ایندکس و کلیک‌های سرچ گوگل"
+        },
+        {
+            "slug": "google_analytics_4",
+            "name": "Google Analytics 4",
+            "icon": "📊",
+            "category": "analytics",
+            "description": "ترافیک، کانال‌های ورودی، نرخ پرش و درآمد"
+        },
+        {
+            "slug": "wordpress",
+            "name": "WordPress REST API",
+            "icon": "📝",
+            "category": "cms",
+            "description": "مدیریت مقالات، ساختار URL و متادیتای سئو"
+        },
+        {
+            "slug": "woocommerce",
+            "name": "WooCommerce & Store API",
+            "icon": "🛒",
+            "category": "ecommerce",
+            "description": "فروش، محصولات پردرآمد و انطباق سئو با سفارش"
+        },
+        {
+            "slug": "instagram",
+            "name": "Instagram Business",
+            "icon": "📸",
+            "category": "social",
+            "description": "عملکرد پست‌ها، ریلز و تعامل شبکه‌های اجتماعی"
+        },
+        {
+            "slug": "google_ads",
+            "name": "Google Ads",
+            "icon": "📢",
+            "category": "ads",
+            "description": "حجم جستجو و کمپین‌های سرچ گوگل (آماده اتصال)"
+        },
+        {
+            "slug": "meta_ads",
+            "name": "Facebook & Meta Ads",
+            "icon": "🎯",
+            "category": "ads",
+            "description": "کمپین‌ها و پرفورمنس متا (آماده اتصال)"
+        },
+        {
+            "slug": "ahrefs",
+            "name": "Ahrefs API",
+            "icon": "🔗",
+            "category": "seo_expansion",
+            "description": "آنالیز بک‌لینک و رقبا (آماده توسعه)"
+        },
+        {
+            "slug": "semrush",
+            "name": "Semrush API",
+            "icon": "📈",
+            "category": "seo_expansion",
+            "description": "تحلیل کیورد گپ و تبلیغات گوگل (آماده توسعه)"
+        },
+        {
+            "slug": "screaming_frog",
+            "name": "Screaming Frog Crawler",
+            "icon": "🐸",
+            "category": "seo_expansion",
+            "description": "کراول عمیق تکنیکال سایت (آماده توسعه)"
+        }
+    ],
+    "integration_connections": [
+        {
+            "id": "conn_rs_gsc",
+            "business_id": "biz_red_style",
+            "integration_slug": "google_search_console",
+            "property_id": "sc-domain:red-style.ir",
+            "account_name": "red-style.ir (Domain Property)",
+            "status": "connected",
+            "auth_method": "composio_oauth",
+            "sync_enabled": true,
+            "sync_frequency": "daily",
+            "last_sync_at": "2026-09-06 12:22:56",
+            "last_sync_status": "success"
+        },
+        {
+            "id": "conn_rs_ga4",
+            "business_id": "biz_red_style",
+            "integration_slug": "google_analytics_4",
+            "property_id": "properties\/382910485",
+            "account_name": "Red Style GA4 (Web Stream)",
+            "status": "connected",
+            "auth_method": "composio_oauth",
+            "sync_enabled": true,
+            "sync_frequency": "daily",
+            "last_sync_at": "2026-09-06 12:22:56",
+            "last_sync_status": "success"
+        },
+        {
+            "id": "conn_rs_wp",
+            "business_id": "biz_red_style",
+            "integration_slug": "wordpress",
+            "property_id": "https:\/\/red-style.ir\/wp-json",
+            "account_name": "Red Style WP REST API",
+            "status": "connected",
+            "auth_method": "api_key",
+            "sync_enabled": true,
+            "sync_frequency": "daily",
+            "last_sync_at": "2026-09-06 13:22:56",
+            "last_sync_status": "success"
+        },
+        {
+            "id": "conn_rs_woo",
+            "business_id": "biz_red_style",
+            "integration_slug": "woocommerce",
+            "property_id": "https:\/\/red-style.ir\/wp-json\/wc\/v3",
+            "account_name": "Red Style WooCommerce Store",
+            "status": "connected",
+            "auth_method": "api_key",
+            "sync_enabled": true,
+            "sync_frequency": "daily",
+            "last_sync_at": "2026-09-06 13:22:56",
+            "last_sync_status": "success"
+        },
+        {
+            "id": "conn_rs_insta",
+            "business_id": "biz_red_style",
+            "integration_slug": "instagram",
+            "property_id": "@redstyle",
+            "account_name": "redstyle.official",
+            "status": "connected",
+            "auth_method": "composio_oauth",
+            "sync_enabled": true,
+            "sync_frequency": "hourly",
+            "last_sync_at": "2026-09-06 13:37:56",
+            "last_sync_status": "success"
+        },
+        {
+            "id": "conn_43a63ae3ffe1fda0b1459abefbff8491",
+            "business_id": "biz_tanedorost",
+            "integration_slug": "google_search_console",
+            "property_id": "sc-domain:tanedorost.ir",
+            "account_name": "tandorost.ir",
+            "status": "connected",
+            "auth_method": "composio_oauth",
+            "sync_enabled": true,
+            "sync_frequency": "daily",
+            "last_sync_at": "2026-09-06 17:55:55",
+            "last_sync_status": "success",
+            "updated_at": "2026-09-06 17:55:55"
+        },
+        {
+            "id": "conn_td_ga4",
+            "business_id": "biz_tanedorost",
+            "integration_slug": "google_analytics_4",
+            "property_id": "properties\/491029384",
+            "account_name": "Tanedorost GA4 (Property ID)",
+            "status": "connected",
+            "auth_method": "composio_oauth",
+            "sync_enabled": true,
+            "sync_frequency": "daily",
+            "last_sync_at": "2026-09-06 11:22:56",
+            "last_sync_status": "success"
+        },
+        {
+            "id": "conn_td_wp",
+            "business_id": "biz_tanedorost",
+            "integration_slug": "wordpress",
+            "property_id": "https:\/\/tandorost.ir\/wp-json",
+            "account_name": "WordPress REST API",
+            "status": "connected",
+            "auth_method": "api_key",
+            "sync_enabled": true,
+            "sync_frequency": "daily",
+            "last_sync_at": "2026-09-06 12:22:56",
+            "last_sync_status": "success"
+        },
+        {
+            "id": "conn_td_insta",
+            "business_id": "biz_tanedorost",
+            "integration_slug": "instagram",
+            "property_id": "@tanedorost",
+            "account_name": "Instagram Business Account",
+            "status": "connected",
+            "auth_method": "composio_oauth",
+            "sync_enabled": true,
+            "sync_frequency": "daily",
+            "last_sync_at": "2026-09-06 12:22:56",
+            "last_sync_status": "success"
+        },
+        {
+            "id": "conn_td_woo",
+            "business_id": "biz_tanedorost",
+            "integration_slug": "woocommerce",
+            "property_id": "https:\/\/tandorost.ir\/wp-json\/wc\/v3",
+            "account_name": "Tanedorost WooCommerce Store API",
+            "status": "connected",
+            "auth_method": "api_key",
+            "sync_enabled": true,
+            "sync_frequency": "daily",
+            "last_sync_at": "2026-09-06 12:22:56",
+            "last_sync_status": "success"
+        }
+    ],
+    "rank_history": [
+        {
+            "date": "2026\/09\/06",
+            "business": "Tanedorost (تن‌درست)",
+            "business_slug": "tanedorost",
+            "keyword": "پیراهن کنفی مردانه",
+            "url": "https:\/\/tanedorost.ir\/mens-hemp-shirt\/",
+            "avg_position": 12.8,
+            "clicks": 613,
+            "impressions": 16494,
+            "ctr": "3.72%",
+            "position_change": "+1",
+            "category": "محصولات اصلی",
+            "id": "rh_6a9d77f34e138",
+            "business_id": "biz_tanedorost"
+        },
+        {
+            "date": "2026\/09\/06",
+            "business": "Tanedorost (تن‌درست)",
+            "business_slug": "tanedorost",
+            "keyword": "مانتو لینن تابستانه خنک",
+            "url": "https:\/\/tanedorost.ir\/linen-manto\/",
+            "avg_position": 2.2,
+            "clicks": 2942,
+            "impressions": 25050,
+            "ctr": "11.74%",
+            "position_change": "-1",
+            "category": "محصولات اصلی",
+            "id": "rh_6a9d77f34d82a",
+            "business_id": "biz_tanedorost"
+        },
+        {
+            "date": "2026\/09\/06",
+            "business": "Tanedorost (تن‌درست)",
+            "business_slug": "tanedorost",
+            "keyword": "خرید لباس الیاف طبیعی زنانه",
+            "url": "https:\/\/tanedorost.ir\/natural-fiber-clothing\/",
+            "avg_position": 1,
+            "clicks": 4115,
+            "impressions": 31242,
+            "ctr": "13.17%",
+            "position_change": "-1",
+            "category": "محصولات اصلی",
+            "id": "rh_6a9d77f34d339",
+            "business_id": "biz_tanedorost"
+        },
+        {
+            "id": "rh_td_1",
+            "date": "1405\/06\/15",
+            "business": "تن درست",
+            "business_slug": "tanedorost",
+            "business_id": "biz_tanedorost",
+            "keyword": "خرید لباس ورزشی",
+            "url": "\/category\/sport-wear",
+            "avg_position": 4.8,
+            "clicks": 340,
+            "impressions": 8200,
+            "ctr": "4.1%",
+            "position_change": "+1.2",
+            "category": "لباس ورزشی"
+        },
+        {
+            "id": "rh_td_2",
+            "date": "1405\/06\/14",
+            "business": "تن درست",
+            "business_slug": "tanedorost",
+            "business_id": "biz_tanedorost",
+            "keyword": "خرید لباس ورزشی",
+            "url": "\/category\/sport-wear",
+            "avg_position": 6,
+            "clicks": 280,
+            "impressions": 7900,
+            "ctr": "3.5%",
+            "position_change": "+0.8",
+            "category": "لباس ورزشی"
+        },
+        {
+            "id": "rh_td_3",
+            "date": "1405\/06\/13",
+            "business": "تن درست",
+            "business_slug": "tanedorost",
+            "business_id": "biz_tanedorost",
+            "keyword": "خرید لباس ورزشی",
+            "url": "\/category\/sport-wear",
+            "avg_position": 6.8,
+            "clicks": 250,
+            "impressions": 7600,
+            "ctr": "3.3%",
+            "position_change": "+0.2",
+            "category": "لباس ورزشی"
+        },
+        {
+            "id": "rh_td_4",
+            "date": "1405\/06\/15",
+            "business": "تن درست",
+            "business_slug": "tanedorost",
+            "business_id": "biz_tanedorost",
+            "keyword": "خرید لباس الیاف طبیعی زنانه",
+            "url": "\/natural-fiber-clothing\/",
+            "avg_position": 1.1,
+            "clicks": 4120,
+            "impressions": 31000,
+            "ctr": "13.2%",
+            "position_change": "+0.3",
+            "category": "الیاف طبیعی"
+        },
+        {
+            "id": "rh_td_5",
+            "date": "1405\/06\/15",
+            "business": "تن درست",
+            "business_slug": "tanedorost",
+            "business_id": "biz_tanedorost",
+            "keyword": "مانتو لینن تابستانه خنک",
+            "url": "\/linen-manto\/",
+            "avg_position": 3.2,
+            "clicks": 2940,
+            "impressions": 24800,
+            "ctr": "11.8%",
+            "position_change": "+0.9",
+            "category": "مانتو و پیراهن"
+        },
+        {
+            "id": "rh_td_6",
+            "date": "1405\/06\/15",
+            "business": "تن درست",
+            "business_slug": "tanedorost",
+            "business_id": "biz_tanedorost",
+            "keyword": "پیراهن کنفی مردانه",
+            "url": "\/mens-hemp-shirt\/",
+            "avg_position": 11.8,
+            "clicks": 610,
+            "impressions": 16200,
+            "ctr": "3.7%",
+            "position_change": "+2.4",
+            "category": "پیراهن مردانه"
+        },
+        {
+            "id": "rh_td_7",
+            "date": "1405\/06\/07",
+            "business": "تن درست",
+            "business_slug": "tanedorost",
+            "business_id": "biz_tanedorost",
+            "keyword": "خرید لباس ورزشی",
+            "url": "\/category\/sport-wear",
+            "avg_position": 7.9,
+            "clicks": 210,
+            "impressions": 7100,
+            "ctr": "3.0%",
+            "position_change": "+1.5",
+            "category": "لباس ورزشی"
+        },
+        {
+            "id": "rh_rs_1",
+            "date": "1405\/06\/15",
+            "business": "رد استایل",
+            "business_slug": "red-style",
+            "business_id": "biz_red_style",
+            "keyword": "خرید شلوار کارگو مشکی",
+            "url": "\/product-category\/cargo-pants\/",
+            "avg_position": 10.9,
+            "clicks": 540,
+            "impressions": 18900,
+            "ctr": "2.8%",
+            "position_change": "+2.8",
+            "category": "شلوار کارگو"
+        },
+        {
+            "id": "rh_rs_2",
+            "date": "1405\/06\/15",
+            "business": "رد استایل",
+            "business_slug": "red-style",
+            "business_id": "biz_red_style",
+            "keyword": "خرید هودی اورسایز مردانه",
+            "url": "\/product-category\/hoodies\/",
+            "avg_position": 2.1,
+            "clicks": 3420,
+            "impressions": 28500,
+            "ctr": "12.0%",
+            "position_change": "+0.4",
+            "category": "هودی و سویشرت"
+        },
+        {
+            "id": "rh_rs_3",
+            "date": "1405\/06\/15",
+            "business": "رد استایل",
+            "business_slug": "red-style",
+            "business_id": "biz_red_style",
+            "keyword": "خرید کفش کژوال قرمز",
+            "url": "\/product\/red-casual-sneaker\/",
+            "avg_position": 4.2,
+            "clicks": 1850,
+            "impressions": 19200,
+            "ctr": "9.6%",
+            "position_change": "+0.6",
+            "category": "کفش و کتانی"
+        },
+        {
+            "id": "rh_rs_4",
+            "date": "1405\/06\/15",
+            "business": "رد استایل",
+            "business_slug": "red-style",
+            "business_id": "biz_red_style",
+            "keyword": "ست کراپ و جاگر اسپرت دخترانه",
+            "url": "\/product\/women-jogger-set\/",
+            "avg_position": 13.4,
+            "clicks": 380,
+            "impressions": 15400,
+            "ctr": "2.4%",
+            "position_change": "-2.1",
+            "category": "ست دخترانه"
+        },
+        {
+            "id": "rh_rs_5",
+            "date": "1405\/06\/15",
+            "business": "رد استایل",
+            "business_slug": "red-style",
+            "business_id": "biz_red_style",
+            "keyword": "استایل خیابانی پاییزه ترند",
+            "url": "\/mag\/autumn-streetwear-trends\/",
+            "avg_position": 7.9,
+            "clicks": 920,
+            "impressions": 14300,
+            "ctr": "6.4%",
+            "position_change": "+4.1",
+            "category": "مقالات استایل"
+        },
+        {
+            "id": "rh_rs_6",
+            "date": "1405\/06\/14",
+            "business": "رد استایل",
+            "business_slug": "red-style",
+            "business_id": "biz_red_style",
+            "keyword": "خرید شلوار کارگو مشکی",
+            "url": "\/product-category\/cargo-pants\/",
+            "avg_position": 12.8,
+            "clicks": 460,
+            "impressions": 18200,
+            "ctr": "2.5%",
+            "position_change": "+0.9",
+            "category": "شلوار کارگو"
+        }
+    ],
+    "internal_links": {
+        "biz_red_style": [
+            {
+                "id": "link_rs_1",
+                "source_url": "https:\/\/red-style.ir\/mag\/autumn-streetwear-trends\/",
+                "source_title": "۱۰ ترند استایل خیابانی پاییزه امسال",
+                "target_url": "https:\/\/red-style.ir\/product-category\/hoodies\/",
+                "target_title": "دسته‌بندی هودی‌های اورسایز",
+                "anchor_text": "خرید هودی اورسایز پاییزه",
+                "status": "Follow",
+                "equity_transfer": "High",
+                "inlinks_count": 14,
+                "click_depth": 2,
+                "is_orphan": false,
+                "has_opportunity": false
+            },
+            {
+                "id": "link_rs_2",
+                "source_url": "https:\/\/red-style.ir\/mag\/autumn-streetwear-trends\/",
+                "source_title": "۱۰ ترند استایل خیابانی پاییزه امسال",
+                "target_url": "https:\/\/red-style.ir\/product-category\/cargo-pants\/",
+                "target_title": "شلوار کارگو مشکی",
+                "anchor_text": "شلوارهای کارگو کتان",
+                "status": "Follow",
+                "equity_transfer": "High",
+                "inlinks_count": 2,
+                "click_depth": 3,
+                "is_orphan": false,
+                "has_opportunity": true,
+                "recommendation": "صفحه شلوار کارگو دارای ۸۲,۴۰۰ ایمپرشن است اما تنها ۲ لینک داخلی دارد. افزودن ۳ لینک متنی از مقالات پربازدید هودی و استایل موجب جهش به صفحه اول می‌شود."
+            },
+            {
+                "id": "link_rs_3",
+                "source_url": "https:\/\/red-style.ir\/product\/discontinued-tee",
+                "source_title": "تیشرت مدل قدیمی ناموجود",
+                "target_url": "https:\/\/red-style.ir\/product\/basic-tshirt\/",
+                "target_title": "تیشرت بیسیک نخی اورجینال",
+                "anchor_text": "مدل جدید تیشرت بیسیک",
+                "status": "Follow",
+                "equity_transfer": "Medium",
+                "inlinks_count": 0,
+                "click_depth": 5,
+                "is_orphan": true,
+                "has_opportunity": true,
+                "recommendation": "این صفحه یک صفحه یتیم (Orphan Page) بدون لینک داخلی است. ریدایرکت ۳۰۱ دائم به تیشرت بیسیک فعال الزامی است."
+            }
+        ],
+        "biz_tanedorost": [
+            {
+                "id": "link_td_1",
+                "source_url": "https:\/\/tanedorost.ir\/natural-fiber-clothing\/",
+                "source_title": "پوشاک الیاف طبیعی تن‌درست",
+                "target_url": "https:\/\/tanedorost.ir\/category\/sport-wear",
+                "target_title": "لباس ورزشی تن‌درست",
+                "anchor_text": "خرید لباس ورزشی ارگانیک",
+                "status": "Follow",
+                "equity_transfer": "High",
+                "inlinks_count": 8,
+                "click_depth": 2,
+                "is_orphan": false,
+                "has_opportunity": true,
+                "recommendation": "تقویت لینک‌سازی داخلی از لندینگ پربازدید الیاف طبیعی به لباس ورزشی با انکرتکست «لباس ورزشی نخی» برای تثبیت در رتبه زیر ۳ گوگل."
+            }
+        ]
+    },
+    "comparison_data": {
+        "biz_tanedorost": {
+            "month_over_month": {
+                "type": "month_over_month",
+                "period_current": "شهریور ۱۴۰۵",
+                "period_previous": "مرداد ۱۴۰۵",
+                "metrics": {
+                    "clicks": {
+                        "current": 22400,
+                        "previous": 17800,
+                        "diff_pct": 25.8
+                    },
+                    "impressions": {
+                        "current": 312000,
+                        "previous": 258000,
+                        "diff_pct": 20.9
+                    },
+                    "avg_position": {
+                        "current": 4.2,
+                        "previous": 6.1,
+                        "diff": -1.9
+                    },
+                    "organic_sessions": {
+                        "current": 51200,
+                        "previous": 39800,
+                        "diff_pct": 28.6
+                    },
+                    "organic_conversions": {
+                        "current": 980,
+                        "previous": 740,
+                        "diff_pct": 32.4
+                    },
+                    "organic_revenue": {
+                        "current": 248000000,
+                        "previous": 189000000,
+                        "diff_pct": 31.2
+                    }
+                },
+                "top_winners": [
+                    {
+                        "keyword": "خرید لباس ورزشی",
+                        "from": 12,
+                        "to": 4.8,
+                        "change": "+7.2"
+                    },
+                    {
+                        "keyword": "پیراهن کنفی مردانه",
+                        "from": 18,
+                        "to": 11.8,
+                        "change": "+6.2"
+                    },
+                    {
+                        "keyword": "مانتو لینن تابستانه خنک",
+                        "from": 5,
+                        "to": 3.2,
+                        "change": "+1.8"
+                    }
+                ],
+                "top_losers": []
+            },
+            "week_over_week": {
+                "type": "week_over_week",
+                "period_current": "هفته جاری (۸ تا ۱۵ شهریور)",
+                "period_previous": "هفته قبل (۱ تا ۷ شهریور)",
+                "metrics": {
+                    "clicks": {
+                        "current": 5600,
+                        "previous": 4700,
+                        "diff_pct": 19.1
+                    },
+                    "impressions": {
+                        "current": 79000,
+                        "previous": 69000,
+                        "diff_pct": 14.5
+                    },
+                    "avg_position": {
+                        "current": 4.4,
+                        "previous": 5.2,
+                        "diff": -0.8
+                    },
+                    "organic_sessions": {
+                        "current": 12800,
+                        "previous": 10900,
+                        "diff_pct": 17.4
+                    },
+                    "organic_conversions": {
+                        "current": 245,
+                        "previous": 195,
+                        "diff_pct": 25.6
+                    },
+                    "organic_revenue": {
+                        "current": 62000000,
+                        "previous": 49000000,
+                        "diff_pct": 26.5
+                    }
+                }
+            },
+            "before_after_seo": {
+                "type": "before_after_seo",
+                "period_current": "پس از اجرای اصلاحات Title و Core Web Vitals",
+                "period_previous": "قبل از بهینه‌سازی فنی و محتوایی",
+                "metrics": {
+                    "clicks": {
+                        "current": 22400,
+                        "previous": 14100,
+                        "diff_pct": 58.8
+                    },
+                    "impressions": {
+                        "current": 312000,
+                        "previous": 210000,
+                        "diff_pct": 48.5
+                    },
+                    "avg_position": {
+                        "current": 4.2,
+                        "previous": 8.9,
+                        "diff": -4.7
+                    },
+                    "organic_sessions": {
+                        "current": 51200,
+                        "previous": 31000,
+                        "diff_pct": 65.1
+                    },
+                    "organic_conversions": {
+                        "current": 980,
+                        "previous": 520,
+                        "diff_pct": 88.4
+                    },
+                    "organic_revenue": {
+                        "current": 248000000,
+                        "previous": 125000000,
+                        "diff_pct": 98.4
+                    }
+                }
+            }
+        },
+        "biz_red_style": {
+            "month_over_month": {
+                "type": "month_over_month",
+                "period_current": "شهریور ۱۴۰۵",
+                "period_previous": "مرداد ۱۴۰۵",
+                "metrics": {
+                    "clicks": {
+                        "current": 18450,
+                        "previous": 14200,
+                        "diff_pct": 29.9
+                    },
+                    "impressions": {
+                        "current": 285400,
+                        "previous": 241000,
+                        "diff_pct": 18.4
+                    },
+                    "avg_position": {
+                        "current": 6.2,
+                        "previous": 8.4,
+                        "diff": -2.2
+                    },
+                    "organic_sessions": {
+                        "current": 42580,
+                        "previous": 31800,
+                        "diff_pct": 33.9
+                    },
+                    "organic_conversions": {
+                        "current": 840,
+                        "previous": 620,
+                        "diff_pct": 35.5
+                    },
+                    "organic_revenue": {
+                        "current": 184500000,
+                        "previous": 134000000,
+                        "diff_pct": 37.7
+                    }
+                }
+            }
+        }
+    },
+    "seo_keywords": {
+        "biz_red_style": [
+            {
+                "id": "kw_1",
+                "keyword": "خرید هودی اورسایز مردانه",
+                "position": 2,
+                "prev_position": 3,
+                "position_change": "+1",
+                "clicks": 3420,
+                "impressions": 28500,
+                "ctr": 12,
+                "intent": "Transactional",
+                "opportunity_score": "High",
+                "target_url": "https:\/\/red-style.ir\/product-category\/hoodies\/",
+                "search_volume": 33000,
+                "cannibalized_urls": []
+            },
+            {
+                "id": "kw_2",
+                "keyword": "خرید کفش کژوال قرمز",
+                "position": 4,
+                "prev_position": 5,
+                "position_change": "+1",
+                "clicks": 1850,
+                "impressions": 19200,
+                "ctr": 9.6,
+                "intent": "Transactional",
+                "opportunity_score": "High",
+                "target_url": "https:\/\/red-style.ir\/product\/red-casual-sneaker\/",
+                "search_volume": 22000,
+                "cannibalized_urls": []
+            },
+            {
+                "id": "kw_3",
+                "keyword": "استایل خیابانی پاییزه ترند",
+                "position": 8,
+                "prev_position": 12,
+                "position_change": "+4",
+                "clicks": 920,
+                "impressions": 14300,
+                "ctr": 6.4,
+                "intent": "Informational",
+                "opportunity_score": "High",
+                "target_url": "https:\/\/red-style.ir\/mag\/autumn-streetwear-trends\/",
+                "search_volume": 16000,
+                "cannibalized_urls": []
+            },
+            {
+                "id": "kw_4",
+                "keyword": "خرید شلوار کارگو مشکی",
+                "position": 11,
+                "prev_position": 14,
+                "position_change": "+3",
+                "clicks": 540,
+                "impressions": 18900,
+                "ctr": 2.8,
+                "intent": "Transactional",
+                "opportunity_score": "High",
+                "target_url": "https:\/\/red-style.ir\/product-category\/cargo-pants\/",
+                "search_volume": 27000,
+                "cannibalized_urls": []
+            },
+            {
+                "id": "kw_5",
+                "keyword": "ست کراپ و جاگر اسپرت دخترانه",
+                "position": 13,
+                "prev_position": 10,
+                "position_change": "-3",
+                "clicks": 380,
+                "impressions": 15400,
+                "ctr": 2.4,
+                "intent": "Commercial",
+                "opportunity_score": "High",
+                "target_url": "https:\/\/red-style.ir\/product\/women-jogger-set\/",
+                "search_volume": 19000,
+                "cannibalized_urls": [
+                    "https:\/\/red-style.ir\/product\/women-jogger-set\/",
+                    "https:\/\/red-style.ir\/product-category\/women-sets\/"
+                ]
+            },
+            {
+                "id": "kw_6",
+                "keyword": "بهترین برندهای پوشاک کژوال ایران",
+                "position": 15,
+                "prev_position": 18,
+                "position_change": "+3",
+                "clicks": 280,
+                "impressions": 11200,
+                "ctr": 2.5,
+                "intent": "Informational",
+                "opportunity_score": "High",
+                "target_url": "https:\/\/red-style.ir\/mag\/best-casual-brands\/",
+                "search_volume": 12500,
+                "cannibalized_urls": []
+            },
+            {
+                "id": "kw_7",
+                "keyword": "تیشرت بیسیک نخی اورجینال",
+                "position": 19,
+                "prev_position": 16,
+                "position_change": "-3",
+                "clicks": 210,
+                "impressions": 9800,
+                "ctr": 2.1,
+                "intent": "Transactional",
+                "opportunity_score": "Medium",
+                "target_url": "https:\/\/red-style.ir\/product\/basic-tshirt\/",
+                "search_volume": 14000,
+                "cannibalized_urls": []
+            }
+        ],
+        "biz_tanedorost": [
+            {
+                "id": "kw_td_1",
+                "keyword": "خرید لباس ورزشی",
+                "position": 5.8,
+                "prev_position": 4.8,
+                "position_change": "+1.2",
+                "clicks": 342,
+                "impressions": 8460,
+                "ctr": 4.04,
+                "intent": "Transactional",
+                "opportunity_score": "High",
+                "target_url": "https:\/\/tanedorost.ir\/category\/sport-wear",
+                "search_volume": 18500,
+                "cannibalized_urls": [],
+                "business_id": "biz_tanedorost"
+            },
+            {
+                "id": "kw_td_2",
+                "keyword": "خرید لباس الیاف طبیعی زنانه",
+                "position": 1,
+                "prev_position": 1.1,
+                "position_change": "+0.3",
+                "clicks": 4115,
+                "impressions": 31242,
+                "ctr": 13.17,
+                "intent": "Transactional",
+                "opportunity_score": "High",
+                "target_url": "https:\/\/tanedorost.ir\/natural-fiber-clothing\/",
+                "search_volume": 35000,
+                "cannibalized_urls": [],
+                "business_id": "biz_tanedorost"
+            },
+            {
+                "id": "kw_td_3",
+                "keyword": "مانتو لینن تابستانه خنک",
+                "position": 2.2,
+                "prev_position": 3.2,
+                "position_change": "+0.9",
+                "clicks": 2942,
+                "impressions": 25050,
+                "ctr": 11.74,
+                "intent": "Transactional",
+                "opportunity_score": "High",
+                "target_url": "https:\/\/tanedorost.ir\/linen-manto\/",
+                "search_volume": 28000,
+                "cannibalized_urls": [],
+                "business_id": "biz_tanedorost"
+            },
+            {
+                "id": "kw_td_4",
+                "keyword": "پیراهن کنفی مردانه",
+                "position": 12.8,
+                "prev_position": 11.8,
+                "position_change": "+2.4",
+                "clicks": 613,
+                "impressions": 16494,
+                "ctr": 3.72,
+                "intent": "Commercial",
+                "opportunity_score": "High",
+                "target_url": "https:\/\/tanedorost.ir\/mens-hemp-shirt\/",
+                "search_volume": 18000,
+                "cannibalized_urls": [],
+                "business_id": "biz_tanedorost"
+            },
+            {
+                "id": "kw_td_5",
+                "keyword": "شلوار راحتی پنبه‌ای نخی",
+                "position": 8.4,
+                "prev_position": 7.2,
+                "position_change": "-1.2",
+                "clicks": 445,
+                "impressions": 9528,
+                "ctr": 4.67,
+                "intent": "Transactional",
+                "opportunity_score": "Medium",
+                "target_url": "https:\/\/tanedorost.ir\/cotton-pants\/",
+                "search_volume": 12000,
+                "cannibalized_urls": [],
+                "business_id": "biz_tanedorost"
+            }
+        ]
+    },
+    "seo_pages": {
+        "biz_red_style": [
+            {
+                "id": "p_1",
+                "url": "https:\/\/red-style.ir\/product-category\/hoodies\/",
+                "title": "خرید انواع هودی اورسایز و لش مردانه و دخترانه | رد استایل",
+                "clicks": 8420,
+                "impressions": 74200,
+                "ctr": 11.34,
+                "avg_position": 3.2,
+                "organic_traffic": 12400,
+                "conversions": 482,
+                "revenue": 458000000,
+                "index_status": "Indexed",
+                "canonical": "https:\/\/red-style.ir\/product-category\/hoodies\/",
+                "core_web_vitals": "Good",
+                "ai_suggestion": "این صفحه عملکرد فوق‌العاده‌ای دارد. جهت حفظ رتبه ۲، ویدیوهای بررسی تن‌خور هودی‌ها از اینستاگرام را به عنوان اسکیما VideoObject در انتهای صفحه اضافه کنید.",
+                "issues": []
+            },
+            {
+                "id": "p_2",
+                "url": "https:\/\/red-style.ir\/product-category\/cargo-pants\/",
+                "title": "شلوار کارگو مشکی و سبز ۶ جیب کتان اصل | رد استایل",
+                "clicks": 1840,
+                "impressions": 82400,
+                "ctr": 2.23,
+                "avg_position": 11.4,
+                "organic_traffic": 3120,
+                "conversions": 115,
+                "revenue": 128000000,
+                "index_status": "Indexed",
+                "canonical": "https:\/\/red-style.ir\/product-category\/cargo-pants\/",
+                "core_web_vitals": "Good",
+                "ai_suggestion": "این صفحه Impression بالایی دارد (۸۲,۴۰۰) ولی CTR آن پایین است (۲.۲۳٪). پیشنهاد می‌شود Title و Meta Description با عبارات ترغیب‌کننده نظیر «تخفیف ۲۰٪ و ارسال رایگان امروز» اصلاح شود.",
+                "issues": [
+                    "نرخ کلیک (CTR) کمتر از ۲.۵٪ با وجود بیش از ۸۲ هزار ایمپرشن در نتایج جستجو",
+                    "عنوان صفحه فاقد ترغیب‌کننده قیمت، ارسال فوری یا تخفیف ویژه است"
+                ]
+            },
+            {
+                "id": "p_3",
+                "url": "https:\/\/red-style.ir\/product\/red-casual-sneaker\/",
+                "title": "کفش ورزشی کژوال ساق کوتاه Red Sneaker",
+                "clicks": 2100,
+                "impressions": 26400,
+                "ctr": 7.95,
+                "avg_position": 4.8,
+                "organic_traffic": 3400,
+                "conversions": 164,
+                "revenue": 185000000,
+                "index_status": "Indexed",
+                "canonical": "https:\/\/red-style.ir\/product\/red-casual-sneaker\/",
+                "core_web_vitals": "Good",
+                "ai_suggestion": "نرخ تبدیل صفحه مطلوب است. افزودن نظرات مشتریان و ریویو اسکیما (Product AggregateRating) می‌تواند ستاره‌های طلایی را در نتایج سرچ نمایان کند.",
+                "issues": []
+            },
+            {
+                "id": "p_4",
+                "url": "https:\/\/red-style.ir\/product\/women-jogger-set\/",
+                "title": "ست جاگر و هودی دخترانه مدل اسپرت",
+                "clicks": 840,
+                "impressions": 36200,
+                "ctr": 2.32,
+                "avg_position": 13.8,
+                "organic_traffic": 1420,
+                "conversions": 42,
+                "revenue": 49000000,
+                "index_status": "Indexed",
+                "canonical": "https:\/\/red-style.ir\/product\/women-jogger-set\/",
+                "core_web_vitals": "Needs Improvement",
+                "ai_suggestion": "این صفحه هم‌پوشانی (Cannibalization) با صفحه دسته‌بندی ست‌ها دارد و LCP آن روی موبایل ۳.۱ ثانیه است. تصاویر را به WebP فشرده کرده و تگ کانونیکال را بازنگری کنید.",
+                "issues": [
+                    "هم‌پوشانی و کانیبالیزیشن با دسته‌بندی ست‌های زنانه",
+                    "سرعت بارگذاری LCP بیشتر از ۳.۱ ثانیه روی موبایل"
+                ]
+            }
+        ],
+        "biz_tanedorost": [
+            {
+                "id": "p_td_1",
+                "url": "https:\/\/tanedorost.ir\/natural-fiber-clothing\/",
+                "title": "پوشاک الیاف طبیعی دست‌بافت تن‌درست | آرامش و سلامت تن",
+                "clicks": 9200,
+                "impressions": 81000,
+                "ctr": 11.35,
+                "avg_position": 1.8,
+                "organic_traffic": 15800,
+                "conversions": 580,
+                "revenue": 620000000,
+                "index_status": "Indexed",
+                "canonical": "https:\/\/tanedorost.ir\/natural-fiber-clothing\/",
+                "core_web_vitals": "Good",
+                "ai_suggestion": "صفحه پرچمدار برند تن‌درست با جایگاه شماره ۱ پایدار. لینک‌سازی داخلی از این صفحه به دسته‌بندی‌های ورزشی و کنفی اولویت اول است.",
+                "issues": []
+            },
+            {
+                "id": "p_td_2",
+                "url": "https:\/\/tanedorost.ir\/category\/sport-wear",
+                "title": "خرید لباس ورزشی نخی و ارگانیک تن‌درست",
+                "clicks": 1480,
+                "impressions": 48600,
+                "ctr": 3.04,
+                "avg_position": 4.8,
+                "organic_traffic": 3240,
+                "conversions": 128,
+                "revenue": 142000000,
+                "index_status": "Indexed",
+                "canonical": "https:\/\/tanedorost.ir\/category\/sport-wear",
+                "core_web_vitals": "Good",
+                "ai_suggestion": "این صفحه Impression بالایی دارد ولی CTR پایین است. پیشنهاد می‌شود Title و Meta Description اصلاح شود و ویژگی‌های ضدحساسیت و الیاف تنفس‌پذیر برجسته گردد.",
+                "issues": [
+                    "نرخ CTR در رتبه ۴.۸ پایین‌تر از میانگین رقبا است.",
+                    "تایتل فاقد مزیت رقابتی «۱۰۰٪ پنبه ارگانیک» است."
+                ]
+            },
+            {
+                "id": "p_td_3",
+                "url": "https:\/\/tanedorost.ir\/mens-hemp-shirt\/",
+                "title": "پیراهن کنفی مردانه دست‌دوز سبک تابستانه",
+                "clicks": 610,
+                "impressions": 24500,
+                "ctr": 2.48,
+                "avg_position": 11.8,
+                "organic_traffic": 1250,
+                "conversions": 48,
+                "revenue": 52000000,
+                "index_status": "Indexed",
+                "canonical": "https:\/\/tanedorost.ir\/mens-hemp-shirt\/",
+                "core_web_vitals": "Good",
+                "ai_suggestion": "این صفحه Impression بالایی دارد ولی به دلیل قرار گرفتن در رتبه ۱۱.۸ کلیک کمتری می‌گیرد. با افزودن ۳ لینک داخلی از صفحه الیاف طبیعی و راهنمای نگهداری، به صفحه اول گوگل جهش خواهد کرد.",
+                "issues": [
+                    "قرار گرفتن در رتبه ۱۱.۸ (آستانه صفحه اول)",
+                    "تعداد لینک‌های داخلی ورودی به این صفحه تنها ۱ عدد است."
+                ]
+            }
+        ]
+    },
+    "traffic_metrics": {
+        "biz_red_style": {
+            "summary": {
+                "growth_pct": 34.2,
+                "organic_sessions": 42580,
+                "organic_users": 29400,
+                "bounce_rate": 38.4,
+                "engagement_rate": 61.6,
+                "avg_session_duration": "3m 24s",
+                "organic_revenue": 184500000
+            },
+            "timeline": [
+                {
+                    "date": "۱۴۰۴\/۰۱",
+                    "organic": 28400,
+                    "direct": 9200,
+                    "social": 7400,
+                    "referral": 2800
+                },
+                {
+                    "date": "۱۴۰۴\/۰۲",
+                    "organic": 31200,
+                    "direct": 9800,
+                    "social": 8200,
+                    "referral": 3100
+                },
+                {
+                    "date": "۱۴۰۴\/۰۳",
+                    "organic": 34800,
+                    "direct": 10400,
+                    "social": 9100,
+                    "referral": 3400
+                },
+                {
+                    "date": "۱۴۰۴\/۰۴",
+                    "organic": 38200,
+                    "direct": 11200,
+                    "social": 10600,
+                    "referral": 3900
+                },
+                {
+                    "date": "۱۴۰۴\/۰۵",
+                    "organic": 42580,
+                    "direct": 12400,
+                    "social": 12800,
+                    "referral": 4500
+                }
+            ],
+            "channels": [
+                {
+                    "name": "Organic Search (گوگل ارگانیک)",
+                    "share": 58.4,
+                    "sessions": 42580,
+                    "color": "#4f46e5"
+                },
+                {
+                    "name": "Social (اینستاگرام و شبکه‌ها)",
+                    "share": 17.6,
+                    "sessions": 12800,
+                    "color": "#ec4899"
+                },
+                {
+                    "name": "Direct (ترافیک مستقیم)",
+                    "share": 17,
+                    "sessions": 12400,
+                    "color": "#0ea5e9"
+                },
+                {
+                    "name": "Referral & Ads (ارجاعی)",
+                    "share": 7,
+                    "sessions": 4500,
+                    "color": "#10b981"
+                }
+            ],
+            "devices": [
+                {
+                    "type": "Mobile",
+                    "share": 82.4
+                },
+                {
+                    "type": "Desktop",
+                    "share": 15.2
+                },
+                {
+                    "type": "Tablet",
+                    "share": 2.4
+                }
+            ]
+        },
+        "biz_tanedorost": {
+            "summary": {
+                "growth_pct": 28.5,
+                "organic_sessions": 51200,
+                "organic_users": 36800,
+                "bounce_rate": 34.1,
+                "engagement_rate": 65.9,
+                "avg_session_duration": "4m 12s",
+                "organic_revenue": 248000000
+            },
+            "timeline": [
+                {
+                    "date": "۱۴۰۴\/۰۱",
+                    "organic": 39000,
+                    "direct": 14000,
+                    "social": 11000,
+                    "referral": 4000
+                },
+                {
+                    "date": "۱۴۰۴\/۰۲",
+                    "organic": 43200,
+                    "direct": 15100,
+                    "social": 12300,
+                    "referral": 4400
+                },
+                {
+                    "date": "۱۴۰۴\/۰۳",
+                    "organic": 47400,
+                    "direct": 16400,
+                    "social": 13800,
+                    "referral": 4800
+                },
+                {
+                    "date": "۱۴۰۴\/۰۴",
+                    "organic": 51200,
+                    "direct": 17800,
+                    "social": 15200,
+                    "referral": 5200
+                }
+            ],
+            "channels": [
+                {
+                    "name": "Organic Search",
+                    "share": 57.5,
+                    "sessions": 51200,
+                    "color": "#4f46e5"
+                },
+                {
+                    "name": "Direct",
+                    "share": 20,
+                    "sessions": 17800,
+                    "color": "#0ea5e9"
+                },
+                {
+                    "name": "Social",
+                    "share": 17.1,
+                    "sessions": 15200,
+                    "color": "#ec4899"
+                },
+                {
+                    "name": "Referral",
+                    "share": 5.4,
+                    "sessions": 5200,
+                    "color": "#10b981"
+                }
+            ],
+            "devices": [
+                {
+                    "type": "Mobile",
+                    "share": 78
+                },
+                {
+                    "type": "Desktop",
+                    "share": 19.5
+                },
+                {
+                    "type": "Tablet",
+                    "share": 2.5
+                }
+            ]
+        }
+    },
+    "social_metrics": {
+        "biz_red_style": {
+            "instagram": {
+                "account": "@redstyle",
+                "followers": 128400,
+                "reach": 342000,
+                "engagement_rate": 4.82,
+                "posts_count": 512
+            }
+        },
+        "biz_tanedorost": {
+            "instagram": {
+                "account": "@tanedorost",
+                "followers": 245000,
+                "reach": 520000,
+                "engagement_rate": 5.4,
+                "posts_count": 840
+            }
+        }
+    },
+    "technical_audit": {
+        "biz_red_style": {
+            "score": 84,
+            "index_coverage": {
+                "indexed": 540,
+                "excluded": 28,
+                "crawled_not_indexed": 8,
+                "errors": 2
+            },
+            "crawling_issues": [
+                {
+                    "type": "server_error_5xx",
+                    "count": 0,
+                    "status": "Good",
+                    "label": "خطاهای ۵xx سرور"
+                },
+                {
+                    "type": "soft_404",
+                    "count": 0,
+                    "status": "Good",
+                    "label": "صفحات Soft 404"
+                },
+                {
+                    "type": "not_found_404",
+                    "count": 2,
+                    "status": "Warning",
+                    "label": "صفحات ۴۰۴ ایندکس شده (\/old-campaign و \/discontinued-tee)"
+                },
+                {
+                    "type": "robots_blocked",
+                    "count": 0,
+                    "status": "Good",
+                    "label": "مسدود در robots.txt"
+                }
+            ],
+            "canonical_problems": [
+                {
+                    "type": "duplicate_without_canonical",
+                    "count": 1,
+                    "status": "Warning",
+                    "label": "تداخل کانونیکال در فیلتر رنگ و سایز محصولات"
+                },
+                {
+                    "type": "google_chose_different",
+                    "count": 1,
+                    "status": "Warning",
+                    "label": "گوگل برای ست جاگر صفحه متفاوتی را به عنوان کانونیکال برگزیده است"
+                }
+            ],
+            "mobile_usability": {
+                "status": "Valid (۹۸٪ صفحات تایید شده)",
+                "text_too_small": 0,
+                "clickable_too_close": 1,
+                "viewport_configured": true
+            },
+            "core_web_vitals": {
+                "lcp": "1.9s (پاس شده)",
+                "fid": "38ms (عالی)",
+                "cls": "0.04 (پایدار)",
+                "inp": "95ms (سبز)"
+            },
+            "critical_issues": [
+                {
+                    "type": "404_errors",
+                    "title": "۲ آدرس ایندکس شده با خطای ۴۰۴ مواجه هستند",
+                    "desc": "آدرس‌های \/old-campaign-2024 و \/product\/discontinued-tee در سرچ کنسول خطای ۴۰۴ داده‌اند.",
+                    "recommendation": "تنظیم ریدایرکت ۳۰۱ دائم به صفحه دسته‌بندی مرتبط جهت انتقال اعتبار سئو."
+                },
+                {
+                    "type": "canonical_mismatch",
+                    "title": "عدم تطابق تگ کانونیکال در صفحه فیلتر رنگ و سایز",
+                    "desc": "صفحات فیلتر شده تگ canonical را به خود صفحه پاس می‌دهند و موجب کانیبالیزیشن شده‌اند.",
+                    "recommendation": "ارجاع کانونیکال فیلترها به URL مادر بدون کوئری استرینگ."
+                }
+            ],
+            "warnings": [
+                {
+                    "type": "missing_alt",
+                    "title": "۱۲ تصویر در محصولات جدید بدون ویژگی alt هستند",
+                    "desc": "موتورهای جستجو برای شناسایی تصاویر گالری محصول نیاز به متن جایگزین دارند.",
+                    "recommendation": "افزودن نام محصول و کلمه کلیدی در alt تصاویر."
+                }
+            ],
+            "passed_checks": [
+                "پروتکل امنیتی HTTPS فعال",
+                "فایل robots.txt استاندارد و ثبت sitemap.xml در سرچ کنسول",
+                "سازگاری با استانداردهای موبایل گوگل (Mobile Usability)"
+            ]
+        },
+        "biz_tanedorost": {
+            "score": 92,
+            "index_coverage": {
+                "indexed": 890,
+                "excluded": 34,
+                "crawled_not_indexed": 6,
+                "errors": 0
+            },
+            "crawling_issues": [
+                {
+                    "type": "server_error_5xx",
+                    "count": 0,
+                    "status": "Good",
+                    "label": "خطاهای ۵xx سرور"
+                },
+                {
+                    "type": "soft_404",
+                    "count": 0,
+                    "status": "Good",
+                    "label": "صفحات Soft 404"
+                },
+                {
+                    "type": "not_found_404",
+                    "count": 0,
+                    "status": "Good",
+                    "label": "صفحات ۴۰۴ نامعتبر"
+                },
+                {
+                    "type": "robots_blocked",
+                    "count": 0,
+                    "status": "Good",
+                    "label": "مسدود در robots.txt"
+                }
+            ],
+            "canonical_problems": [
+                {
+                    "type": "duplicate_without_canonical",
+                    "count": 0,
+                    "status": "Good",
+                    "label": "تگ‌های کانونیکال ۱۰۰٪ استاندارد"
+                },
+                {
+                    "type": "google_chose_different",
+                    "count": 0,
+                    "status": "Good",
+                    "label": "تطابق کامل کانونیکال گوگل با سایت"
+                }
+            ],
+            "mobile_usability": {
+                "status": "Valid (۱۰۰٪ سازگار با موبایل)",
+                "text_too_small": 0,
+                "clickable_too_close": 0,
+                "viewport_configured": true
+            },
+            "core_web_vitals": {
+                "lcp": "1.6s (سبز و سریع)",
+                "fid": "25ms (عالی)",
+                "cls": "0.02 (کاملاً پایدار)",
+                "inp": "72ms (سبز)"
+            },
+            "critical_issues": [],
+            "warnings": [
+                {
+                    "type": "heading_structure",
+                    "title": "عدم وجود تگ H1 در دو صفحه فرود مناسبتی",
+                    "desc": "استفاده مستقیم از تگ‌های H2 بدون تگ سرتیتر اصلی H1.",
+                    "recommendation": "افزودن تگ H1 با کلمه کلیدی اصلی."
+                }
+            ],
+            "passed_checks": [
+                "تگ‌های کانونیکال استاندارد و هماهنگ با سرچ کنسول",
+                "سرعت Core Web Vitals سبز در تمام صفحات فرود",
+                "فایل سایت‌مپ بروز و بدون خطای ایندکس"
+            ]
+        }
+    },
+    "recommendations": {
+        "biz_red_style": [
+            {
+                "id": "rec_1",
+                "type": "page_ctr",
+                "title": "بهینه‌سازی Title و جذاب‌سازی CTR شلوار کارگو",
+                "issue": "صفحه \/product-category\/cargo-pants در ۳۰ روز اخیر ۸۲,۴۰۰ ایمپرشن داشته اما فقط ۲.۲۳٪ کلیک گرفته است (فرصت پرواز به صفحه اول).",
+                "recommendation": "تغییر عنوان سئو به «خرید شلوار کارگو مشکی ۶ جیب اصل با تخفیف ۲۰٪ | رد استایل» و افزودن سوالات متداول FAQ Schema.",
+                "action_plan": "۱. عنوان سئو و متا دیسکریپشن را در متادیتا ویرایش کنید. ۲. اسکیما FAQ را به انتهای صفحه اضافه نمایید. ۳. در سرچ کنسول Request Indexing بزنید.",
+                "impact": "High",
+                "priority": "P1",
+                "target_entity": "https:\/\/red-style.ir\/product-category\/cargo-pants\/",
+                "status": "pending",
+                "created_at": "2026-09-05 14:22:56"
+            },
+            {
+                "id": "rec_2",
+                "type": "keyword_opportunity",
+                "title": "رساندن کلمه کلیدی «خرید شلوار کارگو مشکی» از رتبه ۱۱ به تاپ ۳",
+                "issue": "این کلمه در آستانه صفحه اول (رتبه ۱۱) است و با حجم جستجوی ۲۷,۰۰۰ در ماه می‌تواند روزانه بیش از ۳۵۰ کلیک خالص ایجاد کند.",
+                "recommendation": "افزودن یک بخش راهنمای سایزبندی و استایل کردن در محتوای صفحه دسته‌بندی و ایجاد ۳ اینترنال لینک از مقالات پربازدید هودی و استایل.",
+                "action_plan": "از مقاله ترند پاییزه لینک متنی با انکرتکست «شلوار کارگو مشکی» به این دسته‌بندی بدهید.",
+                "impact": "High",
+                "priority": "P1",
+                "target_entity": "خرید شلوار کارگو مشکی",
+                "status": "pending",
+                "created_at": "2026-09-04 14:22:56"
+            }
+        ],
+        "biz_tanedorost": [
+            {
+                "id": "rec_auto_ctr_fbe9386a22fcee6c2cb8499d768eaf4e",
+                "type": "page_ctr",
+                "title": "بهینه‌سازی Title و افزایش CTR صفحه \/mens-hemp-shirt\/",
+                "issue": "این صفحه در ۳۰ روز اخیر دارای 24,500 ایمپرشن بوده اما CTR آن فقط 2.48٪ است (کمتر از میانگین صنعت).",
+                "recommendation": "تغییر عنوان سئو (Meta Title) به ترکیبی ترغیب‌کننده با کلمه کلیدی، قیمت رقابتی، پیشنهاد ارسال فوری یا تخفیف ویژه و غنی‌سازی Meta Description.",
+                "action_plan": "۱. عنوان سئو و متا دیسکریپشن را به ساختار احساسی و ترغیب‌کننده تغییر دهید. ۲. سوالات متداول FAQ Schema به پایین صفحه اضافه کنید. ۳. در سرچ کنسول درخواست بررسی مجدد (URL Inspection) ثبت فرمایید.",
+                "impact": "High",
+                "priority": "P1",
+                "target_entity": "https:\/\/tanedorost.ir\/mens-hemp-shirt\/",
+                "status": "pending",
+                "created_at": "2026-09-06 17:55:55"
+            },
+            {
+                "id": "rec_auto_opp_6feee48d12e22f7a55fcbfb63c843729",
+                "type": "keyword_opportunity",
+                "title": "جهش کلمه «پیراهن کنفی مردانه» از رتبه 12.8 به صفحه اول گوگل",
+                "issue": "این کلمه با حجم جستجوی ماهانه 18,000 در آستانه صفحه اول (رتبه 12.8) قرار دارد و پتانسیل جهش بالایی به تاپ ۵ دارد.",
+                "recommendation": "بهبود ساختار تیترهای H2 و H3، افزودن بخش سوالات متداول با اسکیما، و دریافت حداقل ۲ اینترنال لینک با انکر تکست دقیق از مقالات با اتوریتی بالای سایت.",
+                "action_plan": "۱. محتوای صفحه هدف را با کلمات LSI پیرامون «پیراهن کنفی مردانه» بازنویسی کنید. ۲. از ۲ صفحه پربازدید به این صفحه لینک مستقیم متنی بدهید.",
+                "impact": "High",
+                "priority": "P1",
+                "target_entity": "پیراهن کنفی مردانه",
+                "status": "pending",
+                "created_at": "2026-09-06 17:55:55"
+            },
+            {
+                "id": "rec_auto_link_e4fdc8ba6f0b7d902ff4bf9551ac2768",
+                "type": "internal_linking",
+                "title": "تقویت لینک‌سازی داخلی برای لباس ورزشی تن‌درست",
+                "issue": "تقویت لینک‌سازی داخلی از لندینگ پربازدید الیاف طبیعی به لباس ورزشی با انکرتکست «لباس ورزشی نخی» برای تثبیت در رتبه زیر ۳ گوگل.",
+                "recommendation": "افزودن لینک از صفحه «https:\/\/tanedorost.ir\/natural-fiber-clothing\/» با انکرتکست «خرید لباس ورزشی ارگانیک» جهت انتقال پیج‌رنک داخلی.",
+                "action_plan": "۱. ورود به ادیتور صفحه مبدا. ۲. درج پاراگراف مرتبط با محصول مقصد. ۳. قرار دادن لینک DoFollow متنی و بازبینی در سرچ کنسول.",
+                "impact": "High",
+                "priority": "P1",
+                "target_entity": "https:\/\/tanedorost.ir\/category\/sport-wear",
+                "status": "pending",
+                "created_at": "2026-09-06 17:55:55"
+            },
+            {
+                "id": "rec_td_1",
+                "type": "keyword_opportunity",
+                "title": "تثبیت کلمه «خرید لباس ورزشی» در تاپ ۳ گوگل",
+                "issue": "کلمه خرید لباس ورزشی با جهش ۱.۲ پله‌ای به رتبه ۴.۸ رسیده است. افزایش ۳۰۰ کلیک دیگر این کلمه را به جایگاه ۱ تا ۳ می‌رساند.",
+                "recommendation": "اصلاح متاتایتل به «خرید لباس ورزشی نخی و ارگانیک تن‌درست | ضدحساسیت» و افزودن ۲ لینک داخلی از صفحه الیاف طبیعی.",
+                "action_plan": "۱. تایتل سئو و توضیحات را بهینه کنید. ۲. لینک داخلی با انکر تکست «لباس ورزشی ارگانیک» ایجاد کنید.",
+                "impact": "High",
+                "priority": "P1",
+                "target_entity": "خرید لباس ورزشی",
+                "status": "pending",
+                "created_at": "2026-09-05 14:22:56"
+            },
+            {
+                "id": "rec_td_2",
+                "type": "page_ctr",
+                "title": "افزایش CTR و جهش صفحه «پیراهن کنفی مردانه» از رتبه ۱۱.۸ به زیر ۵",
+                "issue": "صفحه پیراهن کنفی در ۳۰ روز اخیر ۲۴,۵۰۰ ایمپرشن داشته و در رتبه ۱۱.۸ قرار دارد.",
+                "recommendation": "افزودن جدول ویژگی‌های الیاف کنف، اسکیما محصول و لینک‌سازی از مقالات خنک‌سازی تابستانه.",
+                "action_plan": "ایجاد اسکیما Product و افزودن انکرتکست «پیراهن کنفی مردانه» از مقاله پارچه‌های الیاف طبیعی.",
+                "impact": "High",
+                "priority": "P1",
+                "target_entity": "https:\/\/tanedorost.ir\/mens-hemp-shirt\/",
+                "status": "pending",
+                "created_at": "2026-09-04 14:22:56"
+            }
+        ]
+    },
+    "reports_data": [],
+    "sync_logs": [
+        {
+            "id": "sync_6a9d77f34e2ac",
+            "business_id": "biz_tanedorost",
+            "source": "google_search_console",
+            "start_time": "2026-09-06 17:55:53",
+            "end_time": "2026-09-06 17:55:55",
+            "status": "success",
+            "records_count": 5,
+            "error": null,
+            "details": {
+                "queries_synced": 5,
+                "property": "sc-domain:tanedorost.ir",
+                "adapter": "composio_normalized_adapter"
+            }
+        }
+    ]
+}

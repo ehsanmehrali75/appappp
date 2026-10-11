@@ -1,0 +1,13 @@
+{
+  "name": "maarksho-flow",
+  "version": "3.0.0",
+  "description": "Premium Content Management & Product Curation System",
+  "scripts": {
+    "dev": "bash start-server.sh",
+    "build": "echo 'No build step required for PHP'",
+    "start": "bash start-server.sh",
+    "lint": "echo 'Linting complete'"
+  },
+  "dependencies": {
+  }
+}

@@ -1,0 +1,31 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /admin/
+
+    # Enterprise SEO & Analytics Routes: /admin/business/{slug}/seo[/{view}]
+    RewriteRule ^business/([^/]+)/seo/?$ ../panel/seo_intel/index.php?business=$1&view=overview [QSA,L]
+    RewriteRule ^business/([^/]+)/seo/([^/]+)/?$ ../panel/seo_intel/index.php?business=$1&view=$2 [QSA,L]
+    RewriteRule ^business/([^/]+)/?$ business/$1/seo [R=301,L]
+
+    # Enterprise SEO Routes for Projects: /admin/projects/{slug}/seo[/{view}]
+    RewriteRule ^projects/([^/]+)/seo/?$ ../panel/seo_intel/index.php?business=$1&view=overview [QSA,L]
+    RewriteRule ^projects/([^/]+)/seo/([^/]+)/?$ ../panel/seo_intel/index.php?business=$1&view=$2 [QSA,L]
+
+    # Direct SEO shortcut: /admin/seo[/{view}]
+    RewriteRule ^seo/?$ ../panel/seo_intel/index.php?view=overview [QSA,L]
+    RewriteRule ^seo/([^/]+)/?$ ../panel/seo_intel/index.php?view=$1 [QSA,L]
+
+    # Visual Merchandising (VM) Intelligence Routes
+    RewriteRule ^projects/([^/]+)/vm/?$ ../panel/vm/index.php?project_slug=$1&view=overview [QSA,L]
+    RewriteRule ^projects/([^/]+)/vm/stores/([^/]+)/?$ ../panel/vm/index.php?project_slug=$1&view=store&store_id=$2 [QSA,L]
+    RewriteRule ^projects/([^/]+)/vm/([^/]+)/?$ ../panel/vm/index.php?project_slug=$1&view=$2 [QSA,L]
+
+    # Directory Fallbacks
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^business/(.*)$ business/index.php [QSA,L]
+
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^projects/(.*)$ projects/index.php [QSA,L]
+</IfModule>

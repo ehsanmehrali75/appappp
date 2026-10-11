@@ -1,0 +1,75 @@
+61:        foreach ($db['projects'] as &$p) {
+105:    foreach($allowed as $a) {
+141:            foreach ($products as $p) {
+143:                foreach ($project['products'] as &$old) {
+167:        foreach ($urls as $url) {
+169:            foreach ($products as $p) {
+171:                foreach ($project['products'] as &$old) {
+198:        foreach($project['products'] as &$p) { if($p['id'] == $pid) { $product = &$p; break; } }
+220:        foreach($project['products'] as &$p) {
+235:        foreach($project['products'] as &$p) {
+268:        foreach ($items as $item) {
+300:            foreach ($project['products'] as &$old) {
+428:            foreach ($_FILES['gallery_files']['name'] as $k => $name) {
+446:            foreach ($urls as $u) {
+508:        foreach ($project['products'] as $idx => $p) {
+540:        foreach($project['settings']['feedbackOptions'] as $idx => $f) {
+584:        foreach ($platforms as $platform) {
+609:        foreach($project['schedules'] as $tempIdx => $s) {
+621:                foreach($project['products'] as &$p) {
+664:        foreach ($project['schedules'] as $idx => $s) {
+677:        foreach($project['schedules'] as $idx => $s) {
+784:                foreach ($daySlots as $time) {
+793:                    foreach($project['settings']['schedules'] ?? [] as $s) {
+864:            foreach ($db['scraping_jobs'] as &$job) {
+878:        foreach($project['products'] as &$p) {
+918:                    foreach ($_FILES['gallery_files']['name'] as $k => $name) {
+975:                            foreach ($allRows as $r) {
+1005:        foreach($rows as $row) {
+1012:            foreach($project['products'] as $idx => $p) {
+1078:                    foreach ($daySlots as $time) {
+1350:                                foreach($project['products'] as $pr) { $totalVotes += (($pr['likes']??0) + ($pr['dislikes']??0)); }
+1379:                                foreach($project['products'] as $pr) { if(($pr['status']??'active') == 'pending') $pending++; }
+1415:                            foreach($top as $t): 
+1434:                            <?php endforeach; ?>
+1473:                                foreach($next as $s):
+1508:                                <?php endforeach; if(empty($next)) echo "<tr><td colspan='4' class='py-20 text-center'><div class='text-4xl mb-4'>📭</div><div class='text-slate-400 font-black text-sm'>هیچ برنامه فعالی باز یافت نشد.</div></td></tr>"; ?>
+1586:                    <?php foreach($db['projects'] as $p): ?>
+1618:                    <?php endforeach; ?>
+1656:                            foreach($checks as $dir => $label): 
+1665:                            <?php endforeach; ?>
+1688:                                foreach($project['products'] as $p) {
+1943:                        foreach($p_list as $p): 
+1990:                    <?php endforeach; ?>
+2083:                                foreach($fields as $key => $label):
+2090:                                                <?php foreach($headers as $h) echo "<option value='$h' " . (stripos($h, $key)!==false ? 'selected' : '') . ">$h</option>"; ?>
+2094:                                <?php endforeach; ?>
+2286:                                            foreach($jobsList as $job):
+2330:                                            <?php endforeach; ?>
+2487:                            <?php foreach($suggestions as $s): ?>
+2509:                            <?php endforeach; ?>
+2529:                        <?php foreach(array_slice($colleagueProds, 0, 8) as $p): ?>
+2537:                        <?php endforeach; ?>
+2556:                                    <?php foreach($project['products'] as $p) echo "<option value='{$p['id']}'>{$p['sku']} - {$p['name']}</option>"; ?>
+2645:                                    foreach($project['products'] as $p) { if(($p['status']??'') == 'rejected') $rejectedCount++; }
+2730:                                <?php foreach($daysName as $d) echo "<div class='cal-v2-header'>$d</div>"; ?>
+2758:                                                foreach($dayPosts as $s):
+2772:                                                <?php endforeach; ?>
+2805:                                  foreach($rejectedSchedules as $rs):
+2834:                                  endforeach; 
+2857:                        foreach($upcoming as $s): 
+2875:                        <?php endforeach; ?>
+2970:                                foreach($occasions as $idx => $occ):
+2994:                                <?php endforeach; if(empty($occasions)) echo "<div class='p-20 text-center font-black text-slate-300 italic'>دیتا یافت نشد. لطفا شیت را متصل کنید.</div>"; ?>
+3090:                                    foreach($perms as $pval => $plabel):
+3096:                                    <?php endforeach; ?>
+3116:                    <?php foreach($project['users'] as $idx => $u): ?>
+3149:                                            foreach($userPerms as $p): 
+3155:                                         <?php endforeach; ?>
+3177:                    <?php endforeach; ?>
+3201:                                    <?php foreach(array_reverse($project['logs'] ?? []) as $l): ?>
+3208:                                    <?php endforeach; ?>
+3320:                                    foreach($days_map as $en => $fa):
+3327:                                    <?php endforeach; ?>
+3345:                                    <?php foreach($project['settings']['feedbackOptions'] ?? [] as $opt): ?>
+3356:                                    <?php endforeach; ?>

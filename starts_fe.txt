@@ -1,0 +1,19 @@
+1415:                            foreach($top as $t): 
+1473:                                foreach($next as $s):
+1586:                    <?php foreach($db['projects'] as $p): ?>
+1656:                            foreach($checks as $dir => $label): 
+1943:                        foreach($p_list as $p): 
+2083:                                foreach($fields as $key => $label):
+2286:                                            foreach($jobsList as $job):
+2487:                            <?php foreach($suggestions as $s): ?>
+2529:                        <?php foreach(array_slice($colleagueProds, 0, 8) as $p): ?>
+2758:                                                foreach($dayPosts as $s):
+2805:                                  foreach($rejectedSchedules as $rs):
+2857:                        foreach($upcoming as $s): 
+2970:                                foreach($occasions as $idx => $occ):
+3090:                                    foreach($perms as $pval => $plabel):
+3116:                    <?php foreach($project['users'] as $idx => $u): ?>
+3149:                                            foreach($userPerms as $p): 
+3201:                                    <?php foreach(array_reverse($project['logs'] ?? []) as $l): ?>
+3320:                                    foreach($days_map as $en => $fa):
+3345:                                    <?php foreach($project['settings']['feedbackOptions'] ?? [] as $opt): ?>

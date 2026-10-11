@@ -1,0 +1,9 @@
+{
+    "super_users": [
+        {
+            "username": "admin",
+            "password": "1375"
+        }
+    ],
+    "projects": []
+}

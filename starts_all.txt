@@ -1,0 +1,73 @@
+10:// User specified: If portal access but not admin, shouldn't enter admin section
+794:                        if (date('Y-m-d H:i', strtotime($s['scheduledAt'])) == date('Y-m-d H:i', strtotime($scheduledAt))) {
+991:                if (isset($xlsx) && $xlsx->error) $err .= " (خطا: " . $xlsx->error . ")";
+1165:        body { font-family: 'Vazirmatn', 'Tahoma', sans-serif !important; background: #f8fafc; }
+1212:        .stat-icon-v2 { width: 4.5rem; height: 4.5rem; border-radius: 1.75rem; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; }
+1215:        .edit-modal, .manual-modal, .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15,23,42,0.85); display: none; align-items: center; justify-content: center; z-index: 9999; backdrop-filter: blur(14px); }
+1226:        .ig-overlay { position: absolute; inset: 0; background: rgba(15,23,42,0.4); opacity: 0; transition: 0.4s; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: white; backdrop-filter: blur(4px); }
+1261:                <?php if(isSuperAdmin()): ?>
+1268:                <?php if($project): ?>
+1271:                    <?php if(hasPermission('dashboard')): ?>
+1275:                    <?php if(hasPermission('products')): ?>
+1279:                    <?php if(hasPermission('extract')): ?>
+1283:                    <?php if(hasPermission('calendar')): ?>
+1288:                    <?php if(hasPermission('products')): ?>
+1292:                    <?php if(isSuperAdmin() || isProjectAdmin()): ?>
+1297:                    <?php if(hasPermission('settings')): ?>
+1303:            <?php if($project): ?>
+1315:            <?php if ($msg): ?>
+1322:            <?php if ($tab === 'dashboard' && $project): ?>
+1357:                    <?php if(hasPermission('calendar')): ?>
+1370:                    <?php if(hasPermission('approve_content')): ?>
+1387:                    <?php if(hasPermission('extract')): ?>
+1439:                <?php if(hasPermission('calendar')): ?>
+1478:                                                <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500">🕒</div>
+1540:            <?php if ($tab === 'projects' && isSuperAdmin()): ?>
+1590:                                    <div class="w-16 h-16 bg-slate-50 rounded-[1.5rem] flex items-center justify-center text-3xl group-hover:bg-primary group-hover:text-white transition-all duration-500 shadow-sm">🚀</div>
+1622:            <?php if ($tab === 'system_debug' && isSuperAdmin()): ?>
+1642:                        <?php if($isSql && $dbConnected): ?>
+1680:            <?php if ($tab === 'products'): 
+1705:                    <?php if(hasPermission('products')): ?>
+1743:                        <button onclick="toggleManualBox()" class="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center hover:bg-white/20 transition-all text-xl">✕</button>
+1913:                    <?php if ($filter === 'pending' && !empty($p_list) && hasPermission('approve_content')): ?>
+1940:                    if (!empty($p_list)): ?>
+1954:                                <?php if(($p['likes']??0) > 0 || ($p['dislikes']??0) > 0): ?>
+1959:                                <?php if(($p['comments_count']??0) > 0): ?>
+1969:                                    <?php if(hasPermission('approve_content') && ($p['status']??'pending') === 'pending'): ?>
+1976:                                    <?php if(hasPermission('products')): ?>
+1980:                                    <?php if(hasPermission('approve')): ?>
+1993:                <?php if ($p_total_pages > 1): ?>
+1995:                        <?php if ($p_page > 1): ?>
+2006:                        <?php if ($p_page < $p_total_pages): ?>
+2016:            <?php if ($tab === 'excel'): $step = $_GET['step'] ?? 'upload'; ?>
+2042:                    <?php if ($step === 'upload'): ?>
+2047:                                    <div class="w-20 h-20 bg-white rounded-2xl shadow-xl flex items-center justify-center text-3xl mx-auto mb-6 group-hover:scale-110 transition-transform">📊</div>
+2089:                                            <?php if(is_array($headers ?? null)): ?>
+2102:            <?php if ($tab === 'extract'): ?>
+2169:                                        <div onclick="document.getElementById('json_file_input').click()" class="w-full h-32 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-amber-400 hover:bg-amber-50/30 transition-all group">
+2319:                                                    <?php if($job['status'] == 'pending'): ?>
+2325:                                                    <?php if($job['error_message']): ?>
+2454:            <?php if ($tab === 'calendar'): ?>
+2468:                 <?php if(($_GET['sub']??'main') === 'main'): ?>
+2480:                         <div class="toggle-icon w-10 h-10 rounded-full border border-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all duration-500">
+2501:                                        <button onclick="openScheduleFor('<?php echo $s['id']; ?>', '<?php echo addslashes($s['name']); ?>')" class="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center hover:scale-110 transition-all shadow-lg shadow-primary/20">
+2505:                                    <?php if($s['is_colleague']): ?>
+2518:                 if(!empty($colleagueProds)):
+2650:                                    <?php if($rejectedCount > 0): ?>
+2657:                        <?php if(($sub_cal ?? 'main') == 'main'): ?>
+2749:                                        <?php if($isCurrentMonth): ?>
+2768:                                                        <?php if(($s['likes']??0) > 0 || ($s['dislikes']??0) > 0): ?>
+2802:                              if(empty($rejectedSchedules)):
+2939:<?php if ($tab === 'occasions'): ?>
+3027:            <?php if ($tab === 'users'): ?>
+3033:                    <?php if(isSuperAdmin() || isProjectAdmin()): ?>
+3050:                        <button onclick="document.getElementById('add-user-box').classList.add('hidden')" class="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center hover:bg-white/20 transition-all text-xl">✕</button>
+3109:                    <?php if(empty($project['users'])): ?>
+3162:                                    <button class="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-lg shadow-sm hover:border-primary/50 hover:text-primary transition-all group/btn" title="Edit Access">
+3165:                                    <button class="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-lg shadow-sm hover:border-primary/50 hover:text-primary transition-all group/btn" title="Identity Security">
+3169:                                <?php if(isSuperAdmin() || isProjectAdmin()): ?>
+3181:            <?php if ($tab === 'logs'): ?>
+3216:            <?php if ($tab === 'settings'): ?>
+3846:                    <a id="m-link" href="" target="_blank" class="w-full h-16 flex items-center justify-center bg-white border border-slate-100 rounded-2xl font-black text-sm text-slate-500 hover:text-primary transition-all gap-3 shadow-sm">
+3866:                        <?php if(hasPermission('approve')): ?>
+3894:                    <?php if(hasPermission('products')): ?>

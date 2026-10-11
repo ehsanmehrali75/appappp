@@ -1,0 +1,14 @@
+{
+    "api_key": "comp_live_9876543210",
+    "api_version": "v3.1 (Active Cloud Layer)",
+    "cli_path": "\/usr\/local\/bin\/composio",
+    "cli_version": "0.4.1",
+    "cli_status_text": "نصب شده (0.4.1)",
+    "cli_available": true,
+    "status": "auth_failed",
+    "last_check": "2026-09-06 18:12:45",
+    "last_error": "خطای احراز هویت (HTTP 401): کلید نامعتبر است یا در پروژه دیگری تعریف شده است. [Invalid API key: com**3210] • راهکار پیشنهادی: Please check you are using a valid API key.",
+    "environment": "production",
+    "outbound_ip": "34.96.49.70",
+    "updated_at": "2026-09-06 18:12:47"
+}

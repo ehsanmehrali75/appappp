@@ -1,0 +1,19 @@
+1434:                            <?php endforeach; ?>
+1508:                                <?php endforeach; if(empty($next)) echo "<tr><td colspan='4' class='py-20 text-center'><div class='text-4xl mb-4'>📭</div><div class='text-slate-400 font-black text-sm'>هیچ برنامه فعالی باز یافت نشد.</div></td></tr>"; ?>
+1618:                    <?php endforeach; ?>
+1665:                            <?php endforeach; ?>
+1990:                    <?php endforeach; ?>
+2094:                                <?php endforeach; ?>
+2330:                                            <?php endforeach; ?>
+2509:                            <?php endforeach; ?>
+2537:                        <?php endforeach; ?>
+2772:                                                <?php endforeach; ?>
+2834:                                  endforeach; 
+2875:                        <?php endforeach; ?>
+2994:                                <?php endforeach; if(empty($occasions)) echo "<div class='p-20 text-center font-black text-slate-300 italic'>دیتا یافت نشد. لطفا شیت را متصل کنید.</div>"; ?>
+3096:                                    <?php endforeach; ?>
+3155:                                         <?php endforeach; ?>
+3177:                    <?php endforeach; ?>
+3208:                                    <?php endforeach; ?>
+3327:                                    <?php endforeach; ?>
+3356:                                    <?php endforeach; ?>

@@ -1,0 +1,8 @@
+{
+  "name": "final e: Maarksho Flow2",
+  "description": "Enterprise PHP Platform with Visual Merchandising (VM), Composio-Powered Enterprise SEO & Analytics Intelligence, Multi-Store Management and AI Automation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

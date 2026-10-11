@@ -1,0 +1,18 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /admin/business/
+
+    # Direct rewrite for SEO overview: /admin/business/{slug}/seo
+    RewriteRule ^([^/]+)/seo/?$ ../../panel/seo_intel/index.php?business=$1&view=overview [QSA,L]
+
+    # Direct rewrite for SEO subviews: /admin/business/{slug}/seo/{view}
+    RewriteRule ^([^/]+)/seo/([^/]+)/?$ ../../panel/seo_intel/index.php?business=$1&view=$2 [QSA,L]
+
+    # Redirect shorthand /admin/business/{slug} to /admin/business/{slug}/seo
+    RewriteRule ^([^/]+)/?$ $1/seo [R=301,L]
+
+    # Fallback to index.php if not matched
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>

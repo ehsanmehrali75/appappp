@@ -1,0 +1,4 @@
+sku,name,color,stock_online,stock_total,price,image,link,description,priority
+M101,"تیشرت نخی طرح دار",سفید,10,25,450000,https://example.com/image1.jpg,https://example.com/p1,"توضیحات تیشرت نخی بسیار با کیفیت",5
+M102,"شلوار کتان مردانه",سرمه ای,5,12,890000,https://example.com/image2.jpg,https://example.com/p2,"شلوار کتان مناسب فصل",3
+M103,"کفش ورزشی نایکی",مشکی,0,1,1200000,https://example.com/image3.jpg,https://example.com/p3,"کفش ورزشی سبک مخصوص دویدن",8

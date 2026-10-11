@@ -1,0 +1,295 @@
+{
+    "projects": [
+        {
+            "id": "6a00feeee7669",
+            "slug": "6a00feeee7669",
+            "name": "پروژه 6a00feeee7669",
+            "tagline": "مدیریت و هوش چیدمان فروشگاهی",
+            "logo": "https:\/\/images.unsplash.com\/photo-1511556532299-8f662fc26c06?w=120&h=120&fit=crop",
+            "status": "active",
+            "created_at": "2024-01-10"
+        }
+    ],
+    "stores": [
+        {
+            "id": "store_physical_default",
+            "project_id": "6a00feeee7669",
+            "slug": "store_physical_default",
+            "name": "شعبه حضوری سهروردی (Flagship)",
+            "location": "تهران، سهروردی شمالی",
+            "address": "تهران، خیابان سهروردی شمالی، تقاطع خرمشهر، پلاک ۱۸",
+            "store_type": "Flagship",
+            "area": 160,
+            "floor_count": 1,
+            "opening_date": "1403\/01\/15",
+            "manager": "مدیریت فروشگاه",
+            "working_hours": "۱۰:۰۰ الی ۲۲:۰۰",
+            "status": "active",
+            "cctv_connected": false,
+            "cctv_cameras": 0,
+            "today_visitors": null,
+            "today_sales": null,
+            "avg_basket": null,
+            "conversion_rate": null,
+            "overall_vm_score": null
+        },
+        {
+            "id": "store_online_default",
+            "project_id": "6a00feeee7669",
+            "slug": "store_online_default",
+            "name": "فروشگاه اینترنتی مژده (Online)",
+            "location": "سراسری \/ وب",
+            "address": "وب‌سایت و درگاه آنلاین فروشگاه مژده",
+            "store_type": "Online",
+            "area": 0,
+            "floor_count": 1,
+            "opening_date": "1403\/01\/01",
+            "manager": "مدیر فروش آنلاین",
+            "working_hours": "۲۴ ساعته آنلاین",
+            "status": "active",
+            "cctv_connected": false,
+            "cctv_cameras": 0,
+            "today_visitors": null,
+            "today_sales": null,
+            "avg_basket": null,
+            "conversion_rate": null,
+            "overall_vm_score": null
+        }
+    ],
+    "products": [],
+    "layouts": [
+        {
+            "id": "layout-store_physical_default",
+            "store_id": "store_physical_default",
+            "name": "چیدمان اصلی فروشگاه سهروردی",
+            "version": "v1.0",
+            "is_active": true,
+            "updated_at": "2026\/09\/06 13:31",
+            "canvas_width": 960,
+            "canvas_height": 760,
+            "grid_size": 20,
+            "objects": [
+                {
+                    "id": "obj-ent-1",
+                    "type": "entrance",
+                    "title": "درب ورودی اصلی (سهروردی)",
+                    "position": {
+                        "x": 400,
+                        "y": 680
+                    },
+                    "width": 160,
+                    "height": 35,
+                    "rotation": 0,
+                    "layer": 1,
+                    "color": "#10b981",
+                    "zone": "Zone A"
+                },
+                {
+                    "id": "obj-table-1",
+                    "type": "display_table",
+                    "title": "میز استیج ورودی",
+                    "position": {
+                        "x": 390,
+                        "y": 460
+                    },
+                    "width": 180,
+                    "height": 90,
+                    "rotation": 0,
+                    "layer": 2,
+                    "color": "#f59e0b",
+                    "zone": "Zone A",
+                    "metadata": {
+                        "product_sku": "SHIRT-OVR-BLK",
+                        "product_skus": [
+                            "SHIRT-OVR-BLK"
+                        ],
+                        "zone": "Zone A"
+                    }
+                },
+                {
+                    "id": "obj-rack-1",
+                    "type": "rack",
+                    "title": "رگال لباس‌های کتان و هودی",
+                    "position": {
+                        "x": 120,
+                        "y": 260
+                    },
+                    "width": 160,
+                    "height": 50,
+                    "rotation": 0,
+                    "layer": 2,
+                    "color": "#6366f1",
+                    "zone": "Zone B",
+                    "metadata": {
+                        "product_sku": "HOOD-OVR-OAT",
+                        "product_skus": [
+                            "HOOD-OVR-OAT"
+                        ],
+                        "zone": "Zone B"
+                    }
+                },
+                {
+                    "id": "obj-rack-2",
+                    "type": "rack",
+                    "title": "رگال شلوارهای کارگو",
+                    "position": {
+                        "x": 680,
+                        "y": 260
+                    },
+                    "width": 160,
+                    "height": 50,
+                    "rotation": 0,
+                    "layer": 2,
+                    "color": "#6366f1",
+                    "zone": "Zone B",
+                    "metadata": {
+                        "product_sku": "PANT-CARGO-KHK",
+                        "product_skus": [
+                            "PANT-CARGO-KHK"
+                        ],
+                        "zone": "Zone B"
+                    }
+                },
+                {
+                    "id": "obj-counter-1",
+                    "type": "counter",
+                    "title": "صندوق و میز حسابداری",
+                    "position": {
+                        "x": 680,
+                        "y": 520
+                    },
+                    "width": 170,
+                    "height": 65,
+                    "rotation": 0,
+                    "layer": 2,
+                    "color": "#475569",
+                    "zone": "Zone C",
+                    "metadata": {
+                        "zone": "Zone C"
+                    }
+                }
+            ]
+        },
+        {
+            "id": "layout-store_online_default",
+            "store_id": "store_online_default",
+            "name": "چیدمان فروشگاه",
+            "version": "v1.0",
+            "is_active": true,
+            "updated_at": "2026\/09\/06 17:06",
+            "canvas_width": 960,
+            "canvas_height": 760,
+            "grid_size": 20,
+            "objects": [
+                {
+                    "id": "obj-ent-1",
+                    "type": "entrance",
+                    "title": "درب ورودی",
+                    "position": {
+                        "x": 400,
+                        "y": 680
+                    },
+                    "width": 160,
+                    "height": 35,
+                    "rotation": 0,
+                    "layer": 1,
+                    "color": "#10b981",
+                    "zone": "Zone A"
+                }
+            ]
+        }
+    ],
+    "zone_scores": [],
+    "ai_recommendations": [
+        {
+            "id": "rec-1788701786-checkout",
+            "store_id": "store_online_default",
+            "object_id": null,
+            "title": "جانمایی میز صندوق و پیشخوان تسویه",
+            "recommendation": "در نقشه چیدمان فعلی، میز صندوق (Checkout) تعریف نشده است. از منوی ابزارها، المان صندوق را در نزدیکی خروجی یا ضلع پشتی سالن قرار دهید.",
+            "reason": "مشخص بودن نقطه تسویه به ناوبری طبیعی مشتری و تکمیل چرخه خرید کمک شایانی می‌کند.",
+            "impact_prediction": "+۹٪ نظم جریان پرداخت",
+            "priority": "Medium",
+            "category": "layout_structure",
+            "status": "pending",
+            "created_at": "2026\/09\/06 17:06"
+        },
+        {
+            "id": "rec-1788701786-mannequin",
+            "store_id": "store_online_default",
+            "object_id": null,
+            "title": "افزودن مانکن یا نقطه کانونی دید ورودی (Focal Point)",
+            "recommendation": "استفاده از حداقل یک مانکن در محدوده دید درب ورودی، میزان مکث عابران و جذابیت بصری کالکشن را تا ۳۵٪ افزایش می‌دهد.",
+            "reason": "نقاط کانونی بصری جهت هدایت نگاه مشتری از ورودی به عمق سالن فروشگاه طراحی می‌شوند.",
+            "impact_prediction": "+۲۲٪ جلب نگاه خریدار",
+            "priority": "Low",
+            "category": "visual_merchandising",
+            "status": "pending",
+            "created_at": "2026\/09\/06 17:06"
+        },
+        {
+            "id": "rec-1788701786-pos",
+            "store_id": "store_online_default",
+            "object_id": null,
+            "title": "اتصال وب‌سرویس صندوق فروشگاهی (POS)",
+            "recommendation": "وب‌سرویس فروش برای شعبه «فروشگاه اینترنتی مژده (Online)» هنوز متصل نشده است. اتصال صندوق، امکان محاسبه دقیق نرخ تبدیل هر قفسه و تحلیل ریالی همجواری کالاها را فراهم خواهد کرد.",
+            "reason": "در حال حاضر امتیازهای تحلیلی صرفاً بر مبنای مهندسی فیزیکی نقشه است و برای تحلیل زنده نیازمند دیتای تراکنش هستیم.",
+            "impact_prediction": "فعال‌سازی هوش تجاری ریالی",
+            "priority": "Medium",
+            "category": "data_integration",
+            "status": "pending",
+            "created_at": "2026\/09\/06 17:06"
+        },
+        {
+            "id": "rec-1788701786-checkout",
+            "store_id": "store_physical_default",
+            "object_id": null,
+            "title": "جانمایی میز صندوق و پیشخوان تسویه",
+            "recommendation": "در نقشه چیدمان فعلی، میز صندوق (Checkout) تعریف نشده است. از منوی ابزارها، المان صندوق را در نزدیکی خروجی یا ضلع پشتی سالن قرار دهید.",
+            "reason": "مشخص بودن نقطه تسویه به ناوبری طبیعی مشتری و تکمیل چرخه خرید کمک شایانی می‌کند.",
+            "impact_prediction": "+۹٪ نظم جریان پرداخت",
+            "priority": "Medium",
+            "category": "layout_structure",
+            "status": "pending",
+            "created_at": "2026\/09\/06 17:06"
+        },
+        {
+            "id": "rec-1788701786-mannequin",
+            "store_id": "store_physical_default",
+            "object_id": null,
+            "title": "افزودن مانکن یا نقطه کانونی دید ورودی (Focal Point)",
+            "recommendation": "استفاده از حداقل یک مانکن در محدوده دید درب ورودی، میزان مکث عابران و جذابیت بصری کالکشن را تا ۳۵٪ افزایش می‌دهد.",
+            "reason": "نقاط کانونی بصری جهت هدایت نگاه مشتری از ورودی به عمق سالن فروشگاه طراحی می‌شوند.",
+            "impact_prediction": "+۲۲٪ جلب نگاه خریدار",
+            "priority": "Low",
+            "category": "visual_merchandising",
+            "status": "pending",
+            "created_at": "2026\/09\/06 17:06"
+        },
+        {
+            "id": "rec-1788701786-pos",
+            "store_id": "store_physical_default",
+            "object_id": null,
+            "title": "اتصال وب‌سرویس صندوق فروشگاهی (POS)",
+            "recommendation": "وب‌سرویس فروش برای شعبه «شعبه حضوری سهروردی (Flagship)» هنوز متصل نشده است. اتصال صندوق، امکان محاسبه دقیق نرخ تبدیل هر قفسه و تحلیل ریالی همجواری کالاها را فراهم خواهد کرد.",
+            "reason": "در حال حاضر امتیازهای تحلیلی صرفاً بر مبنای مهندسی فیزیکی نقشه است و برای تحلیل زنده نیازمند دیتای تراکنش هستیم.",
+            "impact_prediction": "فعال‌سازی هوش تجاری ریالی",
+            "priority": "Medium",
+            "category": "data_integration",
+            "status": "pending",
+            "created_at": "2026\/09\/06 17:06"
+        }
+    ],
+    "mflow_sync": {
+        "status": "synced",
+        "last_sync": "2026\/09\/06 13:31",
+        "records_synced": 3,
+        "metrics": {
+            "inventory_feed": "active",
+            "catalog_feed": "active",
+            "sales_feed": "no_data",
+            "orders_feed": "no_data",
+            "sensors_feed": "no_data"
+        }
+    }
+}

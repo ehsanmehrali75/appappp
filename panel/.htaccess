@@ -1,0 +1,8 @@
+# Allow cross-origin access for web fonts and static assets (CORS)
+<IfModule mod_headers.c>
+    <FilesMatch "\.(ttf|ttc|otf|eot|woff|woff2|font\.css|css|js|json|png|jpg|jpeg|svg|webp|gif)$">
+        Header always set Access-Control-Allow-Origin "*"
+        Header always set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+        Header always set Access-Control-Allow-Headers "Content-Type, Origin, Accept, Authorization, X-Requested-With"
+    </FilesMatch>
+</IfModule>

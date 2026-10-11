@@ -1,0 +1,42 @@
+# Maarksho Root .htaccess
+AcceptPathInfo On
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # 1. Enterprise SEO & Analytics Routes: /admin/business/{slug}/seo ...
+    RewriteRule ^admin/business/([^/]+)/seo/?$ panel/seo_intel/index.php?business=$1&view=overview [QSA,L]
+    RewriteRule ^admin/business/([^/]+)/seo/([^/]+)/?$ panel/seo_intel/index.php?business=$1&view=$2 [QSA,L]
+    RewriteRule ^admin/business/([^/]+)/?$ admin/business/$1/seo [R=301,L]
+
+    # 2. Enterprise SEO Routes for Projects: /admin/projects/{slug}/seo ...
+    RewriteRule ^admin/projects/([^/]+)/seo/?$ panel/seo_intel/index.php?business=$1&view=overview [QSA,L]
+    RewriteRule ^admin/projects/([^/]+)/seo/([^/]+)/?$ panel/seo_intel/index.php?business=$1&view=$2 [QSA,L]
+
+    # 3. Direct SEO shortcuts: /admin/seo ...
+    RewriteRule ^admin/seo/?$ panel/seo_intel/index.php?view=overview [QSA,L]
+    RewriteRule ^admin/seo/([^/]+)/?$ panel/seo_intel/index.php?view=$1 [QSA,L]
+
+    # 4. VM Intelligence Module Pretty URLs: /admin/projects/{slug}/vm ...
+    RewriteRule ^admin/projects/([^/]+)/vm/?$ panel/vm/index.php?project_slug=$1&view=overview [QSA,L]
+    RewriteRule ^admin/projects/([^/]+)/vm/stores/([^/]+)/?$ panel/vm/index.php?project_slug=$1&view=store&store_id=$2 [QSA,L]
+    RewriteRule ^admin/projects/([^/]+)/vm/([^/]+)/?$ panel/vm/index.php?project_slug=$1&view=$2 [QSA,L]
+
+    # 5. Shorthand Admin Route
+    RewriteRule ^admin/?$ panel/admin.php [QSA,L]
+
+    # 6. Standard fallbacks if file/dir does not exist
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^admin/business/(.*)$ admin/business/index.php [QSA,L]
+
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^admin/projects/(.*)$ admin/projects/index.php [QSA,L]
+</IfModule>
+
+# CORS & Font headers
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin "*"
+</IfModule>

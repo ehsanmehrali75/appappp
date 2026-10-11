@@ -1,0 +1,1193 @@
+◇ injected env (6) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+[Worker] Auto-discovered credentials from inc/db.php (Host: localhost)
+[Worker] Started ID: worker_localhost_736 (Mode: Daemon)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] [Worker] Attempting to find a work[Worker] Attempting DB conne[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 4)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 5)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 6)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 7)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 8)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 9)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 10)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 11)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 12)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 13)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 14)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 15)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 16)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 17)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 18)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 19)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 20)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 21)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 22)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 23)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 24)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 25)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 26)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 27)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 28)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 29)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 30)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 31)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 32)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 33)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 34)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 35)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 36)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 37)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 38)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 39)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 40)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 41)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 42)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 43)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 44)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 45)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 46)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 47)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 48)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 49)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 50)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 51)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 52)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 53)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 54)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 55)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 56)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 57)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 58)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 59)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 60)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 61)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 62)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 63)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 64)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 65)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 66)
+[Worker] Attempting to find a working DB connection method...
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 67)
+ed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 21)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 22)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 23)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 24)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 25)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 26)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 27)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 28)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 29)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 30)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 31)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 32)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 33)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 34)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 35)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 36)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 37)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 38)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 39)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 40)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 41)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 42)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 43)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 44)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 45)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 46)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 47)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 48)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 49)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 50)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 51)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 52)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 53)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 54)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 55)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 56)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 57)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 58)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 59)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 60)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 61)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 62)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 63)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 64)
+[Worker] Attempting DB connection (Target: localhost)...
+[Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[Worker] No jobs, sleeping 10s... (Loop 65)
+y method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:28:30.861Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:28:30.861Z] [Worker] No jobs, sleeping 10s... (Loop 9)
+[2026-05-15T23:28:39.245Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:28:39.246Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:28:39.250Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:28:39.251Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:28:39.258Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:28:39.258Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:28:39.259Z] [Worker] No jobs, sleeping 10s... (Loop 26)
+[2026-05-15T23:28:39.360Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:28:39.371Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:28:39.371Z] [Worker] No jobs, sleeping 10s... (Loop 28)
+[2026-05-15T23:28:40.863Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:28:40.867Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:28:40.868Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:28:40.871Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:28:40.872Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:28:40.873Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:28:40.873Z] [Worker] No jobs, sleeping 10s... (Loop 10)
+[2026-05-15T23:28:49.259Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:28:49.261Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:28:49.265Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:28:49.267Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:28:49.270Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:28:49.270Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:28:49.270Z] [Worker] No jobs, sleeping 10s... (Loop 27)
+[2026-05-15T23:28:49.372Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:28:49.380Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:28:49.381Z] [Worker] No jobs, sleeping 10s... (Loop 29)
+[2026-05-15T23:28:50.874Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:28:50.876Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:28:50.879Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:28:50.881Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:28:50.883Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:28:50.883Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:28:50.883Z] [Worker] No jobs, sleeping 10s... (Loop 11)
+[2026-05-15T23:28:59.272Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:28:59.275Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:28:59.276Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:28:59.277Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:28:59.278Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:28:59.278Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:28:59.278Z] [Worker] No jobs, sleeping 10s... (Loop 28)
+[2026-05-15T23:28:59.383Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:28:59.398Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:28:59.398Z] [Worker] No jobs, sleeping 10s... (Loop 30)
+[2026-05-15T23:29:00.884Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:29:00.888Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:00.889Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:00.892Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:29:00.893Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:29:00.893Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:00.893Z] [Worker] No jobs, sleeping 10s... (Loop 12)
+[2026-05-15T23:29:09.280Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:29:09.281Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:09.283Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:09.284Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:29:09.286Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:29:09.286Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:09.286Z] [Worker] No jobs, sleeping 10s... (Loop 29)
+[2026-05-15T23:29:09.399Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:29:09.409Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:09.409Z] [Worker] No jobs, sleeping 10s... (Loop 31)
+[2026-05-15T23:29:10.895Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:29:10.897Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:10.900Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:10.901Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:29:10.903Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:29:10.903Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:10.903Z] [Worker] No jobs, sleeping 10s... (Loop 13)
+[2026-05-15T23:29:19.287Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:29:19.290Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:19.291Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:19.294Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:29:19.295Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:29:19.295Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:19.295Z] [Worker] No jobs, sleeping 10s... (Loop 30)
+[2026-05-15T23:29:19.411Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:29:19.422Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:19.422Z] [Worker] No jobs, sleeping 10s... (Loop 32)
+[2026-05-15T23:29:20.902Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:29:20.905Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:20.907Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:20.909Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:29:20.910Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:29:20.911Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:20.911Z] [Worker] No jobs, sleeping 10s... (Loop 14)
+[2026-05-15T23:29:29.296Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:29:29.298Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:29.301Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:29.302Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:29:29.305Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:29:29.306Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:29.306Z] [Worker] No jobs, sleeping 10s... (Loop 31)
+[2026-05-15T23:29:29.424Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:29:29.432Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:29.432Z] [Worker] No jobs, sleeping 10s... (Loop 33)
+[2026-05-15T23:29:30.913Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:29:30.915Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:30.921Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:30.923Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:29:30.929Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:29:30.929Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:30.929Z] [Worker] No jobs, sleeping 10s... (Loop 15)
+[2026-05-15T23:29:39.306Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:29:39.308Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:39.311Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:39.312Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:29:39.314Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:29:39.314Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:39.314Z] [Worker] No jobs, sleeping 10s... (Loop 32)
+[2026-05-15T23:29:39.433Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:29:39.441Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:39.441Z] [Worker] No jobs, sleeping 10s... (Loop 34)
+[2026-05-15T23:29:40.931Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:29:40.934Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:40.938Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:40.940Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:29:40.943Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:29:40.943Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:40.943Z] [Worker] No jobs, sleeping 10s... (Loop 16)
+[2026-05-15T23:29:49.315Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:29:49.318Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:49.319Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:49.320Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:29:49.321Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:29:49.321Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:49.321Z] [Worker] No jobs, sleeping 10s... (Loop 33)
+[2026-05-15T23:29:49.441Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:29:49.473Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:49.473Z] [Worker] No jobs, sleeping 10s... (Loop 35)
+[2026-05-15T23:29:50.945Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:29:50.950Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:50.953Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:50.956Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:29:50.957Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:29:50.958Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:50.958Z] [Worker] No jobs, sleeping 10s... (Loop 17)
+[2026-05-15T23:29:59.322Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:29:59.324Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:59.327Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:29:59.328Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:29:59.330Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:29:59.330Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:59.330Z] [Worker] No jobs, sleeping 10s... (Loop 34)
+[2026-05-15T23:29:59.473Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:29:59.480Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:29:59.480Z] [Worker] No jobs, sleeping 10s... (Loop 36)
+[2026-05-15T23:30:00.960Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:30:00.962Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:00.965Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:00.967Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:30:00.971Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:30:00.971Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:00.971Z] [Worker] No jobs, sleeping 10s... (Loop 18)
+[2026-05-15T23:30:09.332Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:30:09.335Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:09.336Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:09.338Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:30:09.339Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:30:09.339Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:09.339Z] [Worker] No jobs, sleeping 10s... (Loop 35)
+[2026-05-15T23:30:09.482Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:30:09.491Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:09.491Z] [Worker] No jobs, sleeping 10s... (Loop 37)
+[2026-05-15T23:30:10.973Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:30:10.978Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:10.980Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:10.984Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:30:10.985Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:30:10.986Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:10.986Z] [Worker] No jobs, sleeping 10s... (Loop 19)
+[2026-05-15T23:30:19.340Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:30:19.342Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:19.345Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:19.347Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:30:19.351Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:30:19.351Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:19.351Z] [Worker] No jobs, sleeping 10s... (Loop 36)
+[2026-05-15T23:30:19.492Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:30:19.501Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:19.502Z] [Worker] No jobs, sleeping 10s... (Loop 38)
+[2026-05-15T23:30:20.987Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:30:20.990Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:20.995Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:20.997Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:30:21.004Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:30:21.004Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:21.004Z] [Worker] No jobs, sleeping 10s... (Loop 20)
+[2026-05-15T23:30:29.353Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:30:29.356Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:29.362Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:29.363Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:30:29.365Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:30:29.365Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:29.365Z] [Worker] No jobs, sleeping 10s... (Loop 37)
+[2026-05-15T23:30:29.503Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:30:29.538Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:29.538Z] [Worker] No jobs, sleeping 10s... (Loop 39)
+[2026-05-15T23:30:31.006Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:30:31.008Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:31.012Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:31.013Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:30:31.016Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:30:31.016Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:31.016Z] [Worker] No jobs, sleeping 10s... (Loop 21)
+[2026-05-15T23:30:39.366Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:30:39.369Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:39.370Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:39.372Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:30:39.374Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:30:39.374Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:39.374Z] [Worker] No jobs, sleeping 10s... (Loop 38)
+[2026-05-15T23:30:39.539Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:30:39.548Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:39.548Z] [Worker] No jobs, sleeping 10s... (Loop 40)
+[2026-05-15T23:30:41.017Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:30:41.021Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:41.022Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:41.025Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:30:41.027Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:30:41.027Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:41.027Z] [Worker] No jobs, sleeping 10s... (Loop 22)
+[2026-05-15T23:30:49.375Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:30:49.377Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:49.379Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:49.380Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:30:49.382Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:30:49.382Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:49.382Z] [Worker] No jobs, sleeping 10s... (Loop 39)
+[2026-05-15T23:30:49.549Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:30:49.558Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:49.558Z] [Worker] No jobs, sleeping 10s... (Loop 41)
+[2026-05-15T23:30:51.028Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:30:51.030Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:51.033Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:51.034Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:30:51.036Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:30:51.036Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:51.036Z] [Worker] No jobs, sleeping 10s... (Loop 23)
+[2026-05-15T23:30:59.382Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:30:59.387Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:59.389Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:30:59.393Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:30:59.394Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:30:59.394Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:59.395Z] [Worker] No jobs, sleeping 10s... (Loop 40)
+[2026-05-15T23:30:59.560Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:30:59.569Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:30:59.570Z] [Worker] No jobs, sleeping 10s... (Loop 42)
+[2026-05-15T23:31:01.038Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:31:01.043Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:01.045Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:01.047Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:31:01.049Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:31:01.049Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:01.049Z] [Worker] No jobs, sleeping 10s... (Loop 24)
+[2026-05-15T23:31:09.396Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:31:09.397Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:09.401Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:09.402Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:31:09.405Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:31:09.406Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:09.406Z] [Worker] No jobs, sleeping 10s... (Loop 41)
+[2026-05-15T23:31:09.571Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:31:09.592Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:09.593Z] [Worker] No jobs, sleeping 10s... (Loop 43)
+[2026-05-15T23:31:11.050Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:31:11.053Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:11.058Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:11.061Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:31:11.066Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:31:11.066Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:11.066Z] [Worker] No jobs, sleeping 10s... (Loop 25)
+[2026-05-15T23:31:19.407Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:31:19.409Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:19.411Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:19.412Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:31:19.414Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:31:19.414Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:19.414Z] [Worker] No jobs, sleeping 10s... (Loop 42)
+[2026-05-15T23:31:19.593Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:31:19.602Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:19.602Z] [Worker] No jobs, sleeping 10s... (Loop 44)
+[2026-05-15T23:31:21.069Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:31:21.072Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:21.076Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:21.078Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:31:21.080Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:31:21.081Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:21.081Z] [Worker] No jobs, sleeping 10s... (Loop 26)
+[2026-05-15T23:31:29.416Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:31:29.418Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:29.419Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:29.421Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:31:29.422Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:31:29.422Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:29.422Z] [Worker] No jobs, sleeping 10s... (Loop 43)
+[2026-05-15T23:31:29.604Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:31:29.611Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:29.612Z] [Worker] No jobs, sleeping 10s... (Loop 45)
+[2026-05-15T23:31:31.081Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:31:31.086Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:31.087Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:31.092Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:31:31.093Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:31:31.093Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:31.093Z] [Worker] No jobs, sleeping 10s... (Loop 27)
+[2026-05-15T23:31:39.424Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:31:39.425Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:39.428Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:39.428Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:31:39.431Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:31:39.431Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:39.431Z] [Worker] No jobs, sleeping 10s... (Loop 44)
+[2026-05-15T23:31:39.614Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:31:39.624Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:39.624Z] [Worker] No jobs, sleeping 10s... (Loop 46)
+[2026-05-15T23:31:41.095Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:31:41.098Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:41.101Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:41.102Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:31:41.106Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:31:41.106Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:41.106Z] [Worker] No jobs, sleeping 10s... (Loop 28)
+[2026-05-15T23:31:49.432Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:31:49.435Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:49.436Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:49.438Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:31:49.439Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:31:49.439Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:49.439Z] [Worker] No jobs, sleeping 10s... (Loop 45)
+[2026-05-15T23:31:49.625Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:31:49.647Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:49.647Z] [Worker] No jobs, sleeping 10s... (Loop 47)
+[2026-05-15T23:31:51.107Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:31:51.112Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:51.114Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:51.117Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:31:51.118Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:31:51.118Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:51.118Z] [Worker] No jobs, sleeping 10s... (Loop 29)
+[2026-05-15T23:31:59.441Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:31:59.442Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:59.445Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:31:59.447Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:31:59.451Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:31:59.451Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:59.451Z] [Worker] No jobs, sleeping 10s... (Loop 46)
+[2026-05-15T23:31:59.649Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:31:59.657Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:31:59.658Z] [Worker] No jobs, sleeping 10s... (Loop 48)
+[2026-05-15T23:32:01.120Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:32:01.123Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:01.128Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:01.129Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:32:01.136Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:32:01.137Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:01.137Z] [Worker] No jobs, sleeping 10s... (Loop 30)
+[2026-05-15T23:32:09.453Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:32:09.455Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:09.458Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:09.458Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:32:09.460Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:32:09.460Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:09.461Z] [Worker] No jobs, sleeping 10s... (Loop 47)
+[2026-05-15T23:32:09.659Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:32:09.671Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:09.671Z] [Worker] No jobs, sleeping 10s... (Loop 49)
+[2026-05-15T23:32:11.137Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:32:11.141Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:11.145Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:11.146Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:32:11.148Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:32:11.149Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:11.149Z] [Worker] No jobs, sleeping 10s... (Loop 31)
+[2026-05-15T23:32:19.462Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:32:19.466Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:19.468Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:19.470Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:32:19.470Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:32:19.471Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:19.471Z] [Worker] No jobs, sleeping 10s... (Loop 48)
+[2026-05-15T23:32:19.673Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:32:19.684Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:19.684Z] [Worker] No jobs, sleeping 10s... (Loop 50)
+[2026-05-15T23:32:21.149Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:32:21.152Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:21.154Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:21.156Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:32:21.157Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:32:21.157Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:21.157Z] [Worker] No jobs, sleeping 10s... (Loop 32)
+[2026-05-15T23:32:29.471Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:32:29.473Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:29.475Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:29.476Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:32:29.478Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:32:29.478Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:29.478Z] [Worker] No jobs, sleeping 10s... (Loop 49)
+[2026-05-15T23:32:29.685Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:32:29.707Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:29.707Z] [Worker] No jobs, sleeping 10s... (Loop 51)
+[2026-05-15T23:32:31.158Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:32:31.160Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:31.164Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:31.166Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:32:31.170Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:32:31.170Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:31.170Z] [Worker] No jobs, sleeping 10s... (Loop 33)
+[2026-05-15T23:32:39.480Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:32:39.483Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:39.484Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:39.486Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:32:39.487Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:32:39.488Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:39.488Z] [Worker] No jobs, sleeping 10s... (Loop 50)
+[2026-05-15T23:32:39.709Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:32:39.720Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:39.720Z] [Worker] No jobs, sleeping 10s... (Loop 52)
+[2026-05-15T23:32:41.171Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:32:41.175Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:41.176Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:41.179Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:32:41.180Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:32:41.181Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:41.181Z] [Worker] No jobs, sleeping 10s... (Loop 34)
+[2026-05-15T23:32:49.489Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:32:49.491Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:49.495Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:49.496Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:32:49.500Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:32:49.500Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:49.500Z] [Worker] No jobs, sleeping 10s... (Loop 51)
+[2026-05-15T23:32:49.721Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:32:49.731Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:49.731Z] [Worker] No jobs, sleeping 10s... (Loop 53)
+[2026-05-15T23:32:51.181Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:32:51.183Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:51.188Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:51.190Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:32:51.195Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:32:51.195Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:51.196Z] [Worker] No jobs, sleeping 10s... (Loop 35)
+[2026-05-15T23:32:59.501Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:32:59.503Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:59.505Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:32:59.506Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:32:59.508Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:32:59.508Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:59.508Z] [Worker] No jobs, sleeping 10s... (Loop 52)
+[2026-05-15T23:32:59.732Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:32:59.743Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:32:59.743Z] [Worker] No jobs, sleeping 10s... (Loop 54)
+[2026-05-15T23:33:01.195Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:33:01.200Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:01.203Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:01.204Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:33:01.208Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:33:01.208Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:01.209Z] [Worker] No jobs, sleeping 10s... (Loop 36)
+[2026-05-15T23:33:09.509Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:33:09.511Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:09.512Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:09.514Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:33:09.515Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:33:09.515Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:09.515Z] [Worker] No jobs, sleeping 10s... (Loop 53)
+[2026-05-15T23:33:09.744Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:33:09.756Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:09.756Z] [Worker] No jobs, sleeping 10s... (Loop 55)
+[2026-05-15T23:33:11.210Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:33:11.214Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:11.215Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:11.217Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:33:11.218Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:33:11.218Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:11.218Z] [Worker] No jobs, sleeping 10s... (Loop 37)
+[2026-05-15T23:33:19.518Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:33:19.519Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:19.522Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:19.522Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:33:19.524Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:33:19.525Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:19.525Z] [Worker] No jobs, sleeping 10s... (Loop 54)
+[2026-05-15T23:33:19.759Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:33:19.769Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:19.769Z] [Worker] No jobs, sleeping 10s... (Loop 56)
+[2026-05-15T23:33:21.219Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:33:21.221Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:21.226Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:21.227Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:33:21.229Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:33:21.229Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:21.230Z] [Worker] No jobs, sleeping 10s... (Loop 38)
+[2026-05-15T23:33:29.525Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:33:29.528Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:29.531Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:29.533Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:33:29.534Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:33:29.534Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:29.534Z] [Worker] No jobs, sleeping 10s... (Loop 55)
+[2026-05-15T23:33:29.770Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:33:29.785Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:29.785Z] [Worker] No jobs, sleeping 10s... (Loop 57)
+[2026-05-15T23:33:31.231Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:33:31.235Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:31.236Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:31.238Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:33:31.239Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:33:31.239Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:31.239Z] [Worker] No jobs, sleeping 10s... (Loop 39)
+[2026-05-15T23:33:39.536Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:33:39.537Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:39.541Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:39.542Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:33:39.547Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:33:39.548Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:39.548Z] [Worker] No jobs, sleeping 10s... (Loop 56)
+[2026-05-15T23:33:39.786Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:33:39.796Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:39.796Z] [Worker] No jobs, sleeping 10s... (Loop 58)
+[2026-05-15T23:33:41.240Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:33:41.242Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:41.246Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:41.248Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:33:41.252Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:33:41.252Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:41.252Z] [Worker] No jobs, sleeping 10s... (Loop 40)
+[2026-05-15T23:33:49.548Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:33:49.551Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:49.553Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:49.554Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:33:49.556Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:33:49.556Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:49.556Z] [Worker] No jobs, sleeping 10s... (Loop 57)
+[2026-05-15T23:33:49.797Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:33:49.822Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:49.822Z] [Worker] No jobs, sleeping 10s... (Loop 59)
+[2026-05-15T23:33:51.253Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:33:51.257Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:51.262Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:51.263Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:33:51.267Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:33:51.268Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:51.268Z] [Worker] No jobs, sleeping 10s... (Loop 41)
+[2026-05-15T23:33:59.558Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:33:59.561Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:59.562Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:33:59.564Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:33:59.565Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:33:59.565Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:59.565Z] [Worker] No jobs, sleeping 10s... (Loop 58)
+[2026-05-15T23:33:59.823Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:33:59.832Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:33:59.832Z] [Worker] No jobs, sleeping 10s... (Loop 60)
+[2026-05-15T23:34:01.271Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:34:01.274Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:01.276Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:01.280Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:34:01.282Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:34:01.282Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:01.283Z] [Worker] No jobs, sleeping 10s... (Loop 42)
+[2026-05-15T23:34:09.567Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:34:09.569Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:09.571Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:09.572Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:34:09.574Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:34:09.575Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:09.575Z] [Worker] No jobs, sleeping 10s... (Loop 59)
+[2026-05-15T23:34:09.833Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:34:09.842Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:09.842Z] [Worker] No jobs, sleeping 10s... (Loop 61)
+[2026-05-15T23:34:11.284Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:34:11.285Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:11.288Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:11.289Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:34:11.292Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:34:11.292Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:11.292Z] [Worker] No jobs, sleeping 10s... (Loop 43)
+[2026-05-15T23:34:19.576Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:34:19.579Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:19.580Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:19.583Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:34:19.584Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:34:19.584Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:19.584Z] [Worker] No jobs, sleeping 10s... (Loop 60)
+[2026-05-15T23:34:19.841Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:34:19.850Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:19.850Z] [Worker] No jobs, sleeping 10s... (Loop 62)
+[2026-05-15T23:34:21.293Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:34:21.296Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:21.298Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:21.300Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:34:21.302Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:34:21.302Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:21.302Z] [Worker] No jobs, sleeping 10s... (Loop 44)
+[2026-05-15T23:34:29.585Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:34:29.587Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:29.591Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:29.593Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:34:29.597Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:34:29.597Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:29.598Z] [Worker] No jobs, sleeping 10s... (Loop 61)
+[2026-05-15T23:34:29.852Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:34:29.876Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:29.877Z] [Worker] No jobs, sleeping 10s... (Loop 63)
+[2026-05-15T23:34:31.305Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:34:31.307Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:31.312Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:31.314Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:34:31.323Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:34:31.323Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:31.323Z] [Worker] No jobs, sleeping 10s... (Loop 45)
+[2026-05-15T23:34:39.600Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:34:39.606Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:39.609Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:39.609Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:34:39.611Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:34:39.611Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:39.611Z] [Worker] No jobs, sleeping 10s... (Loop 62)
+[2026-05-15T23:34:39.879Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:34:39.887Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:39.887Z] [Worker] No jobs, sleeping 10s... (Loop 64)
+[2026-05-15T23:34:41.324Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:34:41.326Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:41.330Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:41.332Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:34:41.335Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:34:41.335Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:41.335Z] [Worker] No jobs, sleeping 10s... (Loop 46)
+[2026-05-15T23:34:49.612Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:34:49.616Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:49.617Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:49.620Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:34:49.622Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:34:49.622Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:49.622Z] [Worker] No jobs, sleeping 10s... (Loop 63)
+[2026-05-15T23:34:49.888Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:34:49.898Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:49.898Z] [Worker] No jobs, sleeping 10s... (Loop 65)
+[2026-05-15T23:34:51.336Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:34:51.340Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:51.341Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:51.343Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:34:51.344Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:34:51.344Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:51.344Z] [Worker] No jobs, sleeping 10s... (Loop 47)
+[2026-05-15T23:34:59.624Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:34:59.626Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:59.629Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:34:59.630Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:34:59.633Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:34:59.634Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:59.634Z] [Worker] No jobs, sleeping 10s... (Loop 64)
+[2026-05-15T23:34:59.899Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:34:59.907Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:34:59.907Z] [Worker] No jobs, sleeping 10s... (Loop 66)
+[2026-05-15T23:35:01.345Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:35:01.347Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:35:01.349Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:35:01.350Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:35:01.352Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:35:01.353Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:35:01.353Z] [Worker] No jobs, sleeping 10s... (Loop 48)
+[2026-05-15T23:35:09.635Z] [Worker] Attempting DB connection (Target: localhost)...
+[2026-05-15T23:35:09.639Z] [Worker] Try method failed: {"host":"localhost","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:35:09.640Z] [Worker] Try method failed: {"host":"127.0.0.1","port":3306} - connect ECONNREFUSED 127.0.0.1:3306
+[2026-05-15T23:35:09.642Z] [Worker] Try method failed: {"socketPath":"/tmp/mysql.sock"} - connect ENOENT /tmp/mysql.sock
+[2026-05-15T23:35:09.643Z] [Worker] Try method failed: {"socketPath":"/var/run/mysqld/mysqld.sock"} - connect ENOENT /var/run/mysqld/mysqld.sock
+[2026-05-15T23:35:09.644Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:35:09.644Z] [Worker] No jobs, sleeping 10s... (Loop 65)
+[2026-05-15T23:35:09.908Z] [Worker] Attempting to find a working DB connection method...
+[2026-05-15T23:35:09.957Z] ERROR: [Worker] ❌ Fatal Error: All connection methods failed (TCP and Sockets)
+[2026-05-15T23:35:09.957Z] [Worker] No jobs, sleeping 10s... (Loop 67)
+[2026-09-22 23:51:21] [Cron] Checking for pending scraping jobs...
+[2026-09-22 23:51:34] [Cron] Checking for pending scraping jobs...
+[2026-09-22 23:51:34] [System] Checked product auto-approvals and daily aggregated notifications (SQL).
+[2026-09-22 23:51:34] [Status] Pure PHP Mode Active. System is handling scraping and scheduling.
+[2026-09-22 23:51:34] [SEO Sync] Checking if daily SEO/Analytics auto-sync is needed...
+[2026-09-22 23:51:34] [Cron] Task execution finished.

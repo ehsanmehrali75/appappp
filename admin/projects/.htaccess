@@ -1,0 +1,13 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /admin/projects/
+
+    # Enterprise SEO routes
+    RewriteRule ^([^/]+)/seo/?$ ../../panel/seo_intel/index.php?business=$1&view=overview [QSA,L]
+    RewriteRule ^([^/]+)/seo/([^/]+)/?$ ../../panel/seo_intel/index.php?business=$1&view=$2 [QSA,L]
+
+    # Visual Merchandising (VM) routes
+    RewriteRule ^([^/]+)/vm/?$ ../../panel/vm/index.php?project_slug=$1&view=overview [QSA,L]
+    RewriteRule ^([^/]+)/vm/stores/([^/]+)/?$ ../../panel/vm/index.php?project_slug=$1&view=store&store_id=$2 [QSA,L]
+    RewriteRule ^([^/]+)/vm/([^/]+)/?$ ../../panel/vm/index.php?project_slug=$1&view=$2 [QSA,L]
+</IfModule>

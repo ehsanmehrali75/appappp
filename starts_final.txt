@@ -1,0 +1,56 @@
+1261:                <?php if(isSuperAdmin()): ?>
+1268:                <?php if($project): ?>
+1271:                    <?php if(hasPermission('dashboard')): ?>
+1275:                    <?php if(hasPermission('products')): ?>
+1279:                    <?php if(hasPermission('extract')): ?>
+1283:                    <?php if(hasPermission('calendar')): ?>
+1288:                    <?php if(hasPermission('products')): ?>
+1292:                    <?php if(isSuperAdmin() || isProjectAdmin()): ?>
+1297:                    <?php if(hasPermission('settings')): ?>
+1303:            <?php if($project): ?>
+1315:            <?php if ($msg): ?>
+1322:            <?php if ($tab === 'dashboard' && $project): ?>
+1357:                    <?php if(hasPermission('calendar')): ?>
+1370:                    <?php if(hasPermission('approve_content')): ?>
+1387:                    <?php if(hasPermission('extract')): ?>
+1439:                <?php if(hasPermission('calendar')): ?>
+1540:            <?php if ($tab === 'projects' && isSuperAdmin()): ?>
+1622:            <?php if ($tab === 'system_debug' && isSuperAdmin()): ?>
+1642:                        <?php if($isSql && $dbConnected): ?>
+1680:            <?php if ($tab === 'products'): 
+1705:                    <?php if(hasPermission('products')): ?>
+1913:                    <?php if ($filter === 'pending' && !empty($p_list) && hasPermission('approve_content')): ?>
+1940:                    if (!empty($p_list)): ?>
+1954:                                <?php if(($p['likes']??0) > 0 || ($p['dislikes']??0) > 0): ?>
+1959:                                <?php if(($p['comments_count']??0) > 0): ?>
+1969:                                    <?php if(hasPermission('approve_content') && ($p['status']??'pending') === 'pending'): ?>
+1976:                                    <?php if(hasPermission('products')): ?>
+1980:                                    <?php if(hasPermission('approve')): ?>
+1993:                <?php if ($p_total_pages > 1): ?>
+1995:                        <?php if ($p_page > 1): ?>
+2006:                        <?php if ($p_page < $p_total_pages): ?>
+2016:            <?php if ($tab === 'excel'): $step = $_GET['step'] ?? 'upload'; ?>
+2042:                    <?php if ($step === 'upload'): ?>
+2054:                    <?php elseif ($step === 'map' && isset($_SESSION['import_mapping'])): ?>
+2089:                                            <?php if(is_array($headers ?? null)): ?>
+2102:            <?php if ($tab === 'extract'): ?>
+2319:                                                    <?php if($job['status'] == 'pending'): ?>
+2325:                                                    <?php if($job['error_message']): ?>
+2454:            <?php if ($tab === 'calendar'): ?>
+2468:                 <?php if(($_GET['sub']??'main') === 'main'): ?>
+2505:                                    <?php if($s['is_colleague']): ?>
+2518:                 if(!empty($colleagueProds)):
+2650:                                    <?php if($rejectedCount > 0): ?>
+2657:                        <?php if(($sub_cal ?? 'main') == 'main'): ?>
+2749:                                        <?php if($isCurrentMonth): ?>
+2768:                                                        <?php if(($s['likes']??0) > 0 || ($s['dislikes']??0) > 0): ?>
+2802:                              if(empty($rejectedSchedules)):
+2939:<?php if ($tab === 'occasions'): ?>
+3027:            <?php if ($tab === 'users'): ?>
+3033:                    <?php if(isSuperAdmin() || isProjectAdmin()): ?>
+3109:                    <?php if(empty($project['users'])): ?>
+3169:                                <?php if(isSuperAdmin() || isProjectAdmin()): ?>
+3181:            <?php if ($tab === 'logs'): ?>
+3216:            <?php if ($tab === 'settings'): ?>
+3866:                        <?php if(hasPermission('approve')): ?>
+3894:                    <?php if(hasPermission('products')): ?>
