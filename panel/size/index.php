@@ -279,6 +279,7 @@ $default_scs_settings = [
     'table_border_color' => '#e2e8f0',
     'table_border_width' => 1,
     'table_row_alt_bg' => '#fcfdfe',
+    'table_row_colors' => [],
     'table_bg_transparent' => 0,
     'table_bg_color' => '#ffffff',
     'table_bg_opacity' => 100,
@@ -726,7 +727,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
              $block_positions = $default_block_positions;
          }
 
+         $row_colors = json_decode($_POST['table_row_colors'] ?? '{}', true);
+         $valid_row_colors = [];
+         foreach (is_array($row_colors) ? $row_colors : [] as $row => $color) {
+             if (ctype_digit((string)$row) && (int)$row < 1000 && is_string($color) && preg_match('/^#[0-9a-fA-F]{6}$/D', $color)) {
+                 $valid_row_colors[(int)$row] = $color;
+             }
+         }
+
          $settings = [
+             'table_row_colors' => $valid_row_colors,
              'brand_title' => trim($_POST['brand_title'] ?? ''),
              'brand_subtitle' => trim($_POST['brand_subtitle'] ?? ''),
              'brand_tagline' => trim($_POST['brand_tagline'] ?? ''),
@@ -4312,6 +4322,17 @@ if (empty($active_presets)) {
                                 </div>
                             </div>
 
+                            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                                <label class="block text-xs font-black text-slate-700">رنگ پس‌زمینهٔ هر ردیف جدول</label>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <label for="setting-row-color-index" class="text-xs">شمارهٔ ردیف</label>
+                                    <input id="setting-row-color-index" type="number" min="1" max="1000" value="1" oninput="syncRowColorPicker()" class="w-20 p-2 rounded border text-center">
+                                    <input id="setting-row-color-value" type="color" value="#ffffff" aria-label="رنگ پس‌زمینه ردیف" oninput="setIndividualRowColor(this.value)" class="w-10 h-9 cursor-pointer">
+                                    <button type="button" onclick="setIndividualRowColor(null)" class="px-3 py-2 bg-white border rounded text-xs">رنگ پیش‌فرض</button>
+                                </div>
+                                <p class="text-[10px] text-slate-500">شماره از اولین ردیف داده شروع می‌شود. برای نگهداری رنگ‌ها، تنظیمات برند را ذخیره کنید.</p>
+                            </div>
+
                             <!-- Row 3: Borders, Padding, Font-Size & Alignment -->
                             <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
                                 <div>
@@ -4970,6 +4991,44 @@ if (empty($active_presets)) {
         // --- Branding & Styling Engine ---
 
         // Compatibility for callers using the former branding mode name.
+        function getIndividualRowColor(rowIndex) {
+            var color = (scs_settings.table_row_colors || {})[rowIndex];
+            return typeof color === 'string' && /^#[0-9a-f]{6}$/i.test(color) ? color : null;
+        }
+
+        function syncRowColorPicker() {
+            var row = Math.max(0, (parseInt($('#setting-row-color-index').val()) || 1) - 1);
+            $('#setting-row-color-value').val(getIndividualRowColor(row) || '#ffffff');
+        }
+
+        function setIndividualRowColor(color) {
+            var row = (parseInt($('#setting-row-color-index').val()) || 1) - 1;
+            if (row < 0 || row >= 1000) return;
+            // JSON may decode contiguous numeric keys as an array; use an object
+            // so deleting one override never creates null entries on save.
+            scs_settings.table_row_colors = Object.assign({}, scs_settings.table_row_colors || {});
+            if (color === null) delete scs_settings.table_row_colors[row];
+            else if (/^#[0-9a-f]{6}$/i.test(color)) scs_settings.table_row_colors[row] = color;
+            syncRowColorPicker();
+            applyBrandingChanges();
+        }
+
+        function applyIndividualRowColors(targetSelector) {
+            var root = $(targetSelector);
+            root.find('table').each(function() {
+                $(this).find('tbody tr').filter(function() { return !$(this).find('td[colspan]').length; }).each(function(rowIndex) {
+                    var color = getIndividualRowColor(rowIndex);
+                    if (color) this.style.setProperty('background-color', color, 'important');
+                });
+            });
+            root.find('.scs-split-row-block, .scs-split-data-cell').each(function() {
+                var key = $(this).attr('data-scs-block') || '';
+                var row = key.startsWith('table_row_') ? parseInt(key.slice(10)) : parseInt($(this).attr('data-row'));
+                var color = getIndividualRowColor(row);
+                if (color) this.style.setProperty('background', color, 'important');
+            });
+        }
+
         function setBrandingStyleMode(mode) {
             return setStyleMode(mode);
         }
@@ -7500,6 +7559,7 @@ if (empty($active_presets)) {
             var targetBoxH = parseInt(scs_settings.table_target_height) || (tablePos && tablePos.height && tablePos.height !== 'auto' ? parseInt(tablePos.height) : 360);
             if (!targetBoxH || targetBoxH < 150) targetBoxH = 360;
 
+            el.find('tbody tr, .scs-split-row-block, .scs-split-data-cell').each(function() { this.style.removeProperty('background'); this.style.removeProperty('background-color'); });
             var tableEl = el.find('table');
             var bodyRows = tableEl.find('tbody tr').filter(function() {
                 return !$(this).find('td[colspan]').length;
@@ -7759,6 +7819,8 @@ if (empty($active_presets)) {
                 resetFreeformStyles(targetSelector, isMini);
                 applyBlockOrderToDOM(targetSelector, isMini);
             }
+
+            applyIndividualRowColors(targetSelector);
 
             if (isMini) {
                 updateBrandingPreviewScale();
@@ -8918,6 +8980,7 @@ if (empty($active_presets)) {
                 table_header_text: $('#setting-table-header-text').val(),
                 table_border_color: $('#setting-table-border-color').val(),
                 table_row_alt_bg: $('#setting-table-row-alt-bg').val(),
+                table_row_colors: JSON.stringify(scs_settings.table_row_colors || {}),
                 table_cell_text: $('#setting-table-cell-text').val() || $('#setting-text-primary-color').val() || '#1e293b',
                 table_border_width: parseInt($('#setting-table-border-width').val()) ?? 1,
                 table_bg_transparent: $('#setting-table-bg-transparent').is(':checked') ? 1 : 0,
