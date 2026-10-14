@@ -148,7 +148,7 @@ if (empty($allProjects)) {
     $allProjects[] = $project;
 }
 
-$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+$protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443)) ? "https://" : "http://";
 $host = $_SERVER['HTTP_HOST'];
 $script = $_SERVER['SCRIPT_NAME'];
 $dir = dirname(dirname($script));
@@ -1617,7 +1617,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                    foreach ($rows as $row) {
                        $new_row = [];
                        for ($i = 0; $i < $countColumns; $i++) {
-                           $cell_val = $row['c' . $i] ?? '';
+                           $colName = $columns[$i] ?? '';
+                           $cell_val = $row['c' . $i] ?? ($row[$colName] ?? ($row[$i] ?? ($row['values'][$colName] ?? ($i === 0 ? ($row['size'] ?? '') : ''))));
                            if (is_array($cell_val)) {
                                $cell_val = implode(' ', $cell_val);
                            }
@@ -1887,16 +1888,17 @@ if (empty($active_presets)) {
     <script>window.saveAs || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"><\/script>')</script>
     
     <style id="scs-custom-font-style">
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;800;900&display=swap');
         @font-face {
             font-family: 'Vazirmatn';
-            src: local('Vazirmatn'), local('Vazir'), url('../assets/fonts/Vazirmatn-Regular.woff2') format('woff2'), url('assets/fonts/Vazirmatn-Regular.woff2') format('woff2');
+            src: local('Vazirmatn'), local('Vazir'), url('/assets/fonts/Vazirmatn-Regular.woff2') format('woff2'), url('/panel/assets/fonts/Vazirmatn-Regular.woff2') format('woff2'), url('../assets/fonts/Vazirmatn-Regular.woff2') format('woff2');
             font-weight: normal;
             font-style: normal;
             font-display: swap;
         }
         @font-face {
             font-family: 'Vazirmatn';
-            src: local('Vazirmatn-Bold'), local('Vazir-Bold'), url('../assets/fonts/Vazirmatn-Bold.woff2') format('woff2'), url('assets/fonts/Vazirmatn-Bold.woff2') format('woff2');
+            src: local('Vazirmatn-Bold'), local('Vazir-Bold'), url('/assets/fonts/Vazirmatn-Bold.woff2') format('woff2'), url('/panel/assets/fonts/Vazirmatn-Bold.woff2') format('woff2'), url('../assets/fonts/Vazirmatn-Bold.woff2') format('woff2');
             font-weight: bold;
             font-style: normal;
             font-display: swap;
@@ -2055,11 +2057,11 @@ if (empty($active_presets)) {
 
         /* Dynamic Size Chart Card & Table Auto-Scale Styles */
         .scs-dynamic-table-card:not(.hidden) {
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: flex-start !important;
-            overflow: hidden !important;
+            display: block !important;
             box-sizing: border-box !important;
+            border-radius: 1.25rem !important;
+            box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03) !important;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
         .scs-dynamic-table-card.hidden,
         #preview-table-card.hidden,
@@ -2072,32 +2074,173 @@ if (empty($active_presets)) {
             opacity: 0 !important;
             pointer-events: none !important;
         }
+        .scs-canvas #preview-table-container,
         .scs-dynamic-table-card #preview-table-container,
-        .scs-dynamic-table-card .w-full {
+        #preview-table-card #preview-table-container,
+        #bp-table-card #preview-table-container {
+            display: block !important;
+            width: 100% !important;
+            overflow-x: auto !important;
+            box-sizing: border-box !important;
+        }
+        .scs-canvas table,
+        .scs-dynamic-table-card table,
+        #preview-table-card table,
+        #preview-table-container table,
+        #bp-table-card table,
+        #scs-batch-canvas table {
+            display: table !important;
+            width: 100% !important;
+            table-layout: auto !important;
+            margin: 0 !important;
+            letter-spacing: 0 !important;
+            font-feature-settings: normal !important;
+            box-sizing: border-box !important;
+            direction: rtl !important;
+        }
+        .scs-canvas thead,
+        .scs-dynamic-table-card thead,
+        #preview-table-card thead,
+        #preview-table-container thead,
+        #scs-batch-canvas thead {
+            display: table-header-group !important;
+            width: 100% !important;
+        }
+        .scs-canvas tbody,
+        .scs-dynamic-table-card tbody,
+        #preview-table-card tbody,
+        #preview-table-container tbody,
+        #scs-batch-canvas tbody {
+            display: table-row-group !important;
+            width: 100% !important;
+        }
+        .scs-canvas tr,
+        .scs-dynamic-table-card tr,
+        #preview-table-card tr,
+        #preview-table-container tr,
+        #scs-batch-canvas tr {
+            display: table-row !important;
+        }
+        .scs-canvas thead th,
+        .scs-dynamic-table-card thead th,
+        #preview-table-card thead th,
+        #preview-table-container thead th,
+        #scs-batch-canvas thead th {
+            display: table-cell !important;
+            vertical-align: middle !important;
+            text-align: center !important;
+            box-sizing: border-box !important;
+            font-weight: 800 !important;
+            word-break: keep-all !important;
+            white-space: nowrap !important;
+            letter-spacing: 0 !important;
+            font-feature-settings: normal !important;
+            line-height: 1.35 !important;
+            overflow-wrap: normal !important;
+        }
+        .scs-canvas tbody tr,
+        .scs-dynamic-table-card tbody tr,
+        #preview-table-card tbody tr,
+        #preview-table-container tbody tr,
+        #scs-batch-canvas tbody tr {
+            box-sizing: border-box !important;
+            transition: background-color 0.15s ease !important;
+        }
+        .scs-canvas tbody td,
+        .scs-dynamic-table-card tbody td,
+        #preview-table-card tbody td,
+        #preview-table-container tbody td,
+        #scs-batch-canvas tbody td {
+            display: table-cell !important;
+            vertical-align: middle !important;
+            text-align: center !important;
+            box-sizing: border-box !important;
+            font-weight: 700 !important;
+            word-break: keep-all !important;
+            white-space: nowrap !important;
+            letter-spacing: 0 !important;
+            font-feature-settings: normal !important;
+            line-height: 1.35 !important;
+        }
+        .scs-canvas tbody td:first-child,
+        .scs-canvas thead th:first-child,
+        .scs-dynamic-table-card tbody td:first-child,
+        .scs-dynamic-table-card thead th:first-child,
+        #preview-table-card tbody td:first-child,
+        #preview-table-card thead th:first-child,
+        #scs-batch-canvas tbody td:first-child,
+        #scs-batch-canvas thead th:first-child {
+            font-weight: 900 !important;
+        }
+        .scs-canvas tbody tr:nth-child(even),
+        .scs-dynamic-table-card tbody tr:nth-child(even),
+        #preview-table-card tbody tr:nth-child(even),
+        #preview-table-container tbody tr:nth-child(even),
+        #scs-batch-canvas tbody tr:nth-child(even) {
+            background-color: rgba(248, 250, 252, 0.85) !important;
+        }
+
+        /* 2-Column Split Layout Engine & Grid Wrappers */
+        .scs-grid-wrapper {
+            box-sizing: border-box !important;
+            width: 100% !important;
+        }
+        .scs-split-grid,
+        .scs-batch-grid-split {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: stretch !important;
+            justify-content: space-between !important;
+            width: 100% !important;
+            gap: 1rem !important;
+            box-sizing: border-box !important;
+        }
+        .scs-split-grid > #preview-table-card,
+        .scs-split-grid > #bp-table-card {
+            flex: 8 1 0% !important;
+            width: 66.6666% !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+        }
+        .scs-split-grid > #preview-illus-card,
+        .scs-split-grid > #bp-illus-card {
+            flex: 4 1 0% !important;
+            width: 33.3333% !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+        }
+        .scs-batch-grid-split > div:first-child {
+            flex: 8 1 0% !important;
+            width: 66.6666% !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+        }
+        .scs-batch-grid-split > div:last-child {
+            flex: 4 1 0% !important;
+            width: 33.3333% !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+        }
+        .scs-batch-grid-split #preview-table-card,
+        .scs-batch-grid-split #preview-illus-card {
+            width: 100% !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+        }
+        .scs-stacked-grid {
             display: flex !important;
             flex-direction: column !important;
-            flex: 1 !important;
             width: 100% !important;
+            gap: 1rem !important;
+            box-sizing: border-box !important;
         }
-        .scs-dynamic-table-card table {
+        .scs-stacked-grid > #preview-table-card,
+        .scs-stacked-grid > #preview-illus-card,
+        .scs-stacked-grid > #bp-table-card,
+        .scs-stacked-grid > #bp-illus-card {
+            flex: 1 1 auto !important;
             width: 100% !important;
-            border-collapse: collapse !important;
-            table-layout: fixed !important;
-            margin: 0 !important;
-        }
-        .scs-dynamic-table-card thead th {
-            vertical-align: middle !important;
-            text-align: center !important;
             box-sizing: border-box !important;
-        }
-        .scs-dynamic-table-card tbody tr {
-            box-sizing: border-box !important;
-        }
-        .scs-dynamic-table-card tbody td {
-            vertical-align: middle !important;
-            text-align: center !important;
-            box-sizing: border-box !important;
-            word-break: break-word !important;
         }
 
         /* Smart Alignment Guides */
@@ -2486,6 +2629,7 @@ if (empty($active_presets)) {
                     
                     <div id="scs-canvas-viewport" class="bg-slate-100/80 p-6 sm:p-10 rounded-2xl flex justify-center overflow-x-auto min-h-[520px] transition-all">
                         <!-- Dynamic sized-box with flexible layout, background & styling -->
+                        <?php $isTableSplitInitial = !empty($scs_settings['table_split_rows']) || !empty($scs_settings['table_split_cells']); ?>
                         <div id="td-preview" class="scs-canvas relative shrink-0 leading-normal overflow-hidden transition-all duration-300 <?php echo $isTableSplitInitial ? 'scs-table-split-active' : ''; ?>" dir="rtl" style="font-family: 'Vazirmatn', sans-serif; width: 800px; min-height: 1000px; background-color: #ffffff; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);">
                             
                             <!-- Smart Snap Guideline Elements -->
@@ -2532,28 +2676,30 @@ if (empty($active_presets)) {
                                     </div>
                                 </div>
 
-                                <!-- 3. Size Table Area -->
-                                <?php $isTableSplitInitial = !empty($scs_settings['table_split_rows']) || !empty($scs_settings['table_split_cells']); ?>
-                                <div id="preview-table-card" data-scs-block="table" class="scs-card scs-dynamic-table-card relative group w-full overflow-x-auto border border-slate-200 rounded-2xl bg-white shadow-sm transition-all <?php echo $isTableSplitInitial ? 'hidden' : ''; ?>" <?php echo $isTableSplitInitial ? 'style="display: none !important;"' : ''; ?>>
-                                    <button type="button" onclick="toggleBlockVisibility('table')" class="hidden group-hover:flex absolute top-2 left-2 w-6 h-6 bg-rose-500 hover:bg-rose-600 text-white rounded-full items-center justify-center text-[11px] font-black shadow-md transition-all z-20" title="حذف جدول اندازه‌ها از این چیدمان">✕</button>
-                                    <div id="preview-table-container" class="w-full">
-                                        <table class="w-full text-right text-xs">
-                                            <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
-                                                <tr><th class="p-3 text-center">فاقد داده</th></tr>
-                                            </thead>
-                                            <tbody></tbody>
-                                        </table>
+                                <!-- 3 & 4. Grid Wrapper for Table and Illustration (Supports 2-Column Split & Stacked) -->
+                                <div id="preview-grid-wrapper" class="scs-grid-wrapper scs-split-grid w-full flex flex-row items-stretch gap-4 transition-all" style="box-sizing: border-box; width: 100%;">
+                                    <!-- 3. Size Table Area -->
+                                    <div id="preview-table-card" data-scs-block="table" class="scs-card scs-dynamic-table-card relative group overflow-hidden border border-slate-200 rounded-2xl bg-white shadow-sm transition-all <?php echo $isTableSplitInitial ? 'hidden' : ''; ?>" <?php echo $isTableSplitInitial ? 'style="display: none !important;"' : ''; ?>>
+                                        <button type="button" onclick="toggleBlockVisibility('table')" class="hidden group-hover:flex absolute top-2 left-2 w-6 h-6 bg-rose-500 hover:bg-rose-600 text-white rounded-full items-center justify-center text-[11px] font-black shadow-md transition-all z-20" title="حذف جدول اندازه‌ها از این چیدمان">✕</button>
+                                        <div id="preview-table-container" class="w-full overflow-hidden">
+                                            <table class="w-full text-right text-xs" style="table-layout: auto;">
+                                                <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+                                                    <tr><th class="p-3 text-center">فاقد داده</th></tr>
+                                                </thead>
+                                                <tbody></tbody>
+                                            </table>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <!-- 4. Illustration / Measuring Guide Box -->
-                                <div id="preview-illus-card" data-scs-block="illus" class="scs-card relative group w-full bg-slate-50 rounded-2xl border border-slate-200 p-5 flex flex-col items-center justify-center text-center shadow-sm transition-all">
-                                    <button type="button" onclick="toggleBlockVisibility('illus')" class="hidden group-hover:flex absolute top-2 left-2 w-6 h-6 bg-rose-500 hover:bg-rose-600 text-white rounded-full items-center justify-center text-[11px] font-black shadow-md transition-all z-20" title="حذف راهنمای تصویر از این چیدمان">✕</button>
-                                    <div id="preview-illus-box" class="w-full flex items-center justify-center overflow-hidden mb-3 opacity-80" style="max-height: <?php echo htmlspecialchars($scs_settings['illus_max_height'] ?? 160); ?>px;">
-                                        <span class="text-4xl">📏</span>
-                                    </div>
-                                    <div class="text-[9px] text-slate-400 leading-relaxed font-black" id="preview-illus-text">
-                                        ابعاد اندازه‌گیری شده محصول مربوط به اندازه تکه‌ای کالا در حالتِ آزاد و غیرکشیده روی سطح است.
+                                    <!-- 4. Illustration / Measuring Guide Box -->
+                                    <div id="preview-illus-card" data-scs-block="illus" class="scs-card relative group bg-slate-50 rounded-2xl border border-slate-200 p-5 flex flex-col items-center justify-center text-center shadow-sm transition-all">
+                                        <button type="button" onclick="toggleBlockVisibility('illus')" class="hidden group-hover:flex absolute top-2 left-2 w-6 h-6 bg-rose-500 hover:bg-rose-600 text-white rounded-full items-center justify-center text-[11px] font-black shadow-md transition-all z-20" title="حذف راهنمای تصویر از این چیدمان">✕</button>
+                                        <div id="preview-illus-box" class="w-full flex items-center justify-center overflow-hidden mb-3 opacity-80" style="max-height: <?php echo htmlspecialchars($scs_settings['illus_max_height'] ?? 160); ?>px;">
+                                            <span class="text-4xl">📏</span>
+                                        </div>
+                                        <div class="text-[9px] text-slate-400 leading-relaxed font-black" id="preview-illus-text">
+                                            ابعاد اندازه‌گیری شده محصول مربوط به اندازه تکه‌ای کالا در حالتِ آزاد و غیرکشیده روی سطح است.
+                                        </div>
                                     </div>
                                 </div>
 
@@ -4396,44 +4542,47 @@ if (empty($active_presets)) {
                                             <span class="scs-pill px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[9px] font-black text-slate-700">مدل: کلاسیک آزاد</span>
                                         </div>
 
-                                        <!-- 3. Table Preview -->
-                                        <div id="bp-table-card" data-scs-block="table" class="scs-card scs-dynamic-table-card bg-white border border-slate-200 rounded-xl overflow-hidden w-full <?php echo $isTableSplitInitial ? 'hidden' : ''; ?>" <?php echo $isTableSplitInitial ? 'style="display: none !important;"' : ''; ?>>
-                                            <table class="w-full text-right text-[10px]">
-                                                <thead class="bg-slate-50 text-slate-800 font-black border-b border-slate-200">
-                                                    <tr>
-                                                        <th class="p-2 text-center border-l border-slate-200">سایز</th>
-                                                        <th class="p-2 text-center border-l border-slate-200">عرض سینه</th>
-                                                        <th class="p-2 text-center border-l border-slate-200">قد لباس</th>
-                                                        <th class="p-2 text-center">سرشانه</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <tr class="border-b border-slate-100">
-                                                        <td class="p-2 text-center font-black border-l border-slate-100">M</td>
-                                                        <td class="p-2 text-center border-l border-slate-100">54</td>
-                                                        <td class="p-2 text-center border-l border-slate-100">74</td>
-                                                        <td class="p-2 text-center">46</td>
-                                                    </tr>
-                                                    <tr class="border-b border-slate-100 bg-slate-50/50">
-                                                        <td class="p-2 text-center font-black border-l border-slate-100">L</td>
-                                                        <td class="p-2 text-center border-l border-slate-100">57</td>
-                                                        <td class="p-2 text-center border-l border-slate-100">76</td>
-                                                        <td class="p-2 text-center">48</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td class="p-2 text-center font-black border-l border-slate-100">XL</td>
-                                                        <td class="p-2 text-center border-l border-slate-100">60</td>
-                                                        <td class="p-2 text-center border-l border-slate-100">78</td>
-                                                        <td class="p-2 text-center">50</td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                        <!-- 3 & 4. Table & Illustration Grid Wrapper -->
+                                        <div id="bp-grid-wrapper" class="scs-grid-wrapper scs-split-grid w-full flex flex-row items-stretch gap-3 transition-all" style="box-sizing: border-box; width: 100%;">
+                                            <!-- 3. Table Preview -->
+                                            <div id="bp-table-card" data-scs-block="table" class="scs-card scs-dynamic-table-card bg-white border border-slate-200 rounded-xl overflow-hidden <?php echo $isTableSplitInitial ? 'hidden' : ''; ?>" <?php echo $isTableSplitInitial ? 'style="display: none !important;"' : ''; ?>>
+                                                <table class="w-full text-right text-[10px]">
+                                                    <thead class="bg-slate-50 text-slate-800 font-black border-b border-slate-200">
+                                                        <tr>
+                                                            <th class="p-2 text-center border-l border-slate-200">سایز</th>
+                                                            <th class="p-2 text-center border-l border-slate-200">عرض سینه</th>
+                                                            <th class="p-2 text-center border-l border-slate-200">قد لباس</th>
+                                                            <th class="p-2 text-center">سرشانه</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr class="border-b border-slate-100">
+                                                            <td class="p-2 text-center font-black border-l border-slate-100">M</td>
+                                                            <td class="p-2 text-center border-l border-slate-100">54</td>
+                                                            <td class="p-2 text-center border-l border-slate-100">74</td>
+                                                            <td class="p-2 text-center">46</td>
+                                                        </tr>
+                                                        <tr class="border-b border-slate-100 bg-slate-50/50">
+                                                            <td class="p-2 text-center font-black border-l border-slate-100">L</td>
+                                                            <td class="p-2 text-center border-l border-slate-100">57</td>
+                                                            <td class="p-2 text-center border-l border-slate-100">76</td>
+                                                            <td class="p-2 text-center">48</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="p-2 text-center font-black border-l border-slate-100">XL</td>
+                                                            <td class="p-2 text-center border-l border-slate-100">60</td>
+                                                            <td class="p-2 text-center border-l border-slate-100">78</td>
+                                                            <td class="p-2 text-center">50</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
 
-                                        <!-- 4. Illustration Preview -->
-                                        <div id="bp-illus-card" data-scs-block="illus" class="scs-card bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-center text-[9px] flex items-center justify-center gap-2 w-full">
-                                            <span class="text-lg">📏</span>
-                                            <span class="text-slate-500 font-black">اندازه‌گیری بدون کشش</span>
+                                            <!-- 4. Illustration Preview -->
+                                            <div id="bp-illus-card" data-scs-block="illus" class="scs-card bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-center text-[9px] flex items-center justify-center gap-2">
+                                                <span class="text-lg">📏</span>
+                                                <span class="text-slate-500 font-black">اندازه‌گیری بدون کشش</span>
+                                            </div>
                                         </div>
 
                                         <!-- 5. Notes Preview -->
@@ -6228,7 +6377,56 @@ if (empty($active_presets)) {
                 if (!order.includes(k)) order.push(k);
             });
 
+            var gridWrapper = isMini ? root.find('#bp-grid-wrapper') : root.find('#preview-grid-wrapper, #batch-grid-wrapper, #bp-grid-wrapper');
+            var tableCard = isMini ? root.find('#bp-table-card') : root.find('#preview-table-card');
+            var illusCard = isMini ? root.find('#bp-illus-card') : root.find('#preview-illus-card');
+
+            var gridPlaced = false;
+
             order.forEach(function(key) {
+                if (key === 'table' || key === 'illus') {
+                    if (gridWrapper.length > 0) {
+                        if (!gridPlaced) {
+                            container.append(gridWrapper);
+                            gridPlaced = true;
+
+                            // Place table and illustration cards inside the grid wrapper in relative order
+                            var tIdx = order.indexOf('table');
+                            var iIdx = order.indexOf('illus');
+                            if (tIdx <= iIdx) {
+                                if (tableCard.length > 0) gridWrapper.append(tableCard);
+                                if (illusCard.length > 0) gridWrapper.append(illusCard);
+                            } else {
+                                if (illusCard.length > 0) gridWrapper.append(illusCard);
+                                if (tableCard.length > 0) gridWrapper.append(tableCard);
+                            }
+                        }
+
+                        if (key === 'table') {
+                            var isTableVisible = getBlockVisibility('table') && !(scs_settings.table_split_rows || scs_settings.table_split_cells);
+                            if (tableCard.length > 0) {
+                                tableCard.toggleClass('hidden', !isTableVisible);
+                                if (!isTableVisible) {
+                                    tableCard.attr('style', 'display: none !important;');
+                                } else {
+                                    tableCard.css('display', '');
+                                }
+                            }
+                        } else if (key === 'illus') {
+                            var isIllusVisible = getBlockVisibility('illus');
+                            if (illusCard.length > 0) {
+                                illusCard.toggleClass('hidden', !isIllusVisible);
+                                if (!isIllusVisible) {
+                                    illusCard.attr('style', 'display: none !important;');
+                                } else {
+                                    illusCard.css('display', '');
+                                }
+                            }
+                        }
+                        return;
+                    }
+                }
+
                 var el = container.find(`[data-scs-block="${key}"]`);
                 if (el.length > 0) {
                     var isVisible = getBlockVisibility(key);
@@ -7160,34 +7358,89 @@ if (empty($active_presets)) {
 
             // 5. Dynamic Layout Modes (Flow mode grid columns)
             var layout = scs_settings.layout_mode || 'standard_split';
-            var gridWrapper = isMini ? null : $('#preview-grid-wrapper');
-            var tableCard = isMini ? $('#bp-table-card') : $('#preview-table-card');
-            var illusCard = isMini ? $('#bp-illus-card') : $('#preview-illus-card');
+            var gridWrapper = isMini ? el.find('#bp-grid-wrapper') : el.find('#preview-grid-wrapper, #batch-grid-wrapper, #bp-grid-wrapper');
+            var tableCard = isMini ? el.find('#bp-table-card') : el.find('#preview-table-card');
+            var illusCard = isMini ? el.find('#bp-illus-card') : el.find('#preview-illus-card');
 
-            if (!isFreeform && !isMini && gridWrapper && gridWrapper.length > 0) {
+            if (isFreeform) {
+                if (gridWrapper.length > 0) {
+                    gridWrapper.css({ 'display': 'contents', 'width': '100%' });
+                }
+            } else if (gridWrapper && gridWrapper.length > 0) {
+                var isIllusVisible = illusCard.length > 0 && !illusCard.hasClass('hidden') && (typeof getBlockVisibility !== 'function' || getBlockVisibility('illus'));
+
                 if (layout === 'stacked_wide') {
-                    tableCard.removeClass('md:col-span-8 md:col-span-12').addClass('md:col-span-12');
-                    illusCard.removeClass('md:col-span-4 md:col-span-12').addClass('md:col-span-12');
+                    gridWrapper.removeClass('scs-split-grid').addClass('scs-stacked-grid');
+                    gridWrapper.css({
+                        'display': 'flex',
+                        'flex-direction': 'column',
+                        'width': '100%',
+                        'gap': gap + 'px'
+                    });
+                    tableCard.css({ 'width': '100%', 'flex': '1 1 auto', 'box-sizing': 'border-box' });
+                    illusCard.css({ 'width': '100%', 'flex': '1 1 auto', 'box-sizing': 'border-box' });
                 } else if (layout === 'table_first') {
-                    tableCard.removeClass('md:col-span-8 md:col-span-12').addClass('md:col-span-12');
-                    illusCard.removeClass('md:col-span-4 md:col-span-12').addClass('md:col-span-12 flex-row gap-4 text-right');
-                } else if (layout === 'modern_bento') {
-                    tableCard.removeClass('md:col-span-8 md:col-span-12').addClass('md:col-span-8');
-                    illusCard.removeClass('md:col-span-4 md:col-span-12').addClass('md:col-span-4');
+                    gridWrapper.removeClass('scs-split-grid').addClass('scs-stacked-grid');
+                    gridWrapper.css({
+                        'display': 'flex',
+                        'flex-direction': 'column',
+                        'width': '100%',
+                        'gap': Math.round(gap * 0.7) + 'px'
+                    });
+                    tableCard.css({ 'width': '100%', 'flex': '1 1 auto', 'box-sizing': 'border-box' });
+                    illusCard.css({ 'width': '100%', 'flex': '1 1 auto', 'box-sizing': 'border-box' });
                 } else {
-                    tableCard.removeClass('md:col-span-8 md:col-span-12').addClass('md:col-span-8');
-                    illusCard.removeClass('md:col-span-4 md:col-span-12').addClass('md:col-span-4');
+                    // standard_split or modern_bento: 2-column layout!
+                    if (isIllusVisible) {
+                        gridWrapper.removeClass('scs-stacked-grid').addClass('scs-split-grid');
+                        gridWrapper.css({
+                            'display': 'flex',
+                            'flex-direction': 'row',
+                            'align-items': 'stretch',
+                            'justify-content': 'space-between',
+                            'width': '100%',
+                            'gap': gap + 'px',
+                            'box-sizing': 'border-box'
+                        });
+                        var isBatchSplit = gridWrapper.hasClass('scs-batch-grid-split');
+                        if (isBatchSplit) {
+                            tableCard.css({ 'width': '100%', 'box-sizing': 'border-box' });
+                            illusCard.css({ 'width': '100%', 'box-sizing': 'border-box' });
+                        } else {
+                            tableCard.removeClass('w-full').css({
+                                'width': '66.666%',
+                                'flex': '8 1 0%',
+                                'min-width': '0',
+                                'box-sizing': 'border-box'
+                            });
+                            illusCard.removeClass('w-full').css({
+                                'width': '33.333%',
+                                'flex': '4 1 0%',
+                                'min-width': '0',
+                                'box-sizing': 'border-box'
+                            });
+                        }
+                    } else {
+                        gridWrapper.removeClass('scs-split-grid').addClass('scs-stacked-grid');
+                        gridWrapper.css({
+                            'display': 'flex',
+                            'flex-direction': 'column',
+                            'width': '100%'
+                        });
+                        tableCard.css({ 'width': '100%', 'flex': '1 1 auto', 'box-sizing': 'border-box' });
+                    }
                 }
             }
 
             // 6. Illustration Image Dimensions & Fit
             var maxH = parseInt(scs_settings.illus_max_height) || 160;
             var objFit = scs_settings.illus_object_fit || 'contain';
+            var illusBox = isMini ? el.find('#bp-illus-card') : el.find('#preview-illus-box');
             if (isMini) {
-                $('#bp-illus-card img').css({ 'max-height': Math.round(maxH * 0.6) + 'px', 'object-fit': objFit });
+                el.find('#bp-illus-card img').css({ 'max-height': Math.round(maxH * 0.6) + 'px', 'object-fit': objFit });
             } else {
-                $('#preview-illus-box').css('max-height', maxH + 'px');
-                $('#preview-illus-box img').css({ 'max-height': maxH + 'px', 'object-fit': objFit });
+                illusBox.css('max-height', maxH + 'px');
+                illusBox.find('img').css({ 'max-height': maxH + 'px', 'object-fit': objFit });
             }
 
             // 7. Styling Engine (Cards, Borders, Radius, Colors & Size Chart Styling)
@@ -7286,8 +7539,7 @@ if (empty($active_presets)) {
                         cardCss['min-height'] = 'unset';
                         cardCss['max-height'] = Math.max(tableDim.cardHeight, targetBoxH) + 'px';
                         cardCss['overflow'] = 'hidden';
-                        cardCss['display'] = 'flex';
-                        cardCss['flex-direction'] = 'column';
+                        cardCss['display'] = 'block';
                     }
                     $(this).css(cardCss);
                 } else if (isSplitRow) {
@@ -7318,6 +7570,14 @@ if (empty($active_presets)) {
                 });
             });
 
+            // Table container & card overflow protection
+            el.find('#preview-table-container, #bp-table-container').css({
+                'width': '100%',
+                'overflow-x': 'auto',
+                'overflow-y': 'hidden',
+                'display': 'block'
+            });
+
             // Table styling (headers, rows, cells, fonts, borders, gap)
             tableEl.css({
                 'font-size': tableDim.tdFontSize + 'px',
@@ -7326,7 +7586,11 @@ if (empty($active_presets)) {
                 'background-color': isTableTransparent ? 'transparent' : 'inherit',
                 'width': '100%',
                 'height': (tableDim.scaleMode === 'fixed_frame' ? '100%' : 'auto'),
-                'table-layout': 'fixed'
+                'table-layout': 'auto',
+                'direction': 'rtl',
+                'letter-spacing': '0px',
+                'margin': '0',
+                'display': 'table'
             });
 
             var theadEl = el.find('thead');
@@ -7338,26 +7602,42 @@ if (empty($active_presets)) {
                     'background-color': isTableTransparent ? 'transparent' : thBg,
                     'color': thText,
                     'border-bottom': tableBorderCss,
-                    'height': tableDim.thHeight + 'px'
+                    'min-height': tableDim.thHeight + 'px',
+                    'display': 'table-header-group'
                 });
             }
 
             var thCells = el.find('thead th');
+            var colCount = thCells.length || 4;
+            var padH = Math.max(3, Math.round(cellPadding * (colCount >= 8 ? 0.45 : (colCount >= 6 ? 0.6 : 0.8))));
+            var thFontAdaptive = colCount >= 8 ? Math.min(10.5, tableDim.thFontSize) : (colCount >= 6 ? Math.min(11, tableDim.thFontSize) : tableDim.thFontSize);
+            var tdFontAdaptive = colCount >= 8 ? Math.min(11, tableDim.tdFontSize) : tableDim.tdFontSize;
+
             thCells.removeClass('bg-slate-50 text-slate-800 border-slate-200 border-slate-100');
             thCells.css({
                 'background-color': isTableTransparent ? 'transparent' : thBg,
                 'color': thText,
                 'border': isPureData ? 'none' : tableBorderCss,
-                'padding': `${tableDim.thPaddingV}px ${Math.max(4, Math.round(cellPadding * 0.8))}px`,
+                'padding': `${Math.max(4, tableDim.thPaddingV)}px ${padH}px`,
                 'font-family': headerFont,
-                'font-size': tableDim.thFontSize + 'px',
-                'height': tableDim.thHeight + 'px',
+                'font-size': thFontAdaptive + 'px',
                 'vertical-align': 'middle',
-                'text-align': tableTextAlign
+                'text-align': tableTextAlign,
+                'letter-spacing': '0px',
+                'word-break': 'keep-all',
+                'white-space': 'nowrap',
+                'line-height': '1.35',
+                'display': 'table-cell',
+                'box-sizing': 'border-box'
+            });
+
+            el.find('thead tr').css({
+                'display': 'table-row'
             });
 
             bodyRows.css({
-                'height': tableDim.rowHeight + 'px'
+                'min-height': tableDim.rowHeight + 'px',
+                'display': 'table-row'
             });
 
             var tdCells = el.find('tbody td');
@@ -7365,13 +7645,21 @@ if (empty($active_presets)) {
             tdCells.css({
                 'border': isPureData ? 'none' : tableBorderCss,
                 'color': cellText,
-                'padding': `${tableDim.tdPaddingV}px ${Math.max(4, Math.round(cellPadding * 1.1))}px`,
+                'padding': `${Math.max(4, tableDim.tdPaddingV)}px ${padH}px`,
                 'font-family': activeFont,
-                'font-size': tableDim.tdFontSize + 'px',
-                'height': tableDim.rowHeight + 'px',
+                'font-size': tdFontAdaptive + 'px',
                 'vertical-align': 'middle',
-                'text-align': tableTextAlign
+                'text-align': tableTextAlign,
+                'letter-spacing': '0px',
+                'word-break': 'keep-all',
+                'white-space': 'nowrap',
+                'line-height': '1.35',
+                'display': 'table-cell',
+                'box-sizing': 'border-box'
             });
+
+            el.find('tbody tr td:first-child').css({ 'font-weight': '900' });
+            el.find('thead tr th:first-child').css({ 'font-weight': '900' });
 
             // Split cells inside individual row blocks and matrix blocks
             var splitRowsFontSize = parseInt(scs_settings.table_font_size) || tableDim.tdFontSize || 11;
@@ -9213,38 +9501,48 @@ if (empty($active_presets)) {
             $('#grid-body').empty();
 
             if (oldRows.length > 0 && oldColumns.length > 0) {
-                // Find column mappings: mapNewToOld[newIdx] = oldIdx or -1
+                // Safe and accurate column mapping using normalized semantic keys
+                function normalizeColName(name) {
+                    if (!name) return '';
+                    var n = String(name).replace(/[\s\/\-\_\u200c\(\)\.\،]/g, '').toLowerCase();
+                    if (n === 'سایز' || n === 'سایزبندی' || n === 'سایزمحصول' || n === 'size') return 'col_size';
+                    if (n === 'قدمحصول' || n === 'قدلباس' || n === 'قد' || n === 'height' || n === 'length') return 'col_length';
+                    if (n === 'قدآستین' || n === 'آستین' || n === 'sleeve') return 'col_sleeve';
+                    if (n === 'عرضشانه' || n === 'سرشانه' || n === 'شانه' || n === 'shoulder') return 'col_shoulder';
+                    if (n === 'عرضلباس' || n === 'عرض' || n === 'عرضسینه' || n === 'width') return 'col_width';
+                    if (n === 'دورسینه' || n === 'سینه' || n === '12دورسینه' || n === 'نصفدورسینه' || n === 'chest' || n === 'bust') return 'col_chest';
+                    if (n === 'دورکمر' || n === 'کمر' || n === '12دورکمر' || n === 'نصفدورکمر' || n === 'waist') return 'col_waist';
+                    if (n === 'دورباسن' || n === 'باسن' || n === '12دورباسن' || n === 'نصفدورباسن' || n === 'hip') return 'col_hip';
+                    if (n === 'دورران' || n === 'ران' || n === '12دورران' || n === 'thigh') return 'col_thigh';
+                    if (n === 'دمپا' || n === 'عرضدمپا' || n === 'leg') return 'col_hem';
+                    if (n === 'مدل' || n === 'مدلمحصول' || n === 'model') return 'col_model';
+                    if (n === 'نوعکمر' || n === 'کمرمدل') return 'col_waist_type';
+                    return n;
+                }
+
                 var mapNewToOld = [];
+                var usedOldIndices = {};
                 preset.columns.forEach(newCol => {
                     var foundOldIdx = -1;
-                    // 1- Try direct exact match
+                    var normNew = normalizeColName(newCol);
+                    // 1- Exact match
                     for (var i = 0; i < oldColumns.length; i++) {
-                        if (oldColumns[i] === newCol) {
+                        if (!usedOldIndices[i] && oldColumns[i].trim() === newCol.trim()) {
                             foundOldIdx = i;
                             break;
                         }
                     }
-                    // 2- Try ignoring spaces, hyphens, slashes and half-spaces
+                    // 2- Normalized semantic match
                     if (foundOldIdx === -1) {
-                        var cleanNew = newCol.replace(/[\s\/\-\u200c]/g, '').toLowerCase();
                         for (var i = 0; i < oldColumns.length; i++) {
-                            var cleanOld = oldColumns[i].replace(/[\s\/\-\u200c]/g, '').toLowerCase();
-                            if (cleanOld === cleanNew) {
+                            if (!usedOldIndices[i] && normalizeColName(oldColumns[i]) === normNew) {
                                 foundOldIdx = i;
                                 break;
                             }
                         }
                     }
-                    // 3- Try substring-level match
-                    if (foundOldIdx === -1) {
-                        var cleanNew = newCol.replace(/[\s\/\-\u200c]/g, '').toLowerCase();
-                        for (var i = 0; i < oldColumns.length; i++) {
-                            var cleanOld = oldColumns[i].replace(/[\s\/\-\u200c]/g, '').toLowerCase();
-                            if (cleanNew.indexOf(cleanOld) !== -1 || cleanOld.indexOf(cleanNew) !== -1) {
-                                foundOldIdx = i;
-                                break;
-                            }
-                        }
+                    if (foundOldIdx !== -1) {
+                        usedOldIndices[foundOldIdx] = true;
                     }
                     mapNewToOld.push(foundOldIdx);
                 });
@@ -9279,23 +9577,23 @@ if (empty($active_presets)) {
 
         function addChartRow(colsCount = 0) {
             if (colsCount === 0) {
+                var validThs = 0;
+                $('#grid-header-row th').each(function() {
+                    var t = $(this).text().trim();
+                    if (t && t !== 'اکشن' && !t.includes('پریست') && !t.includes('فاقد ستون') && !t.includes('ابتدا یک')) {
+                        validThs++;
+                    }
+                });
+                if (validThs > 0) colsCount = validThs;
+            }
+            if (colsCount === 0 && window.selected_chart && Array.isArray(selected_chart.columns) && selected_chart.columns.length > 0) {
+                colsCount = selected_chart.columns.length;
+            }
+            if (colsCount === 0) {
                 var currentPresetId = $('#chart-preset-select').val();
                 if (currentPresetId) {
-                    var pr = app_presets.find(x => x.id === currentPresetId);
-                    if (!pr && window.selected_chart && selected_chart.columns) {
-                        pr = { id: currentPresetId, columns: selected_chart.columns };
-                    }
+                    var pr = app_presets.find(x => String(x.id) === String(currentPresetId) || x.id == currentPresetId);
                     if (pr && pr.columns) colsCount = pr.columns.length;
-                }
-                if (colsCount === 0) {
-                    var validThs = 0;
-                    $('#grid-header-row th').each(function() {
-                        var t = $(this).text().trim();
-                        if (t && t !== 'اکشن' && !t.includes('پریست') && !t.includes('فاقد ستون')) {
-                            validThs++;
-                        }
-                    });
-                    if (validThs > 0) colsCount = validThs;
                 }
             }
             if (colsCount === 0) {
@@ -9356,86 +9654,114 @@ if (empty($active_presets)) {
                     $('#chart-product-desc').val(d.product_desc || '');
                     $('#chart-product-notes').val(d.product_notes || '');
                     
-                    // Fire preset selected
-                    $('#chart-preset-select').val(d.preset_id);
-                    applyPresetTemplate(d.preset_id);
-
-                    // Re-enable model/waist based on values or preset settings
-                    setTimeout(() => {
-                        if (d.model) $('#chart-model').val(d.model).prop('disabled', false);
-                        if (d.waist_type) $('#chart-waist-type').val(d.waist_type).prop('disabled', false);
-
-                        // Preset description specs loader
-                        if (d.desc_preset_id) {
-                            $('#chart-desc-preset-select').val(d.desc_preset_id);
-                            buildDescriptionFields(d.desc_preset_id, d.desc_values || {});
+                    var presetId = d.preset_id || ('custom_' + d.id);
+                    var pr = app_presets.find(x => String(x.id) === String(presetId) || x.id == presetId);
+                    if (!pr) {
+                        pr = {
+                            id: presetId,
+                            name: d.title || d.product_desc || 'سفارشی',
+                            category: d.category || 'عمومی',
+                            columns: (d.columns && d.columns.length > 0) ? d.columns : [],
+                            show_model: d.model ? 1 : 0,
+                            show_waist: d.waist_type ? 1 : 0,
+                            illus_url: d.illus_url || '',
+                            icon_url: ''
+                        };
+                        app_presets.push(pr);
+                        if ($('#chart-preset-select option[value="' + presetId + '"]').length === 0) {
+                            $('#chart-preset-select').append(`<option value="${presetId}">${d.category ? (d.category + ' (قالب ذخیره‌شده)') : 'قالب اختصاصی'}</option>`);
                         }
+                    } else if (d.columns && d.columns.length > 0) {
+                        pr.columns = d.columns;
+                    }
+                    $('#chart-preset-select').val(presetId);
 
-                        // Re-index cell row inputs
-                        var pr = app_presets.find(x => x.id === d.preset_id);
-                        if (!pr && d.columns && d.columns.length > 0) {
-                            pr = { id: d.preset_id, columns: d.columns, category: d.category || 'عمومی' };
-                        }
-                        if (pr && d.rows && d.rows.length > 0) {
-                            $('#grid-body').empty();
-                            d.rows.forEach(row => {
-                                var rId = 'r_' + Math.floor(Math.random() * 1000000);
-                                var tr = $(`<tr id="${rId}" class="border-b border-slate-150"></tr>`);
-                                
-                                pr.columns.forEach((col, idx) => {
-                                    var cellVal = row['c' + idx] || '';
-                                    tr.append(`<td class="p-2 border border-slate-200"><input type="text" value="${cellVal}" oninput="updateLivePreview()" class="w-full text-center p-2 border border-slate-100 rounded bg-slate-50/50 hover:bg-white text-xs font-bold focus:bg-white outline-none select-input-cell"></td>`);
-                                });
-                                tr.append(`<td class="p-2 border border-slate-200 text-center"><button type="button" onclick="$(this).closest('tr').remove(); updateLivePreview();" class="text-rose-600 font-bold hover:text-rose-500">حذف</button></td>`);
-                                
-                                $('#grid-body').append(tr);
+                    // Rebuild header row with the chart's exact columns
+                    var chartCols = (d.columns && d.columns.length > 0) ? d.columns : (pr ? pr.columns : []);
+                    var headerRow = $('#grid-header-row').empty();
+                    chartCols.forEach(function(col) {
+                        headerRow.append(`<th class="p-3 bg-slate-100/80 border border-slate-200 text-center font-black">${col}</th>`);
+                    });
+                    headerRow.append('<th class="p-3 bg-rose-50 text-rose-600 border border-slate-200 text-center w-16 font-black">اکشن</th>');
+
+                    // Rebuild body rows with the chart's exact rows
+                    var gridBody = $('#grid-body').empty();
+                    if (Array.isArray(d.rows) && d.rows.length > 0) {
+                        d.rows.forEach(function(row) {
+                            var rId = 'r_' + Math.floor(Math.random() * 1000000);
+                            var tr = $(`<tr id="${rId}" class="border-b border-slate-150"></tr>`);
+                            chartCols.forEach(function(col, idx) {
+                                var cellVal = row['c' + idx] !== undefined ? row['c' + idx] : (row[col] !== undefined ? row[col] : (Array.isArray(row) ? row[idx] : (row.values && row.values[col] !== undefined ? row.values[col] : (idx === 0 && row.size !== undefined ? row.size : ''))));
+                                tr.append(`<td class="p-2 border border-slate-200"><input type="text" value="${cellVal}" oninput="updateLivePreview()" class="w-full text-center p-2 border border-slate-100 rounded bg-slate-50/50 hover:bg-white text-xs font-bold focus:bg-white outline-none select-input-cell"></td>`);
                             });
-                        }
+                            tr.append(`<td class="p-2 border border-slate-200 text-center"><button type="button" onclick="$(this).closest('tr').remove(); updateLivePreview();" class="text-rose-600 font-bold hover:text-rose-500">حذف</button></td>`);
+                            gridBody.append(tr);
+                        });
+                    }
 
-                        // Pre-select linked product
-                        var activeProdId = overrideProductId;
-                        if (!activeProdId && Array.isArray(app_products)) {
-                            var linkedProd = app_products.find(function(p) {
-                                return String(p.size_chart_template_id) === String(d.id);
-                            });
-                            if (linkedProd) {
-                                activeProdId = linkedProd.id;
-                            } else {
-                                var matchedProd = app_products.find(function(p) {
-                                    var base = getProductBaseName(p.name || p.title || '');
-                                    return base && d.product_desc && base.toLowerCase() === d.product_desc.toLowerCase();
-                                });
-                                if (matchedProd) activeProdId = matchedProd.id;
-                            }
-                        }
+                    // Model & Waist fields
+                    if (d.model) {
+                        $('#chart-model').val(d.model).prop('disabled', false).parent().removeClass('opacity-50');
+                    } else {
+                        $('#chart-model').val('').prop('disabled', !(pr && pr.show_model)).parent().toggleClass('opacity-50', !(pr && pr.show_model));
+                    }
+                    if (d.waist_type) {
+                        $('#chart-waist-type').val(d.waist_type).prop('disabled', false).parent().removeClass('opacity-50');
+                    } else {
+                        $('#chart-waist-type').val('').prop('disabled', !(pr && pr.show_waist)).parent().toggleClass('opacity-50', !(pr && pr.show_waist));
+                    }
 
-                        if (activeProdId) {
-                            $('#chart-linked-product-select').val(activeProdId);
-                            $('#preview-product-quick-select').val(activeProdId);
-                            var foundP = app_products.find(p => String(p.id) === String(activeProdId));
-                            if (foundP) {
-                                var pBase = getProductBaseName(foundP.name || foundP.title || '');
-                                var pSku = foundP.sku || '';
-                                $('#preview-active-product-label').text('محصول فعال: ' + pBase + (pSku ? ' (کد: ' + pSku + ')' : ''));
-                            }
+                    // Specs & Description presets
+                    if (d.desc_preset_id) {
+                        $('#chart-desc-preset-select').val(d.desc_preset_id);
+                        buildDescriptionFields(d.desc_preset_id, d.desc_values || {});
+                    } else if (d.desc_values && Object.keys(d.desc_values).length > 0) {
+                        buildDescriptionFields('', d.desc_values);
+                    }
+
+                    // Pre-select linked product
+                    var activeProdId = overrideProductId;
+                    if (!activeProdId && Array.isArray(app_products)) {
+                        var linkedProd = app_products.find(function(p) {
+                            return String(p.size_chart_template_id) === String(d.id);
+                        });
+                        if (linkedProd) {
+                            activeProdId = linkedProd.id;
                         } else {
-                            $('#chart-linked-product-select').val('');
-                            $('#preview-product-quick-select').val('');
-                            $('#preview-active-product-label').text(d.product_desc ? 'طرح اختصاصی: ' + d.product_desc : 'یک محصول را انتخاب کنید تا نام و جدول سایز آن در پیش‌نمایش بارگذاری شود');
+                            var matchedProd = app_products.find(function(p) {
+                                var base = getProductBaseName(p.name || p.title || '');
+                                return base && d.product_desc && base.toLowerCase() === d.product_desc.toLowerCase();
+                            });
+                            if (matchedProd) activeProdId = matchedProd.id;
                         }
+                    }
 
-                        // Ensure table block is visible
-                        setBlockVisibility('table', true);
-                        $('#setting-show-table').prop('checked', true);
-                        scs_settings.show_table = 1;
-                        $('#preview-table-card').removeClass('hidden');
+                    if (activeProdId) {
+                        $('#chart-linked-product-select').val(activeProdId);
+                        $('#preview-product-quick-select').val(activeProdId);
+                        var foundP = app_products.find(p => String(p.id) === String(activeProdId));
+                        if (foundP) {
+                            var pBase = getProductBaseName(foundP.name || foundP.title || '');
+                            var pSku = foundP.sku || '';
+                            $('#preview-active-product-label').text('محصول فعال: ' + pBase + (pSku ? ' (کد: ' + pSku + ')' : ''));
+                        }
+                    } else {
+                        $('#chart-linked-product-select').val('');
+                        $('#preview-product-quick-select').val('');
+                        $('#preview-active-product-label').text(d.product_desc ? 'طرح اختصاصی: ' + d.product_desc : 'یک محصول را انتخاب کنید تا نام و جدول سایز آن در پیش‌نمایش بارگذاری شود');
+                    }
 
-                        $('#btn-delete-chart').removeClass('hidden');
-                        renderDragAndDropBuilder();
-                        applyBrandingChanges();
-                        updateLivePreview();
-                        showToast('جدول سایز با موفقیت بارگذاری شد.', 'success');
-                    }, 150);
+                    // Ensure table block is visible
+                    setBlockVisibility('table', true);
+                    $('#setting-show-table').prop('checked', true);
+                    scs_settings.show_table = 1;
+                    $('#preview-table-card').removeClass('hidden');
+
+                    $('#btn-delete-chart').removeClass('hidden');
+                    renderDragAndDropBuilder();
+                    applyBrandingChanges();
+                    updateLivePreview();
+                    showToast('جدول سایز با موفقیت بارگذاری شد.', 'success');
                 }
             });
         }
@@ -9449,73 +9775,79 @@ if (empty($active_presets)) {
             
             // Output values or defaults
             $('#preview-title').text(productDesc || 'شرح محصول');
-            
+
+            // 1. Primary Source of Truth for Columns: Active Editor Table Headers
+            var activeCols = [];
+            $('#grid-header-row th').each(function() {
+                var colText = $(this).text().trim();
+                if (colText && colText !== 'اکشن' && !colText.includes('پریست') && !colText.includes('فاقد ستون') && !colText.includes('ابتدا یک')) {
+                    activeCols.push(colText);
+                }
+            });
+
+            // 2. Fallback to loaded chart columns
+            if (activeCols.length === 0 && window.selected_chart && Array.isArray(selected_chart.columns) && selected_chart.columns.length > 0) {
+                activeCols = selected_chart.columns;
+            }
+
+            // 3. Fallback to preset
             var preset = app_presets.find(x => String(x.id) === String(presetId) || x.id == presetId);
             if (!preset && presetId) {
                 preset = app_presets.find(x => x.name === presetId || (x.category && x.category === presetId));
             }
-            if (!preset) {
-                var columns = [];
-                if (window.selected_chart && selected_chart.columns && selected_chart.columns.length > 0) {
-                    columns = selected_chart.columns;
-                } else {
-                    $('#grid-header-row th').each(function() {
-                        var colText = $(this).text().trim();
-                        if (colText && colText !== 'اکشن' && !colText.includes('پریست') && !colText.includes('فاقد ستون')) {
-                            columns.push(colText);
-                        }
-                    });
-                }
-                if (columns.length > 0) {
-                    preset = {
-                        id: presetId || 'custom',
-                        name: 'سفارشی',
-                        category: (window.selected_chart && selected_chart.category) || 'عمومی',
-                        columns: columns,
-                        show_model: modelVal ? 1 : 0,
-                        show_waist: waistVal ? 1 : 0,
-                        illus_url: (window.selected_chart && selected_chart.illus_url) || '',
-                        icon_url: ''
-                    };
-                } else if (Array.isArray(app_presets) && app_presets.length > 0) {
-                    preset = app_presets[0];
+            if (activeCols.length === 0) {
+                if (preset && Array.isArray(preset.columns) && preset.columns.length > 0) {
+                    activeCols = preset.columns;
+                } else if (Array.isArray(app_presets) && app_presets.length > 0 && app_presets[0].columns) {
+                    activeCols = app_presets[0].columns;
                 }
             }
-            if (preset && preset.columns && preset.columns.length > 0) {
-                $('#preview-cat').text(preset.category || 'عمومی');
-                
-                // Show model / waist pills
-                if (preset.show_model && modelVal) {
-                    $('#preview-model-pill').removeClass('hidden').css('display', 'flex');
-                    $('#preview-model').text(modelVal);
-                } else {
-                    $('#preview-model-pill').addClass('hidden').css('display', 'none');
-                }
-                if (preset.show_waist && waistVal) {
-                    $('#preview-waist-pill').removeClass('hidden').css('display', 'flex');
-                    $('#preview-waist').text(waistVal);
-                } else {
-                    $('#preview-waist-pill').addClass('hidden').css('display', 'none');
-                }
 
-                // Illustration figure loader or generic fallback
-                var figureBox = $('#preview-illus-box');
-                if (preset.illus_url) {
-                    figureBox.html(`<img src="${resolveImageUrl(preset.illus_url)}" class="max-w-full max-h-[160px] object-contain">`);
-                } else {
-                    figureBox.html('<span class="text-4xl text-slate-350">📐</span>');
-                }
-                
-                // Table visual columns builder
+            var catName = (preset && preset.category) || (window.selected_chart && selected_chart.category) || 'عمومی';
+            $('#preview-cat').text(catName);
+
+            // Show model / waist pills
+            var showModel = (preset && preset.show_model) || (window.selected_chart && selected_chart.model) || (modelVal ? 1 : 0);
+            if (showModel && modelVal) {
+                $('#preview-model-pill').removeClass('hidden').css('display', 'flex');
+                $('#preview-model').text(modelVal);
+            } else {
+                $('#preview-model-pill').addClass('hidden').css('display', 'none');
+            }
+
+            var showWaist = (preset && preset.show_waist) || (window.selected_chart && selected_chart.waist_type) || (waistVal ? 1 : 0);
+            if (showWaist && waistVal) {
+                $('#preview-waist-pill').removeClass('hidden').css('display', 'flex');
+                $('#preview-waist').text(waistVal);
+            } else {
+                $('#preview-waist-pill').addClass('hidden').css('display', 'none');
+            }
+
+            // Illustration figure loader or generic fallback
+            var figureBox = $('#preview-illus-box');
+            var illusUrl = (preset && preset.illus_url) || (window.selected_chart && selected_chart.illus_url) || (window.selected_chart && selected_chart.image_path) || '';
+            if (illusUrl) {
+                figureBox.html(`<img src="${resolveImageUrl(illusUrl)}" class="max-w-full max-h-[160px] object-contain">`);
+            } else {
+                figureBox.html('<span class="text-4xl text-slate-350">📐</span>');
+            }
+            
+            // Table visual columns builder with 100% matched column-cell mapping
+            if (activeCols.length > 0) {
                 var tableContainer = $('#preview-table-container');
+                var numCols = activeCols.length;
+                var cellPaddingH = numCols >= 8 ? 'px-2' : (numCols >= 6 ? 'px-2.5' : 'px-3.5');
+                var cellPaddingV = 'py-3';
+                var cellFontSize = numCols >= 8 ? 'text-[10.5px]' : (numCols >= 6 ? 'text-[11px]' : 'text-xs');
+
                 var tableHtml = `
-                    <table class="w-full text-right text-[11px] border-collapse" style="direction: rtl; width: 100%;">
-                        <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+                    <table class="w-full text-right ${cellFontSize} border-collapse" style="direction: rtl; width: 100%; table-layout: auto; border-spacing: 0;">
+                        <thead class="bg-slate-50 text-slate-800 font-black border-b border-slate-200">
                             <tr>
                 `;
-                preset.columns.forEach((col, idx) => {
-                    var borderClass = idx > 0 ? 'border-r border-slate-200' : '';
-                    tableHtml += `<th class="p-3 bg-slate-50 text-slate-800 border-b border-slate-200 ${borderClass} text-center font-black">${col}</th>`;
+                activeCols.forEach((col, idx) => {
+                    var borderClass = idx > 0 ? 'border-r border-slate-200/90' : '';
+                    tableHtml += `<th class="${cellPaddingV} ${cellPaddingH} bg-slate-50 text-slate-800 border-b-2 border-slate-200 ${borderClass} text-center font-black whitespace-nowrap tracking-normal">${col}</th>`;
                 });
                 tableHtml += `
                             </tr>
@@ -9527,16 +9859,20 @@ if (empty($active_presets)) {
                 var rowsCount = 0;
                 var htmlSeoTableRows = ''; // For generating standard searchable HTML snippet
                 
-                $('#grid-body').find('tr').each(function() {
+                $('#grid-body').find('tr').each(function(rIdx) {
                     var rowInputs = $(this).find('.select-input-cell');
                     if (rowInputs.length > 0) {
-                        tableHtml += '<tr class="border-b last:border-0 border-slate-100 hover:bg-slate-50/50 transition-colors">';
+                        var isEven = (rIdx % 2 === 1);
+                        var bgClass = isEven ? 'bg-slate-50/70' : 'bg-white';
+                        tableHtml += `<tr class="border-b last:border-0 border-slate-100 ${bgClass} hover:bg-indigo-50/30 transition-colors">`;
                         htmlSeoTableRows += '<tr>';
-                        rowInputs.each(function(idx) {
-                            var cellVal = $(this).val().trim();
+                        activeCols.forEach(function(col, idx) {
+                            var input = rowInputs.eq(idx);
+                            var cellVal = input.length ? input.val().trim() : '';
                             var displayVal = cellVal !== '' ? cellVal : '—';
                             var borderClass = idx > 0 ? 'border-r border-slate-100' : '';
-                            tableHtml += `<td class="p-3 ${borderClass} text-center font-bold">${displayVal}</td>`;
+                            var fontBoldClass = (idx === 0) ? 'font-black text-slate-900' : 'font-bold text-slate-700';
+                            tableHtml += `<td class="${cellPaddingV} ${cellPaddingH} ${borderClass} text-center ${fontBoldClass} whitespace-nowrap">${displayVal}</td>`;
                             htmlSeoTableRows += `<td style="padding: 10px; border: 1px solid #ddd; text-align: center;">${displayVal}</td>`;
                         });
                         tableHtml += '</tr>';
@@ -9546,7 +9882,7 @@ if (empty($active_presets)) {
                 });
 
                 if (rowsCount === 0) {
-                    tableHtml += '<tr><td colspan="' + preset.columns.length + '" class="p-6 text-center text-slate-400 font-bold">ردیفی ثبت نگردیده است (داده‌ای وارد نشده)</td></tr>';
+                    tableHtml += '<tr><td colspan="' + activeCols.length + '" class="p-6 text-center text-slate-400 font-bold">ردیفی ثبت نگردیده است (داده‌ای وارد نشده)</td></tr>';
                 }
                 
                 tableHtml += `
@@ -9614,9 +9950,9 @@ if (empty($active_presets)) {
                 var seoHtml = `<!-- Size Chart Studio Optimized Block -->\n<div class="size-chart-wrapper" style="direction: rtl; text-align: right; font-family: Tahoma, sans-serif; line-height: 1.8; max-width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #eee; border-radius: 16px; background: #fff;">\n`;
                 seoHtml += `    <h2 style="font-size: 20px; color: #111; border-bottom: 2px solid #5a57eb; padding-bottom: 8px; margin-top: 0; font-weight: 900;">جدول سایزبندی: ${productDesc || 'شرح محصول'}</h2>\n`;
                 
-                if (preset.category || modelVal || waistVal) {
+                if (catName || modelVal || waistVal) {
                     seoHtml += `    <p style="font-size: 13px; color: #666; margin: 12px 0;">\n`;
-                    if (preset.category) seoHtml += `        <strong>دسته‌بندی:</strong> ${preset.category}\n`;
+                    if (catName) seoHtml += `        <strong>دسته‌بندی:</strong> ${catName}\n`;
                     if (modelVal) seoHtml += `        | <strong>مدل:</strong> ${modelVal}\n`;
                     if (waistVal) seoHtml += `        | <strong>نوع کمر:</strong> ${waistVal}\n`;
                     seoHtml += `    </p>\n`;
@@ -9638,7 +9974,7 @@ if (empty($active_presets)) {
                 seoHtml += `        <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: center; border: 1px solid #eee;">\n`;
                 seoHtml += `            <thead>\n`;
                 seoHtml += `                <tr style="background-color: #f9f9f9; font-weight: bold; border-bottom: 2px solid #ddd;">\n`;
-                preset.columns.forEach(col => {
+                activeCols.forEach(col => {
                     seoHtml += `                    <th style="padding: 10px; border: 1px solid #ddd;">${col}</th>\n`;
                 });
                 seoHtml += `                </tr>\n`;
@@ -9780,15 +10116,28 @@ if (empty($active_presets)) {
                                 desc_values[key] = val;
                             });
 
-                            var preset = app_presets.find(x => x.id === presetId);
-                            var columns = preset ? preset.columns : [];
+                            var columns = [];
+                            $('#grid-header-row th').each(function() {
+                                var t = $(this).text().trim();
+                                if (t && t !== 'اکشن' && !t.includes('پریست') && !t.includes('فاقد ستون') && !t.includes('ابتدا یک')) {
+                                    columns.push(t);
+                                }
+                            });
+                            if (columns.length === 0 && window.selected_chart && Array.isArray(selected_chart.columns) && selected_chart.columns.length > 0) {
+                                columns = selected_chart.columns;
+                            }
+                            var preset = app_presets.find(x => String(x.id) === String(presetId) || x.id == presetId);
+                            if (columns.length === 0) {
+                                columns = (preset && Array.isArray(preset.columns)) ? preset.columns : [];
+                            }
+                            var categoryVal = (preset && preset.category) || (window.selected_chart && selected_chart.category) || $('#preview-cat').text().trim() || 'عمومی';
 
                             var postData = {
                                 action: 'td_scs_chart_save',
                                 id: $('#editor-chart-id').val(),
                                 title: $('#chart-title').val().trim(),
                                 product_desc: productDesc,
-                                category: preset ? preset.category : '',
+                                category: categoryVal,
                                 preset_id: presetId,
                                 model: $('#chart-model').val().trim(),
                                 waist_type: $('#chart-waist-type').val().trim(),
@@ -10821,15 +11170,19 @@ if (empty($active_presets)) {
             `);
 
             if (chart.columns && chart.columns.length > 0 && chart.rows && chart.rows.length > 0) {
+                var firstColIsSize = (chart.columns[0].includes('سایز') || chart.columns[0].toLowerCase() === 'size');
+                var hasExplicitRowSize = !firstColIsSize && chart.rows.some(function(r) { return r && r.size; });
                 var tableHtml = `
                     <div class="overflow-x-auto border border-slate-200 rounded-2xl">
-                        <table class="w-full text-xs text-right border-collapse">
+                        <table class="w-full text-xs text-right border-collapse" style="direction: rtl;">
                             <thead>
                                 <tr class="bg-indigo-600 text-white font-black">
-                                    <th class="p-3 border-b border-indigo-700">سایز</th>
                 `;
+                if (hasExplicitRowSize) {
+                    tableHtml += `<th class="p-3 border-b border-indigo-700 text-center">سایز</th>`;
+                }
                 chart.columns.forEach(function(col) {
-                    tableHtml += `<th class="p-3 border-b border-indigo-700">${escapeHtml(col)}</th>`;
+                    tableHtml += `<th class="p-3 border-b border-indigo-700 text-center">${escapeHtml(col)}</th>`;
                 });
                 tableHtml += `
                                 </tr>
@@ -10839,10 +11192,14 @@ if (empty($active_presets)) {
                 chart.rows.forEach(function(row, rIdx) {
                     var bg = rIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50';
                     tableHtml += `<tr class="${bg} font-bold text-slate-800 border-b border-slate-100">`;
-                    tableHtml += `<td class="p-3 font-black text-indigo-700 bg-indigo-50/40">${escapeHtml(row.size || '')}</td>`;
-                    chart.columns.forEach(function(col) {
-                        var val = (row.values && row.values[col] !== undefined) ? row.values[col] : '-';
-                        tableHtml += `<td class="p-3">${escapeHtml(val)}</td>`;
+                    if (hasExplicitRowSize) {
+                        tableHtml += `<td class="p-3 font-black text-indigo-700 bg-indigo-50/40 text-center">${escapeHtml(row.size || '—')}</td>`;
+                    }
+                    chart.columns.forEach(function(col, cIdx) {
+                        var val = row['c' + cIdx] !== undefined ? row['c' + cIdx] : (row[col] !== undefined ? row[col] : (Array.isArray(row) ? row[cIdx] : (row.values && row.values[col] !== undefined ? row.values[col] : '—')));
+                        var isFirst = (cIdx === 0 && firstColIsSize);
+                        var boldClass = isFirst ? 'font-black text-indigo-700 bg-indigo-50/30' : '';
+                        tableHtml += `<td class="p-3 text-center ${boldClass}">${escapeHtml(val !== '' ? val : '—')}</td>`;
                     });
                     tableHtml += `</tr>`;
                 });
@@ -12691,17 +13048,17 @@ if (empty($active_presets)) {
 
                      var ths = cols.map(function(col, idx) {
                          var borderClass = idx > 0 ? 'border-r border-slate-200' : '';
-                         return `<th class="p-3 bg-slate-50 text-slate-800 border-b border-slate-200 ${borderClass} text-center font-black">${col}</th>`;
+                         return `<th class="p-3 bg-slate-50 text-slate-800 border-b border-slate-200 ${borderClass} text-center font-black whitespace-nowrap">${col}</th>`;
                      }).join('');
 
                      var trs = '';
                      if (rows.length > 0) {
                          trs = rows.map(function(row) {
                              var tds = cols.map(function(col, idx) {
-                                 var cellVal = row['c' + idx] !== undefined ? row['c' + idx] : '';
+                                 var cellVal = row['c' + idx] !== undefined ? row['c' + idx] : (row[col] !== undefined ? row[col] : (Array.isArray(row) ? row[idx] : (row.values && row.values[col] !== undefined ? row.values[col] : (idx === 0 && row.size !== undefined ? row.size : ''))));
                                  var displayVal = cellVal !== '' ? cellVal : '—';
                                  var borderClass = idx > 0 ? 'border-r border-slate-100' : '';
-                                 return `<td class="p-3 ${borderClass} text-center font-bold">${displayVal}</td>`;
+                                 return `<td class="p-3 ${borderClass} text-center font-bold whitespace-nowrap">${displayVal}</td>`;
                              }).join('');
                              return `<tr class="border-b last:border-0 border-slate-100 hover:bg-slate-50/50 transition-colors">${tds}</tr>`;
                          }).join('');
@@ -12712,7 +13069,7 @@ if (empty($active_presets)) {
                      return `
                          <div id="preview-table-card" data-scs-block="table" class="scs-card relative group w-full overflow-x-auto border border-slate-200 rounded-2xl bg-white shadow-sm transition-all">
                              <div id="preview-table-container" class="w-full">
-                                 <table class="w-full text-right text-[11px] border-collapse" style="direction: rtl; width: 100%;">
+                                 <table class="w-full text-right text-[11px] border-collapse" style="direction: rtl; width: 100%; table-layout: auto;">
                                      <thead class="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
                                          <tr>${ths}</tr>
                                      </thead>
@@ -12725,21 +13082,28 @@ if (empty($active_presets)) {
                      `;
                  },
                  illus: function() {
-                     if (!chart.image_path) return '';
-                     var maxH = parseInt((typeof scs_settings !== 'undefined' && scs_settings.illus_max_height) || 160, 10);
-                     var objFit = (typeof scs_settings !== 'undefined' && scs_settings.illus_object_fit) || 'contain';
-                     return `
-                         <div id="preview-illus-card" data-scs-block="illus" class="scs-card relative group w-full bg-slate-50 rounded-2xl border border-slate-200 p-5 flex flex-col items-center justify-center text-center shadow-sm transition-all">
-                             <div id="preview-illus-box" class="w-full flex items-center justify-center overflow-hidden mb-3 opacity-80" style="max-height: ${maxH}px;">
-                                 <img src="${resolveImageUrl(chart.image_path)}" class="max-w-full rounded-lg" style="max-height: ${maxH}px; object-fit: ${objFit};" alt="Illustration" crossorigin="anonymous">
-                             </div>
-                             <div class="text-[9px] text-slate-400 leading-relaxed font-black">
-                                 ابعاد اندازه‌گیری شده محصول مربوط به اندازه تکه‌ای کالا در حالتِ آزاد و غیرکشیده روی سطح است.
-                             </div>
-                         </div>
-                     `;
-                 },
-                 notes: function() {
+                    var maxH = parseInt((typeof scs_settings !== 'undefined' && scs_settings.illus_max_height) || 160, 10);
+                    var objFit = (typeof scs_settings !== 'undefined' && scs_settings.illus_object_fit) || 'contain';
+                    var imgUrl = chart.image_path || chart.illus_url || '';
+                    if (!imgUrl && Array.isArray(app_presets) && chart.preset_id) {
+                        var pr = app_presets.find(p => String(p.id) === String(chart.preset_id));
+                        if (pr && pr.illus_url) imgUrl = pr.illus_url;
+                    }
+                    var mediaHtml = imgUrl ?
+                        `<img src="${resolveImageUrl(imgUrl)}" class="max-w-full rounded-lg" style="max-height: ${maxH}px; object-fit: ${objFit};" alt="Illustration" crossorigin="anonymous">` :
+                        `<div class="w-full flex items-center justify-center mb-2"><span class="text-4xl text-slate-400">📏</span></div>`;
+                    return `
+                        <div id="preview-illus-card" data-scs-block="illus" class="scs-card relative group w-full bg-slate-50 rounded-2xl border border-slate-200 p-5 flex flex-col items-center justify-center text-center shadow-sm transition-all" style="box-sizing: border-box;">
+                            <div id="preview-illus-box" class="w-full flex items-center justify-center overflow-hidden mb-3 opacity-90" style="max-height: ${maxH}px;">
+                                ${mediaHtml}
+                            </div>
+                            <div class="text-[9px] text-slate-400 leading-relaxed font-black">
+                                ابعاد اندازه‌گیری شده محصول مربوط به اندازه تکه‌ای کالا در حالتِ آزاد و غیرکشیده روی سطح است.
+                            </div>
+                        </div>
+                    `;
+                },
+                notes: function() {
                      if (!chart.product_notes) return '';
                      return `
                          <div id="preview-notes-card" data-scs-block="notes" class="scs-card relative group w-full bg-amber-50/50 p-4 rounded-2xl border border-amber-200/60 text-right shadow-sm transition-all">
@@ -12797,11 +13161,42 @@ if (empty($active_presets)) {
                  }
              };
 
+             var layout = (typeof scs_settings !== 'undefined' && scs_settings.layout_mode) || 'standard_split';
+             var isFreeform = (typeof scs_settings !== 'undefined' && scs_settings.positioning_mode === 'freeform');
+             var renderedBlocks = new Set();
+
              order.forEach(function(k) {
-                 if (blocks[k] && (typeof getBlockVisibility !== 'function' || getBlockVisibility(k))) {
-                     var html = blocks[k]();
-                     if (html) container.append(html);
+                 if (renderedBlocks.has(k)) return;
+                 if (!blocks[k] || (typeof getBlockVisibility === 'function' && !getBlockVisibility(k))) return;
+
+                 if ((k === 'table' || k === 'illus') && !isFreeform) {
+                     var hasTable = order.includes('table') && (typeof getBlockVisibility !== 'function' || getBlockVisibility('table'));
+                     var hasIllus = order.includes('illus') && (typeof getBlockVisibility !== 'function' || getBlockVisibility('illus'));
+
+                     if (hasTable && hasIllus && (layout === 'standard_split' || layout === 'modern_bento')) {
+                         var tableHtml = blocks.table();
+                         var illusHtml = blocks.illus();
+                         var gapPx = (typeof scs_settings !== 'undefined' && scs_settings.content_gap) || 16;
+                         var gridHtml = `
+                             <div id="batch-grid-wrapper" class="w-full scs-batch-grid-split scs-grid-wrapper flex flex-row items-stretch gap-4" style="display: flex !important; flex-direction: row !important; gap: ${gapPx}px !important; align-items: stretch !important; justify-content: space-between !important; width: 100% !important; box-sizing: border-box !important;">
+                                 <div style="flex: 8 1 0% !important; width: 66.666% !important; min-width: 0 !important; box-sizing: border-box !important;">
+                                     ${tableHtml}
+                                 </div>
+                                 <div style="flex: 4 1 0% !important; width: 33.333% !important; min-width: 0 !important; box-sizing: border-box !important;">
+                                     ${illusHtml}
+                                 </div>
+                             </div>
+                         `;
+                         container.append(gridHtml);
+                         renderedBlocks.add('table');
+                         renderedBlocks.add('illus');
+                         return;
+                     }
                  }
+
+                 var html = blocks[k]();
+                 if (html) container.append(html);
+                 renderedBlocks.add(k);
              });
 
              if (typeof applyBrandingStyleToTarget === 'function') {
@@ -13002,11 +13397,36 @@ if (empty($active_presets)) {
 
              initNewChart();
 
+             selected_chart = chart;
+             $('#editor-chart-id').val(chart.id || '');
+             $('#editor-title-text').text(`ویرایش: ${chart.title || chart.product_desc}`);
              $('#chart-title').val(chart.title || '');
              $('#chart-product-desc').val(chart.product_desc || '');
              $('#chart-product-notes').val(chart.product_notes || '');
-             if (chart.model) $('#chart-model').val(chart.model).prop('disabled', false);
-             if (chart.waist_type) $('#chart-waist-type').val(chart.waist_type).prop('disabled', false);
+             if (chart.model) $('#chart-model').val(chart.model).prop('disabled', false).parent().removeClass('opacity-50');
+             if (chart.waist_type) $('#chart-waist-type').val(chart.waist_type).prop('disabled', false).parent().removeClass('opacity-50');
+
+             var presetId = chart.preset_id || ('custom_' + (chart.id || idx));
+             var pr = app_presets.find(x => String(x.id) === String(presetId) || x.id == presetId);
+             if (!pr) {
+                 pr = {
+                     id: presetId,
+                     name: chart.title || 'سفارشی',
+                     category: chart.category || 'عمومی',
+                     columns: chart.columns || [],
+                     show_model: chart.model ? 1 : 0,
+                     show_waist: chart.waist_type ? 1 : 0,
+                     illus_url: chart.image_path || '',
+                     icon_url: ''
+                 };
+                 app_presets.push(pr);
+                 if ($('#chart-preset-select option[value="' + presetId + '"]').length === 0) {
+                     $('#chart-preset-select').append(`<option value="${presetId}">${chart.category ? (chart.category + ' (قالب ورودی)') : 'قالب اختصاصی'}</option>`);
+                 }
+             } else if (chart.columns && chart.columns.length > 0) {
+                 pr.columns = chart.columns;
+             }
+             $('#chart-preset-select').val(presetId);
 
              // Rebuild header row
              var headerRow = $('#grid-header-row').empty();
@@ -13028,7 +13448,17 @@ if (empty($active_presets)) {
                  gridBody.append(tr);
              });
 
+             if (chart.desc_values && Object.keys(chart.desc_values).length > 0) {
+                 buildDescriptionFields('', chart.desc_values);
+             }
+
+             setBlockVisibility('table', true);
+             $('#setting-show-table').prop('checked', true);
+             scs_settings.show_table = 1;
+             $('#preview-table-card').removeClass('hidden');
+
              $('#preview-cat').text(chart.category || 'عمومی');
+             applyBrandingChanges();
              updateLivePreview();
 
              $('html, body').animate({ scrollTop: $('#tabcontent-editor').offset().top - 80 }, 400);

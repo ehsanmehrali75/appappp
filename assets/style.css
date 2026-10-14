@@ -1,6 +1,6 @@
 @font-face {
     font-family: 'Vazirmatn';
-    src: local('Vazirmatn'), local('Vazir'), url('fonts/Vazirmatn-Regular.woff2') format('woff2');
+    src: local('Vazirmatn'), local('Vazir'), url('fonts/Vazirmatn-Regular.woff2') format('woff2'), url('fonts/Vazirmatn-Regular.ttf') format('truetype');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -8,7 +8,7 @@
 
 @font-face {
     font-family: 'Vazirmatn';
-    src: local('Vazirmatn-Bold'), local('Vazir-Bold'), url('fonts/Vazirmatn-Bold.woff2') format('woff2');
+    src: local('Vazirmatn-Bold'), local('Vazir-Bold'), url('fonts/Vazirmatn-Bold.woff2') format('woff2'), url('fonts/Vazirmatn-Bold.ttf') format('truetype');
     font-weight: bold;
     font-style: normal;
     font-display: swap;

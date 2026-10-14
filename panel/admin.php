@@ -1677,6 +1677,7 @@ $sections_json
             echo json_encode([
                 'status' => 'success',
                 'download_url' => 'uploads/' . $zipName,
+                'zip_url' => 'uploads/' . $zipName,
                 'total_products' => $added,
                 'msg' => "تعداد $added فایل جدول سایز با موفقیت بسته‌بندی شد."
             ]);
@@ -6435,7 +6436,7 @@ $suggestions = getCalendarSuggestions($project);
                     return originalFetch.apply(window, arguments);
                 }
                 const controller = new AbortController();
-                const timeoutMs = (typeof init.timeout === 'number') ? init.timeout : 10000;
+                const timeoutMs = (typeof init.timeout === 'number') ? init.timeout : 30000;
                 const timer = setTimeout(() => {
                     controller.abort(new Error('Network request timed out after ' + (timeoutMs/1000) + 's'));
                 }, timeoutMs);
@@ -6686,16 +6687,22 @@ $suggestions = getCalendarSuggestions($project);
     <style>
         @font-face {
             font-family: 'Vazirmatn';
-            src: url('<?php echo getFullUrl('assets/fonts/Vazirmatn-Regular.woff2'); ?>') format('woff2');
+            src: local('Vazirmatn'), local('Vazir'),
+                 url('<?php echo getFullUrl('assets/fonts/Vazirmatn-Regular.woff2'); ?>') format('woff2'),
+                 url('<?php echo getFullUrl('assets/fonts/Vazirmatn-Regular.ttf'); ?>') format('truetype');
             font-weight: normal;
             font-style: normal;
+            font-display: swap;
         }
 
         @font-face {
             font-family: 'Vazirmatn';
-            src: url('<?php echo getFullUrl('assets/fonts/Vazirmatn-Bold.woff2'); ?>') format('woff2');
+            src: local('Vazirmatn-Bold'), local('Vazir-Bold'),
+                 url('<?php echo getFullUrl('assets/fonts/Vazirmatn-Bold.woff2'); ?>') format('woff2'),
+                 url('<?php echo getFullUrl('assets/fonts/Vazirmatn-Bold.ttf'); ?>') format('truetype');
             font-weight: bold;
             font-style: normal;
+            font-display: swap;
         }
 
         body { font-family: 'Vazirmatn', 'Tahoma', sans-serif !important; background: #f8fafc; }
@@ -10211,8 +10218,9 @@ $suggestions = getCalendarSuggestions($project);
                                 updateSelectedExportCount();
                                 
                                 if (data.status === 'success') {
+                                    const rawDl = data.zip_url || data.download_url;
                                     const link = document.createElement('a');
-                                    link.href = data.zip_url;
+                                    link.href = getFullUrl(rawDl);
                                     link.download = '';
                                     document.body.appendChild(link);
                                     link.click();
@@ -25459,18 +25467,37 @@ ${desc2}
             if (!modal) {
                 modal = document.createElement('div');
                 modal.id = 'lightboxModal';
-                modal.className = 'fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md transition-all duration-300';
-                modal.onclick = function(e) { this.style.display = 'none'; };
+                modal.className = 'fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 transition-all duration-300';
+                modal.onclick = function(e) { if(e.target === this) this.style.display = 'none'; };
                 modal.innerHTML = `
-                    <div class="relative max-w-[90%] max-h-[90%] flex flex-col items-center">
-                        <button class="absolute -top-12 right-0 text-white hover:text-rose-450 text-2xl font-bold bg-white/10 w-10 h-10 rounded-full flex items-center justify-center transition-all">✕</button>
-                        <img id="lightboxImg" src="" class="max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl border-4 border-white">
-                        <p class="text-white text-xs font-black mt-4 uppercase tracking-wider">جدول راهنمای سایز کالا</p>
+                    <div class="relative max-w-4xl w-full max-h-[92vh] flex flex-col bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div class="p-4 sm:p-5 bg-gradient-to-r from-slate-900 to-indigo-950 text-white flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-indigo-500/20 border border-indigo-400/30 rounded-2xl flex items-center justify-center text-lg">📐</div>
+                                <div>
+                                    <h3 class="font-black text-sm text-white">جدول راهنمای سایزبندی کالا</h3>
+                                    <p class="text-[10px] text-indigo-200 mt-0.5">اندازه‌گیری و تطابق سایز استاندارد رسمی</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <a id="lightboxDownloadBtn" href="" download="size_chart.jpg" target="_blank" class="px-3.5 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-black rounded-xl transition-all flex items-center gap-1 border border-white/10">
+                                    <span>📥</span> <span class="hidden sm:inline">دانلود تصویر</span>
+                                </a>
+                                <button type="button" onclick="document.getElementById('lightboxModal').style.display='none'" class="w-9 h-9 rounded-xl bg-white/10 hover:bg-rose-500 text-white hover:text-white transition-all flex items-center justify-center text-sm font-black cursor-pointer">
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                        <div class="p-4 sm:p-6 overflow-auto flex-1 flex items-center justify-center bg-slate-50 min-h-[300px]">
+                            <img id="lightboxImg" src="" class="max-w-full max-h-[70vh] object-contain rounded-2xl shadow-lg border border-slate-200 bg-white" alt="جدول سایز">
+                        </div>
                     </div>
                 `;
                 document.body.appendChild(modal);
             }
             document.getElementById('lightboxImg').src = imgUrl;
+            const dlBtn = document.getElementById('lightboxDownloadBtn');
+            if (dlBtn) dlBtn.href = imgUrl;
             modal.style.display = 'flex';
         }
 
