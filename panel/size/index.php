@@ -730,7 +730,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
          $row_colors = json_decode($_POST['table_row_colors'] ?? '{}', true);
          $valid_row_colors = [];
          foreach (is_array($row_colors) ? $row_colors : [] as $row => $color) {
-             if (ctype_digit((string)$row) && (int)$row < 1000 && is_string($color) && preg_match('/^#[0-9a-fA-F]{6}$/D', $color)) {
+             if (preg_match('/^[0-9]+$/D', (string)$row) && (int)$row < 1000 && is_string($color) && preg_match('/^#[0-9a-fA-F]{6}$/D', $color)) {
                  $valid_row_colors[(int)$row] = $color;
              }
          }
