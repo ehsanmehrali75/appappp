@@ -139,7 +139,24 @@ if (isSuperAdmin()) {
     }
 }
 
-$project = getCurrentProject();
+// Bind branding requests to the project displayed in this studio, not a
+// shared session that another browser tab may have switched.
+$studioProjectId = $_GET['project'] ?? ($_SESSION['project_id'] ?? null);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'td_scs_save_branding_settings') {
+    $studioProjectId = $_POST['project_id'] ?? ($_GET['project'] ?? null);
+}
+$allowedProjectIds = array_column($allProjects, 'id');
+if (!is_string($studioProjectId) || !in_array($studioProjectId, $allowedProjectIds, true)) {
+    http_response_code(403);
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => false, 'error' => 'پروژه معتبر و مجاز انتخاب نشده است.'], JSON_UNESCAPED_UNICODE);
+    } else {
+        echo 'پروژه معتبر و مجاز انتخاب نشده است.';
+    }
+    exit;
+}
+$project = getCurrentProject($studioProjectId, true);
 if (!$project) {
     die('پروژه فعال یافت نشد.');
 }
@@ -795,8 +812,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
          ];
 
          $project['settings']['size_chart_settings'] = $settings;
-         saveProject($project);
-         echo json_encode(['success' => true, 'settings' => $settings], JSON_UNESCAPED_UNICODE);
+         $saved = saveProject($project);
+         echo json_encode(['success' => (bool)$saved, 'project_id' => $project['id'], 'settings' => $settings], JSON_UNESCAPED_UNICODE);
          exit;
     }
     
@@ -4952,6 +4969,11 @@ if (empty($active_presets)) {
 
         // --- Branding & Styling Engine ---
 
+        // Compatibility for callers using the former branding mode name.
+        function setBrandingStyleMode(mode) {
+            return setStyleMode(mode);
+        }
+
         function setStyleMode(mode) {
             scs_settings.style_mode = mode;
             
@@ -8681,7 +8703,7 @@ if (empty($active_presets)) {
         function applyCustomThemePreset(presetKey) {
             scs_settings.style_mode = 'custom';
             scs_settings.custom_theme_preset = presetKey;
-            setBrandingStyleMode('custom');
+            setStyleMode('custom');
 
             if (presetKey === 'persepolis') {
                 // 🔴 Persepolis & Sport Red Brand Theme
@@ -8837,6 +8859,7 @@ if (empty($active_presets)) {
 
             var postData = {
                 action: 'td_scs_save_branding_settings',
+                project_id: <?php echo json_encode($project['id']); ?>,
                 brand_title: $('#setting-brand-title').val().trim(),
                 brand_subtitle: $('#setting-brand-subtitle').val().trim(),
                 brand_tagline: $('#setting-brand-tagline').val().trim(),
