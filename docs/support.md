@@ -28,7 +28,7 @@
 
 ### Unicode database compatibility and diagnostics
 
-Support tables explicitly use InnoDB and utf8mb4 on MySQL/MariaDB. Existing tables with a different character set are converted once, preserving rows; back up the database before deployment as with any schema migration. The database user needs CREATE and ALTER permissions. SQLite uses its native Unicode storage. Database failures show a reference code; the PHP error log records that reference, operation, numeric error and SQLSTATE, without ticket contents or connection credentials. A live-host failure still needs its matching log entry to establish its cause.
+Support tables explicitly use InnoDB and utf8mb4 on MySQL/MariaDB. Existing tables with a different character set or a nontransactional engine are converted to utf8mb4/InnoDB once, preserving rows; back up the database before deployment as with any schema migration. The database user needs CREATE and ALTER permissions. SQLite uses its native Unicode storage. Database failures show a reference code; the PHP error log records that reference, operation, numeric error and SQLSTATE, without ticket contents or connection credentials. A live-host failure still needs its matching log entry to establish its cause.
 
 Run `php tests/support_tickets.php` for SQLite workflow checks. An isolated MySQL/MariaDB server can run `SUPPORT_TEST_MYSQL_PORT=3308 php tests/support_mysql.php`; it creates and drops only a random `support_test_*` database. Optional host/user/password environment variables have the same `SUPPORT_TEST_MYSQL_` prefix. This test reproduces the latin1/Persian failure, verifies conversion, emoji, cost consent, resolution, and repeated initialization.
 

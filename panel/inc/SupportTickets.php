@@ -21,6 +21,12 @@ class SupportTickets {
         if (!($this->db instanceof mysqli)) return;
         // Older installations inherited the database default (often latin1).
         foreach (['support_tickets', 'support_messages'] as $table) {
+            $status = $this->db->query("SHOW TABLE STATUS WHERE Name = '$table'");
+            if (!$status) $this->databaseFailure('table_status');
+            $metadata = $status->fetch_assoc();
+            $status->free();
+            if (!$metadata) $this->databaseFailure('missing_table');
+            if (strcasecmp($metadata['Engine'] ?? '', 'InnoDB') !== 0 && !$this->db->query("ALTER TABLE `$table` ENGINE=InnoDB")) $this->databaseFailure('transaction_migration');
             $columns = $this->db->query("SHOW FULL COLUMNS FROM `$table`");
             if (!$columns) $this->databaseFailure('schema');
             $convert = false;
