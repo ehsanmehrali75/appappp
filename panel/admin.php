@@ -260,6 +260,8 @@ if ($project && isset($project['settings']['auto_admin']['active']) && (int)$pro
 }
 
 if ($project && isset($_GET['download_full_backup'])) {
+    if(!isMainAdmin())AccessControl::deny();
+    header('Cache-Control: no-store');
     header('Content-Type: application/json; charset=utf-8');
     header('Content-Disposition: attachment; filename="maarksho_backup_project_' . preg_replace('/[^a-zA-Z0-9_-]/', '', $project['id']) . '_' . date('Ymd_His') . '.json"');
     
@@ -499,7 +501,7 @@ if ($project && isset($_POST['ajax_action'])) {
     header('Content-Type: application/json');
     $action = $_POST['ajax_action'];
 
-    if (in_array($action, ['website_catalog_preview','website_catalog_apply','website_catalog_resolve'], true)) {
+    if (in_array($action, ['website_catalog_preview','website_catalog_apply','website_catalog_resolve','website_catalog_request_image'], true)) {
         if (!hasPermission('products')) { http_response_code(403); echo json_encode(['status'=>'failed','msg'=>'دسترسی ویرایش محصولات مجاز نیست.']); exit; }
         if (!isset($_POST['csrf']) || !hash_equals($_SESSION['website_catalog_csrf'] ?? '', (string)$_POST['csrf'])) { http_response_code(403); echo json_encode(['status'=>'failed','msg'=>'نشست معتبر نیست؛ صفحه را تازه کنید.']); exit; }
         $websiteLock = null;
@@ -510,7 +512,23 @@ if ($project && isset($_POST['ajax_action'])) {
             if (!$websiteLock || !flock($websiteLock,LOCK_EX)) throw new RuntimeException('قفل همگام‌سازی پروژه در دسترس نیست.');
             $freshProject = getCurrentProject($project['id'], true);
             if (!$freshProject) throw new RuntimeException('پروژه یافت نشد.');
-            if ($action === 'website_catalog_preview') {
+            if($action==='website_catalog_request_image') {
+                if(!ImageProduction::canRequest($freshProject))AccessControl::deny();
+                $found=false;
+                foreach($freshProject['products'] as &$item)if((string)$item['id']===(string)($_POST['product_id']??'')) {
+                    $state=WebsiteCatalogSync::state($freshProject,$item);
+                    if(!$state['needs_image']||$state['archived'])throw new RuntimeException('این محصول به درخواست تولید تصویر نیاز ندارد.');
+                    if(empty($item['content_gen_requested'])) {
+                        $item['content_gen_requested']=true;
+                        $item['website_sync']['image_request']=['at'=>time(),'by'=>$_SESSION['user']['username']??''];
+                        if(!saveProject($freshProject,[$item]))throw new RuntimeException('ثبت درخواست تولید ناموفق بود.');
+                    }
+                    $found=true;break;
+                }
+                unset($item);
+                if(!$found)throw new RuntimeException('محصول یافت نشد.');
+                echo json_encode(['status'=>'success','msg'=>'درخواست تولید تصویر ثبت شد؛ مرحلهٔ بعد بر اساس رفرنس همین محصول تعیین شد.'],JSON_UNESCAPED_UNICODE);
+            } elseif ($action === 'website_catalog_preview') {
                 if (strlen($_POST['data'] ?? '') > 5*1024*1024) throw new RuntimeException('حداکثر اندازهٔ JSON پنج مگابایت است.');
                 $rows = json_decode($_POST['data'] ?? '', true);
                 $options = ['complete'=>($_POST['complete']??'')==='1','update_price'=>($_POST['update_price']??'1')==='1','update_stock'=>($_POST['update_stock']??'1')==='1','price_unit'=>$_POST['price_unit']??'auto'];
@@ -2187,6 +2205,7 @@ $sections_json
 
                         if (count($p['approvals_stage1']) >= $st1_min && count($p['approvals_stage2']) >= $st2_min) {
                             $p['status'] = 'active';
+                            approveProductImages($p);
                             $p['approved_at'] = time();
                             unset($p['rejectionReason']);
                         } else {
@@ -2194,6 +2213,7 @@ $sections_json
                         }
                     } else {
                         $p['status'] = 'active';
+                        approveProductImages($p);
                         $p['approved_at'] = time();
                         unset($p['rejectionReason']);
                     }
@@ -3338,6 +3358,7 @@ if ($project) {
             echo json_encode(['status' => 'error', 'msg' => 'دسترسی غیرمجاز برای مدیریت عکس رفرنس']);
             exit;
         }
+        if(!ImageProduction::canReference($project))AccessControl::deny();
         $pid = trim($_POST['pid'] ?? ($_POST['product_id'] ?? ''));
         if (empty($pid)) {
             echo json_encode(['status' => 'error', 'msg' => 'شناسه محصول یافت نشد']);
@@ -3358,6 +3379,9 @@ if ($project) {
         }
 
         $p = &$project['products'][$foundIndex];
+        if(WebsiteCatalogSync::state($project,$p)['image_production']['needs_image_request']) {
+            http_response_code(400);echo json_encode(['status'=>'error','msg'=>'ابتدا درخواست تولید تصویر این محصول را ثبت کنید.'],JSON_UNESCAPED_UNICODE);exit;
+        }
         if (!isset($p['reference_gallery']) || !is_array($p['reference_gallery'])) {
             $p['reference_gallery'] = [];
         }
@@ -3425,12 +3449,14 @@ if ($project) {
 
         if (isset($_POST['priority']) || isset($_POST['content_gen_requested'])) {
             $val = $_POST['priority'] ?? $_POST['content_gen_requested'];
+            $nextRequested=in_array($val,['1','true',true],true);
+            if($nextRequested!==!empty($p['content_gen_requested'])&&!ImageProduction::canRequest($project))AccessControl::deny();
             $p['content_gen_requested'] = ($val === '1' || $val === 'true' || $val === true);
         }
 
         if (!empty($p['reference_gallery'])) {
             $p['has_reference'] = true;
-            $p['content_gen_requested'] = true;
+            if(empty($project['settings']['prod_require_image_request']))$p['content_gen_requested'] = true;
             $p['waiting_final_photo'] = true;
             if (($p['status'] ?? '') === 'no_image' || ($p['status'] ?? '') === 'rejected') {
                 $p['status'] = 'pending';
@@ -3445,12 +3471,12 @@ if ($project) {
             saveProduct($p, $project['id']);
         }
 
-        $wfStatus = getProductWorkflowStatus($p);
-        $wfLabel = ($wfStatus === 'waiting_ai_image' || $wfStatus === 'pending') ? 'در انتظار عکس نهایی' : 'در انتظار پردازش';
+        $wfStatus = getProductWorkflowStatus($p,$project);
+        $wfLabel = ProductWorkflow::label($wfStatus);
 
         echo json_encode([
             'status' => 'success',
-            'msg' => 'تصاویر رفرنس با موفقیت ذخیره شدند و محصول به وضعیت در انتظار عکس نهایی منتقل شد.',
+            'msg' => 'عکس‌های رفرنس ذخیره شدند؛ وضعیت فعلی: '.$wfLabel,
             'reference_gallery' => $p['reference_gallery'],
             'workflow_status' => $wfStatus,
             'workflow_status_label' => $wfLabel,
@@ -3559,6 +3585,7 @@ if ($project) {
         }
 
         $p = &$project['products'][$foundIndex];
+        if(!ImageProduction::canRequest($project))AccessControl::deny();
         if (isset($_POST['priority'])) {
             $p['content_gen_requested'] = ($_POST['priority'] === '1' || $_POST['priority'] === 'true' || $_POST['priority'] === true);
         } else {
@@ -4850,6 +4877,10 @@ if ($project) {
         $project['settings']['prod_content_gen_users'] = $_POST['prod_content_gen_users'] ?? '';
         $project['settings']['prod_couples_users'] = $_POST['prod_couples_users'] ?? '';
         $project['settings']['prod_ref_image_users'] = $_POST['prod_ref_image_users'] ?? '';
+        if(isset($_POST['image_production_settings_present'])) {
+            $project['settings']['prod_require_reference']=isset($_POST['prod_require_reference'])?1:0;
+            $project['settings']['prod_require_image_request']=isset($_POST['prod_require_image_request'])?1:0;
+        }
 
         $project['settings']['cal_approval_split_enabled'] = isset($_POST['cal_approval_split_enabled']) ? 1 : 0;
         $project['settings']['cal_approval_stage1_users'] = $_POST['cal_approval_stage1_users'] ?? '';
@@ -5584,7 +5615,7 @@ if ($project) {
         }
         
         $u_username = trim($_POST['username']);
-        $u_password = $_POST['password'];
+        $u_password = password_hash($_POST['password'],PASSWORD_DEFAULT);
         $u_role = $_POST['role'];
         if (!in_array($u_role, ['project_admin', 'manager', 'editor', 'viewer'], true)) AccessControl::deny();
         $u_mobile = $_POST['mobile'] ?? '';
@@ -5679,7 +5710,7 @@ if ($project) {
             
             $u_password = $project['users'][$uidx]['password'];
             if (!empty($_POST['password'])) {
-                $u_password = $_POST['password'];
+                $u_password = password_hash($_POST['password'],PASSWORD_DEFAULT);
             }
             
             $assigned_pids = $_POST['assigned_projects'] ?? [];
@@ -7794,6 +7825,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             'all' => $allProdsCount,
                             'out_of_stock' => 0,
                             'no_image' => 0,
+                            'image_request' => 0,
                             'waiting_reference' => 0,
                             'waiting_ai_image' => 0,
                             'pending_approval' => 0,
@@ -7936,6 +7968,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             $tabs = [
                                 'out_of_stock' => ['label' => '۱. بدون موجودی', 'count' => $stats['out_of_stock'], 'icon' => '📦', 'color' => 'rose'],
                                 'no_image' => ['label' => '۲. بدون تصویر', 'count' => $stats['no_image'], 'icon' => '🖼️', 'color' => 'amber'],
+                                'image_request' => ['label'=>'درخواست تولید تصویر','count'=>$stats['image_request'],'icon'=>'✍️','color'=>'amber'],
                                 'waiting_reference' => ['label' => '۳. در انتظار عکس رفرنس', 'count' => $stats['waiting_reference'], 'icon' => '📸', 'color' => 'sky'],
                                 'waiting_ai_image' => ['label' => '۴. در انتظار تولید تصویر AI', 'count' => $stats['waiting_ai_image'], 'icon' => '🤖', 'color' => 'purple'],
                                 'pending_approval' => ['label' => '۵. در انتظار تایید پورتال', 'count' => $stats['pending_approval'], 'icon' => '⏳', 'color' => 'amber'],
@@ -8315,6 +8348,8 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             $b_req = !empty($b['content_gen_requested']) ? 1 : 0;
                             return $b_req <=> $a_req;
                         });
+                    } elseif ($filter === 'image_request') {
+                        $p_list=array_filter($all_products,fn($p)=>getProductWorkflowStatus($p)==='image_request');
                     } elseif ($filter === 'waiting_reference') {
                         $p_list = array_filter($all_products, function($p) { 
                             return getProductWorkflowStatus($p) === 'waiting_reference'; 
@@ -10189,7 +10224,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                 </div>
                             </div>
                             <div class="shrink-0 flex flex-col gap-3 text-center">
-                                <a href="cron.php?ajax=1" target="_blank" class="px-8 py-4 bg-indigo-600 text-white rounded-2xl text-xs font-black shadow-xl shadow-indigo-200 hover:-translate-y-1 transition-all">🚀 تست موتور</a>
+                                <?php if(isMainAdmin()): ?><form method="post" action="cron.php?ajax=1" target="_blank"><button class="px-8 py-4 bg-indigo-600 text-white rounded-2xl text-xs font-black shadow-xl shadow-indigo-200 hover:-translate-y-1 transition-all">🚀 تست موتور</button></form><?php endif; ?>
                                 <p class="text-[9px] text-slate-400 font-black uppercase tracking-widest">Manual Trigger</p>
                             </div>
                         </div>
@@ -10204,11 +10239,11 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                 <p class="text-xs text-slate-500 leading-relaxed mb-3">یک خروجی کامل و جامع به صورت فایل استاندارد JSON از تمام محصولات، نظرات، لایک‌ها، واکنش‌ها، تنظیمات کلی و جزئیات زمان‌بندی سیستم خود دانلود کنید. از این فایل می‌توانید در هر شرایطی برای گارانتی و بازگردانی سریع کل مجموعه استفاده نمایید.</p>
                                 <p class="text-[10px] text-emerald-600 font-black tracking-wider uppercase flex items-center gap-2">
                                     <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                                    سیستم پشتیبان‌گیری چندلایه فعال و امن
+                                    خروجی دادهٔ پروژه؛ فایل‌های تصاویر باید جداگانه پشتیبان‌گیری شوند
                                 </p>
                             </div>
                             <div class="shrink-0 flex flex-col gap-2 text-center">
-                                <a href="?tab=extract&download_full_backup=1" class="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-xl shadow-emerald-200 hover:-translate-y-1 transition-all">📥 خروجی جامع JSON</a>
+                                <?php if(isMainAdmin()): ?><a href="?tab=extract&download_full_backup=1" class="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-xl shadow-emerald-200 hover:-translate-y-1 transition-all">📥 خروجی جامع JSON</a><?php endif; ?>
                                 <p class="text-[9px] text-slate-400 font-black uppercase tracking-widest">Complete System Backup</p>
                             </div>
                         </div>
@@ -11156,7 +11191,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
 
                 function clearDebugLog() {
                     if (!confirm('آیا مایل به پاکسازی لاگ‌های عمیق هستید؟')) return;
-                    fetch('ajax_helper.php?action=clear_debug_log')
+                    fetch('ajax_helper.php?action=clear_debug_log',{method:'POST'})
                         .then(r => r.json())
                         .then(res => {
                             if (res.status === 'success') {
@@ -11167,10 +11202,10 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
 
                 let isHeartbeatRunning = false;
                 function triggerWorker() {
-                    if (isHeartbeatRunning) return;
+                    if (!<?php echo isMainAdmin()?'true':'false'; ?> || isHeartbeatRunning) return;
                     isHeartbeatRunning = true;
 
-                    fetch('cron.php?trigger=1&ajax=1')
+                    fetch('cron.php?trigger=1&ajax=1', {method:'POST'})
                         .then(r => r.text())
                         .then(data => {
                             const badge = document.getElementById('worker-status-badge');
@@ -20320,6 +20355,12 @@ async function handleRequest(request) {
                                           </div>
                                       </div>
 
+                                      <div class="premium-card p-4 mt-4 space-y-3">
+                                          <h4 class="font-bold text-sm">مراحل تولید تصویر این پروژه</h4><input type="hidden" name="image_production_settings_present" value="1">
+                                          <label class="flex items-start gap-2"><input type="checkbox" name="prod_require_image_request" value="1" <?php echo !empty($project['settings']['prod_require_image_request'])?'checked':''; ?>><span>قبل از عکس رفرنس، درخواست تولید تصویر ثبت شود</span></label>
+                                          <label class="flex items-start gap-2"><input type="checkbox" name="prod_require_reference" value="1" <?php echo !empty($project['settings']['prod_require_reference'])?'checked':''; ?>><span>عکس رفرنس قبل از تولید تصویر الزامی باشد</span></label>
+                                          <p class="text-xs text-slate-500">با فعال‌بودن هر الزام، محصول تا تکمیل آن مرحله وارد صف تولید عکس نمی‌شود. اگر درخواست الزامی نباشد، کالای بدون عکس و رفرنس مستقیم در صف رفرنس دیده می‌شود. اگر رفرنس اختیاری باشد، هم‌زمان در فیلتر رفرنسِ تکمیل‌نشده و تولید عکس نمایش داده می‌شود. ناموجودها وارد صف اجرا نمی‌شوند.</p>
+                                      </div>
                                       <!-- Content Generation Allowed Users Section -->
                                       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-4 rounded-xl border border-slate-200 mt-4">
                                           <div>
@@ -26382,7 +26423,7 @@ ${desc2}
                 fd.append('pid', currentFastRefProduct.id);
                 fd.append('priority', checked ? 1 : 0);
 
-                const res = await fetch('admin.php', { method: 'POST', body: fd });
+                const res = await fetch('admin.php?tab=' + encodeURIComponent(new URL(location.href).searchParams.get('tab') || 'products'), { method: 'POST', body: fd });
                 const data = await res.json();
                 if (data.status === 'success') {
                     currentFastRefProduct.content_gen_requested = checked;
@@ -26417,7 +26458,7 @@ ${desc2}
                     fd.append('reference_files[]', file);
                 });
 
-                const response = await fetch('admin.php', {
+                const response = await fetch('admin.php?tab=' + encodeURIComponent(new URL(location.href).searchParams.get('tab') || 'products'), {
                     method: 'POST',
                     body: fd
                 });
@@ -26444,9 +26485,9 @@ ${desc2}
         // Global background execution dispatcher (Lightweight & Throttled)
         let isGlobalHeartbeatRunning = false;
         function triggerGlobalWorker() {
-            if (document.hidden || isGlobalHeartbeatRunning) return;
+            if (!<?php echo isMainAdmin()?'true':'false'; ?> || document.hidden || isGlobalHeartbeatRunning) return;
             isGlobalHeartbeatRunning = true;
-            fetch('cron.php?trigger=1&ajax=1')
+            fetch('cron.php?trigger=1&ajax=1', {method:'POST'})
                 .then(r => r.text())
                 .catch(e => console.error('Global Heartbeat Error:', e))
                 .finally(() => {

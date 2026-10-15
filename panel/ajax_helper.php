@@ -9,6 +9,8 @@ if (!isUser()) {
 $action = $_GET['action'] ?? '';
 
 if ($action === 'clear_debug_log') {
+    if(($_SERVER['REQUEST_METHOD']??'GET')!=='POST'||!isMainAdmin())AccessControl::deny();
+    RequestSecurity::enforce();
     $file = __DIR__ . '/scraper/scraper_debug.log';
     if (file_exists($file)) {
         file_put_contents($file, "");

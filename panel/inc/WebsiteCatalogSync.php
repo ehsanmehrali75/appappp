@@ -1,6 +1,7 @@
 <?php
 /** Website data enriches existing products; ERP remains the product/variant authority. */
 require_once __DIR__.'/ProductSizeChartCatalog.php';
+require_once __DIR__.'/ImageProduction.php';
 class WebsiteCatalogSync {
     public static function code($value) {
         return trim(strtr((string)$value, array_combine(preg_split('//u','۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩',-1,PREG_SPLIT_NO_EMPTY),str_split('01234567890123456789'))));
@@ -144,8 +145,11 @@ class WebsiteCatalogSync {
         $descriptionPending=$hasDescription&&(($meta['presence']??'')==='missing'||(array_key_exists('has_description',$meta)&&!$meta['has_description'])||(isset($meta['local_description_fingerprint'])&&!hash_equals($meta['local_description_fingerprint'],hash('sha256',trim((string)$product['description'])))));
         if(in_array('description',$receiptAssets,true)&&hash_equals($receipt['description_fingerprint']??'',hash('sha256',trim((string)($product['description']??'')))))$descriptionPending=false;
         $archived=self::inventory($product)==='out_of_stock';
+        $production=ImageProduction::state($project,$product,$hasImage,$archived);
+        if(!$hasImage&&!$archived)$pub=$production['stage'];
         return array_replace($meta,[
             'archived'=>$archived,
+            'image_production'=>$production,
             'publication'=>$archived?'archived':$pub,'inventory'=>self::inventory($product),
             'low_priority'=>self::inventory($product)==='out_of_stock',
             'needs_description'=>!$archived&&!$hasDescription,
@@ -160,7 +164,7 @@ class WebsiteCatalogSync {
         ]);
     }
     public static function fingerprint($project) {
-        return hash('sha256',json_encode([$project['id'],$project['products']??[],$project['settings']['website_catalog']??[],$project['settings']['size_charts']??[]],JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION));
+        return hash('sha256',json_encode([$project['id'],$project['products']??[],$project['settings']['website_catalog']??[],$project['settings']['size_charts']??[],!empty($project['settings']['prod_require_reference']),!empty($project['settings']['prod_require_image_request'])],JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION));
     }
     public static function reconcile($project,$rows,$options=[]) {
         if(!self::isWebsiteRows($rows)||count($rows)>50000)throw new RuntimeException('فایل باید آرایهٔ خروجی سایت با url و product_code باشد (حداکثر ۵۰۰۰۰ ردیف).');

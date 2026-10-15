@@ -11,7 +11,7 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
         http_response_code(500);
         echo json_encode([
             'status' => 'error',
-            'msg' => $msg
+            'msg' => 'عملیات ناموفق بود؛ لاگ خطای سرور را بررسی کنید.'
         ]);
         exit();
     }
@@ -23,8 +23,8 @@ set_exception_handler(function($e) {
     http_response_code(500);
     echo json_encode([
         'status' => 'error',
-        'msg' => $msg,
-        'trace' => $e->getTraceAsString()
+        'msg' => 'عملیات ناموفق بود؛ لاگ خطای سرور را بررسی کنید.',
+        'reference' => 'API_ERROR'
     ]);
     exit();
 });
@@ -65,6 +65,10 @@ $actionFeature = [
 if ($actionFeature !== null) {
     $browserAction = in_array($action, ['get_project_status', 'get_pending_browser_relay_posts', 'mark_relay_schedule_status'], true);
     if ($browserAction && !isUser()) AccessControl::deny();
+    if($browserAction) {
+        if($action==='mark_relay_schedule_status'&&($_SERVER['REQUEST_METHOD']??'GET')!=='POST')AccessControl::deny();
+        RequestSecurity::enforce();
+    }
     if (isUser() && !isMainAdmin()) {
         $member = null;
         foreach (($project['users'] ?? []) as $candidate) {

@@ -4,8 +4,8 @@
  * Route: /size
  */
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+ini_set('display_errors', getenv('MAARKSHO_DEBUG')==='1'?'1':'0');
+ini_set('display_startup_errors', getenv('MAARKSHO_DEBUG')==='1'?'1':'0');
 error_reporting(E_ALL);
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -16,7 +16,7 @@ if (session_status() === PHP_SESSION_NONE) {
             'domain' => $_SERVER['HTTP_HOST'],
             'secure' => true,
             'httponly' => true,
-            'samesite' => 'None'
+            'samesite' => 'Lax'
         ]);
     }
     session_start();

@@ -10,8 +10,8 @@ if (!ob_start("ob_gzhandler")) {
  */
 
 // فعالسازی نمایش خطاها برای دیباگ
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+ini_set('display_errors', getenv('MAARKSHO_DEBUG')==='1'?'1':'0');
+ini_set('display_startup_errors', getenv('MAARKSHO_DEBUG')==='1'?'1':'0');
 error_reporting(E_ALL);
 
 // شروع session با تنظیمات امن
@@ -23,7 +23,7 @@ if (session_status() === PHP_SESSION_NONE) {
             'domain' => $_SERVER['HTTP_HOST'],
             'secure' => true,
             'httponly' => true,
-            'samesite' => 'None'
+            'samesite' => 'Lax'
         ]);
     }
     session_start();
@@ -42,7 +42,8 @@ if (!isUser()) {
 }
 
 // دریافت پارامتر تب فعال
-$active_tab = $_GET['tab'] ?? 'overview';
+$active_tab = is_string($_GET['tab']??null)?$_GET['tab']:'overview';
+if(!in_array($active_tab,['overview','pending','library','calendar','out-of-stock','rejected','no-image','occasions'],true))$active_tab='overview';
 
 // بررسی وجود پروژه (از طریق session یا پارامتر GET)
 $projectId = $_GET['project'] ?? ($_SESSION['project_id'] ?? null);
@@ -110,13 +111,11 @@ if (isSuperAdmin()) {
         }
     }
     
-    if (isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'portal_viewer') {
-        $allowed = true;
-    }
+
 }
 
 if (!$allowed) {
-    die('خطای دسترسی: شما به این پروژه دسترسی ندارید.');
+    http_response_code(403);die('شما عضو این پروژه نیستید. برای پیگیری دسترسی از بخش پشتیبانی حساب کاربری اقدام کنید.');
 }
 
 // Pre-load all allowed projects for quick switching dropdown
@@ -165,7 +164,10 @@ if (!isModuleActive('products')) {
                 <title>پورتال اختصاصی پروژه <?php echo htmlspecialchars($project['name']); ?></title>
                 <link rel="stylesheet" href="assets/font.css">
                 <script src="<?php echo getFullUrl('assets/tailwindcss.js'); ?>"></script>
-            </head>
+            <link rel="stylesheet" href="/panel/assets/neo-tokens.css?v=1">
+<link rel="stylesheet" href="/panel/assets/portal-workspace.css?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.css'); ?>">
+<script src="/panel/assets/portal-workspace.js?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.js'); ?>" defer></script>
+</head>
             <body class="bg-slate-50 min-h-screen flex items-center justify-center font-sans p-6 select-none">
                 <div class="max-w-md w-full bg-white border border-slate-100 rounded-[3rem] p-10 text-center shadow-2xl shadow-indigo-500/5">
                     <div class="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-6">⚙️</div>
@@ -339,7 +341,7 @@ if (!empty($project['products']) && is_array($project['products'])) {
     }
 }
 
-$active_tab = $_GET['tab'] ?? 'overview';
+$portalLibraryFilter=is_string($_GET['library_status']??null)&&isset(ProductWorkflow::filters()[$_GET['library_status']])?$_GET['library_status']:'all';
 
 // شناسایی و یکپارچه‌سازی هویت کاربر جهت جلوگیری از تکرار آراء
 $voterId = getVoterId();
@@ -353,7 +355,7 @@ if (!isset($_SESSION['display_name'])) {
 $current_p_username = $_SESSION['user']['username'] ?? $_SESSION['display_name'] ?? 'guest';
 $content_gen_users_raw = $project['settings']['prod_content_gen_users'] ?? '';
 $content_gen_users = array_filter(array_map('trim', preg_split('/[,\x{060c}]+/u', strtolower($content_gen_users_raw))));
-$can_request_content_gen = empty($content_gen_users) || in_array(strtolower($current_p_username), $content_gen_users);
+$can_request_content_gen = ImageProduction::canRequest($project);
 
 $couples_users_raw = $project['settings']['prod_couples_users'] ?? '';
 $couples_users = array_filter(array_map('trim', preg_split('/[,\x{060c}]+/u', strtolower($couples_users_raw))));
@@ -361,7 +363,7 @@ $can_create_couples = empty($couples_users) || in_array(strtolower($current_p_us
 
 $ref_image_users_raw = $project['settings']['prod_ref_image_users'] ?? '';
 $ref_image_users = array_filter(array_map('trim', preg_split('/[,\x{060c}]+/u', strtolower($ref_image_users_raw))));
-$can_manage_ref_images = empty($ref_image_users) || in_array(strtolower($current_p_username), $ref_image_users) || (isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'admin');
+$can_manage_ref_images = ImageProduction::canReference($project);
 
 $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
 if ($isAjax && isset($_POST['action'])) {
@@ -554,7 +556,7 @@ if ($isAjax && isset($_POST['action'])) {
         $content_gen_users_raw = $project['settings']['prod_content_gen_users'] ?? '';
         $content_gen_users = array_filter(array_map('trim', preg_split('/[,\x{060c}]+/u', strtolower($content_gen_users_raw))));
         $current_user = $_SESSION['user']['username'] ?? $_SESSION['display_name'] ?? 'unknown';
-        if (!in_array(strtolower($current_user), $content_gen_users)) {
+        if (!ImageProduction::canRequest($project)) {
             echo json_encode(['status' => 'error', 'msg' => 'دسترسی غیرمجاز 🚫 شما اجازه ندارید برای کالاهای بدون تصویر درخواست تولید محتوا ثبت کنید.']);
             exit;
         }
@@ -570,11 +572,14 @@ if ($isAjax && isset($_POST['action'])) {
         $skippedCount = 0;
         foreach ($project['products'] ?? [] as &$prod) {
             if (in_array((string)$prod['id'], $product_ids)) {
+                $productionState=WebsiteCatalogSync::state($project,$prod);
+                if($productionState['archived']||!$productionState['needs_image']){$skippedCount++;continue;}
                 if (!empty($prod['content_gen_requested'])) {
                     $skippedCount++;
                     continue;
                 }
                 $prod['content_gen_requested'] = true;
+                $prod['website_sync']['image_request']=['at'=>time(),'by'=>$_SESSION['user']['username']??''];
                 $updatedProducts[] = $prod;
                 $count++;
             }
@@ -603,7 +608,7 @@ if ($isAjax && isset($_POST['action'])) {
         $content_gen_users_raw = $project['settings']['prod_content_gen_users'] ?? '';
         $content_gen_users = array_filter(array_map('trim', preg_split('/[,\x{060c}]+/u', strtolower($content_gen_users_raw))));
         $current_user = $_SESSION['user']['username'] ?? $_SESSION['display_name'] ?? 'unknown';
-        if (!in_array(strtolower($current_user), $content_gen_users)) {
+        if (!ImageProduction::canRequest($project)) {
             echo json_encode(['status' => 'error', 'msg' => 'دسترسی غیرمجاز 🚫 شما اجازه ندارید اولویت تولید محتوا را ریست کنید.']);
             exit;
         }
@@ -712,7 +717,7 @@ if ($isAjax && isset($_POST['action'])) {
         $ref_image_users_raw = $project['settings']['prod_ref_image_users'] ?? '';
         $ref_image_users = array_filter(array_map('trim', preg_split('/[,\x{060c}]+/u', strtolower($ref_image_users_raw))));
         $current_user = $_SESSION['user']['username'] ?? $_SESSION['display_name'] ?? 'unknown';
-        $can_manage = empty($ref_image_users) || in_array(strtolower($current_user), $ref_image_users) || (isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'admin');
+        $can_manage = ImageProduction::canReference($project);
         if (!$can_manage) {
             echo json_encode(['status' => 'error', 'msg' => 'دسترسی غیرمجاز 🚫 شما اجازه ثبت یا ویرایش عکس‌های رفرنس را ندارید.']);
             exit;
@@ -738,6 +743,9 @@ if ($isAjax && isset($_POST['action'])) {
             exit;
         }
 
+        if(WebsiteCatalogSync::state($project,$target_prod)['image_production']['needs_image_request']) {
+            http_response_code(400);echo json_encode(['status'=>'error','msg'=>'ابتدا درخواست تولید تصویر این محصول را ثبت کنید.'],JSON_UNESCAPED_UNICODE);exit;
+        }
         $currentRefs = getProductReferenceImagesList($target_prod);
 
         // Process URL inputs
@@ -817,7 +825,7 @@ if ($isAjax && isset($_POST['action'])) {
         $ref_image_users_raw = $project['settings']['prod_ref_image_users'] ?? '';
         $ref_image_users = array_filter(array_map('trim', preg_split('/[,\x{060c}]+/u', strtolower($ref_image_users_raw))));
         $current_user = $_SESSION['user']['username'] ?? $_SESSION['display_name'] ?? 'unknown';
-        $can_manage = empty($ref_image_users) || in_array(strtolower($current_user), $ref_image_users) || (isset($_SESSION['user']['role']) && $_SESSION['user']['role'] === 'admin');
+        $can_manage = empty($ref_image_users) || in_array(strtolower($current_user), $ref_image_users) || (isMainAdmin()||isProjectAdmin());
         if (!$can_manage) {
             echo json_encode(['status' => 'error', 'msg' => 'دسترسی غیرمجاز 🚫']);
             exit;
@@ -1436,6 +1444,7 @@ if ($isAjax && isset($_POST['action'])) {
             
             refreshProductSplitStatus($productToUpdate, $project);
             if ($productToUpdate['status'] === 'active') {
+                approveProductImages($productToUpdate);
                 unset($productToUpdate['rejectionReason']);
             }
             
@@ -1492,6 +1501,7 @@ if ($isAjax && isset($_POST['action'])) {
                 }
             }
             $productToUpdate['images_list'] = $imagesList;
+            approveProductImages($productToUpdate);
             $productToUpdate['has_image'] = !empty($productToUpdate['image']) && strpos($productToUpdate['image'], 'placeholder') === false && strpos($productToUpdate['image'], 'placehold.co') === false;
             $productToUpdate['media_status'] = $productToUpdate['has_image'] ? 'ok' : 'missing';
             
@@ -1545,18 +1555,16 @@ if ($isAjax && isset($_POST['action'])) {
             }
         }
     } elseif ($_POST['action'] === 'approve') {
+        if(!hasPermission('approve_content')&&!isMainAdmin()&&!isProjectAdmin())AccessControl::deny();
         $productToUpdate['status'] = 'active';
+        approveProductImages($productToUpdate);
         saveProject($project, [$productToUpdate]);
         $response = ['status' => 'success', 'msg' => 'با موفقیت تایید شد'];
     } elseif ($_POST['action'] === 'reject') {
-        // حذف محصول
-        $filtered = [];
-        foreach($project['products'] as $p) {
-            if ($p['id'] != $productId) $filtered[] = $p;
-        }
-        $project['products'] = $filtered;
-        saveProject($project);
-        $response = ['status' => 'success', 'msg' => 'محصول حذف شد'];
+        if(!hasPermission('approve_content')&&!isMainAdmin()&&!isProjectAdmin())AccessControl::deny();
+        $productToUpdate['status']='rejected';
+        saveProject($project,[$productToUpdate]);
+        $response=['status'=>'success','msg'=>'تصویر رد شد؛ محصول و فایل‌های اصلی حفظ شدند.'];
     }
     
     echo json_encode($response);
@@ -1788,8 +1796,11 @@ if ($isAjax && isset($_POST['action'])) {
             display: block !important;
         }
     </style>
+<link rel="stylesheet" href="/panel/assets/neo-tokens.css?v=1">
+<link rel="stylesheet" href="/panel/assets/portal-workspace.css?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.css'); ?>">
+<script src="/panel/assets/portal-workspace.js?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.js'); ?>" defer></script>
 </head>
-<body>
+<body class="portal-workspace" data-portal-tab="<?php echo htmlspecialchars($active_tab,ENT_QUOTES,'UTF-8'); ?>">
 <script>
     window.portalProducts = <?php 
         $jsProds = [];
@@ -1814,13 +1825,7 @@ if ($isAjax && isset($_POST['action'])) {
 </div>
 
 <!-- Floating Profile Button -->
-<button onclick="document.getElementById('profile-modal').style.display='flex'" class="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 w-12 h-12 sm:w-14 sm:h-14 bg-brand-600 hover:bg-brand-700 text-white rounded-full shadow-elevated hover:scale-105 active:scale-95 transition-all z-50 overflow-hidden flex items-center justify-center border-2 sm:border-4 border-white pulse-active" aria-label="تنظیمات پروفایل">
-    <?php if(!empty($_SESSION['user_icon'])): ?>
-        <img src="<?php echo getFullUrl($_SESSION['user_icon']); ?>" class="w-full h-full object-cover">
-    <?php else: ?>
-        <span class="text-lg sm:text-xl">👤</span>
-    <?php endif; ?>
-</button>
+
 
 <!-- Profile Modal Dialog -->
 <div id="profile-modal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[6000] hidden items-center justify-center p-3 sm:p-4 animate-fade-in" onclick="if(event.target === this) this.style.display='none'">
@@ -1856,89 +1861,7 @@ if ($isAjax && isset($_POST['action'])) {
     </div>
 </div>
 
-<header class="sticky top-0 z-40 bg-white/90 backdrop-blur-xl border-b border-slate-100 px-3 sm:px-6 py-2.5 sm:py-4 shadow-sm">
-    <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-        <div class="flex items-center justify-between md:justify-start gap-3 w-full md:w-auto">
-            <div class="flex items-center gap-2.5 sm:gap-3">
-                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-brand-500 text-white flex items-center justify-center text-xl sm:text-2xl font-black shadow-md shadow-brand-500/20 shrink-0">🚀</div>
-                <div>
-                    <h1 class="font-extrabold text-base sm:text-lg text-slate-800 leading-tight line-clamp-1"><?php echo htmlspecialchars($project['name']); ?></h1>
-                    <p class="text-[9px] sm:text-[10px] text-brand-600 font-extrabold tracking-widest uppercase">Maarksho Social Portal v3</p>
-                </div>
-            </div>
-            
-            <div class="flex items-center gap-2">
-                <?php if (count($user_allowed_projects) > 1): ?>
-                    <div>
-                        <select onchange="window.location.href='?project=' + this.value" class="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-slate-50 border border-slate-200/60 rounded-xl text-[10px] font-black text-slate-700 outline-none cursor-pointer focus:border-brand-500 max-w-[140px] sm:max-w-none truncate">
-                            <?php foreach($user_allowed_projects as $p_item): ?>
-                                <option value="<?php echo htmlspecialchars($p_item['id']); ?>" <?php echo $p_item['id'] === $project['id'] ? 'selected' : ''; ?>>
-                                    📁 <?php echo htmlspecialchars($p_item['name']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                <?php endif; ?>
-
-                <!-- Mobile User Badge -->
-                <div class="flex md:hidden items-center gap-1 px-2.5 py-1.5 bg-slate-50 border border-slate-100/80 rounded-xl text-[10px] font-black text-slate-600 max-w-[110px] truncate">
-                    <span class="text-xs">👤</span>
-                    <span class="truncate"><?php echo htmlspecialchars($_SESSION['display_name'] ?? $_SESSION['user']['username'] ?? 'کاربر'); ?></span>
-                </div>
-            </div>
-        </div>
-
-        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap md:flex-nowrap justify-start sm:justify-end w-full md:w-auto overflow-x-auto pb-0.5 custom-scrollbar">
-            <!-- Desktop Username/Display Name Badge -->
-            <div class="hidden md:flex items-center gap-2 px-3.5 py-2 bg-slate-50 border border-slate-100/80 rounded-xl text-[11px] font-black text-slate-600 shrink-0">
-                <span class="text-xs">👤</span>
-                <span><?php echo htmlspecialchars($_SESSION['display_name'] ?? $_SESSION['user']['username'] ?? 'کاربر مهمان'); ?></span>
-            </div>
-
-            <?php if(isFeatureAvailable('support')): ?><a href="/panel/support.php" class="px-3 py-2 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold">🎫 پشتیبانی</a><?php endif; ?>
-            <?php if (canAccessManagement()): ?>
-                <a href="admin.php" class="px-3 py-2 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold">پنل مدیریت</a>
-            <?php endif; ?>
-            <?php if(isSuperAdmin() || isProjectAdmin()): ?>
-                <a href="sale.php<?php echo isSuperAdmin() ? '?project='.$project['id'] : ''; ?>" class="px-2.5 sm:px-4 py-1.5 sm:py-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-700 text-[11px] sm:text-xs font-black rounded-xl transition-all flex items-center gap-1 sm:gap-1.5 shadow-sm shadow-indigo-500/5 shrink-0" title="تحلیل فروش و شعب">
-                    <span>💰</span>
-                    <span class="hidden sm:inline">تحلیل فروش و شعب</span>
-                    <span class="sm:hidden">فروش</span>
-                </a>
-                <a href="seo.php<?php echo isSuperAdmin() ? '?project='.$project['id'] : ''; ?>" class="px-2.5 sm:px-4 py-1.5 sm:py-2.5 bg-sky-50 hover:bg-sky-100 border border-sky-100 text-sky-700 text-[11px] sm:text-xs font-black rounded-xl transition-all flex items-center gap-1 sm:gap-1.5 shadow-sm shadow-sky-500/5 shrink-0" title="آنالیز و سئو">
-                    <span>🔍</span>
-                    <span class="hidden sm:inline">آنالیز و سئو</span>
-                    <span class="sm:hidden">سئو</span>
-                </a>
-                <a href="admin.php" class="px-2.5 sm:px-5 py-1.5 sm:py-2.5 bg-slate-50 hover:bg-brand-50 border border-slate-100 hover:border-brand-200 text-slate-600 hover:text-brand-700 text-[11px] sm:text-xs font-black rounded-xl transition-all flex items-center gap-1 sm:gap-2 shrink-0" title="مدیریت">
-                    <span>⚙️</span>
-                    <span class="hidden sm:inline">مدیریت</span>
-                </a>
-            <?php endif; ?>
-
-            <!-- Internal User Communication Chat -->
-            <a href="user_chat.php" class="px-2.5 sm:px-4 py-1.5 sm:py-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-700 text-[11px] sm:text-xs font-black rounded-xl transition-all flex items-center gap-1 sm:gap-1.5 shadow-sm shadow-amber-500/5 shrink-0" title="سیستم گفتگوی داخلی همکاران">
-                <span>💬</span>
-                <span class="hidden sm:inline">گفتگوی داخلی</span>
-                <span class="sm:hidden">چت</span>
-            </a>
-
-            <!-- Central Task Manager -->
-            <a href="task_manager.php?project=<?php echo urlencode($project['id']); ?>" class="px-2.5 sm:px-4 py-1.5 sm:py-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-[11px] sm:text-xs font-black rounded-xl transition-all flex items-center gap-1 sm:gap-1.5 shadow-sm shadow-emerald-500/5 shrink-0" title="سیستم مدیریت تسک و زمان‌بندی همکاران">
-                <span>📋</span>
-                <span class="hidden sm:inline">مدیریت تسک‌ها</span>
-                <span class="sm:hidden">تسک‌ها</span>
-            </a>
-
-            <!-- Logout Button -->
-            <a href="logout.php" class="px-2.5 sm:px-5 py-1.5 sm:py-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 hover:text-rose-700 text-[11px] sm:text-xs font-black rounded-xl transition-all flex items-center gap-1 sm:gap-1.5 shadow-sm shadow-rose-500/5 shrink-0" title="خروج از حساب کاربری">
-                <span>🚪</span>
-                <span class="hidden sm:inline">خروج از حساب</span>
-                <span class="sm:hidden">خروج</span>
-            </a>
-        </div>
-    </div>
-</header>
+<?php require __DIR__.'/inc/PortalNavigation.php'; ?>
 
 <?php 
 $storageInfo = getProjectStorageUsage($project);
@@ -1963,6 +1886,8 @@ if ($storageInfo['is_warning'] || $storageInfo['is_full']):
 <?php endif; ?>
 
 <main id="portal-main-container" class="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
+<div class="portal-page-heading"><div><p>پروژه / <?php echo $pnEscape($project['name']); ?></p><h1><?php echo $pnEscape($pnTitle); ?></h1><span>همان محصولات و وضعیت‌های پنل مدیریت، در فضای کاری پروژه</span></div><?php if($active_tab==='library'): ?><span class="portal-total"><?php echo number_format($pnCounts['all']); ?> محصول در کتابخانه</span><?php endif; ?></div>
+
 <?php
 // ============================================
 // محاسبه آمار پیشرفته و شخصی‌سازی شده کاربر بر اساس نقش‌ها و عملکردها
@@ -2416,7 +2341,7 @@ foreach ($raw_all_project_products as $_p) {
         $count_out_of_stock++;
     } elseif ($isNoImg) {
         $count_no_image++;
-    } elseif ($pSt === 'pending') {
+    } elseif (getProductWorkflowStatus($_p,$project)==='pending_approval') {
         $count_pending++;
     } else {
         $count_library++;
@@ -2498,7 +2423,12 @@ if (!empty($raw_all_project_products)) {
         }
         // ۴. فیلتر موجودی انبار و وضعیت تصویر
         if ($f_stock !== '') {
-            if ($f_stock === 'stock_gte_5' || $f_stock === 'stock_agg_gte') {
+            if(in_array($f_stock,['gt_5','gt_10','gt_15','gt_20'],true)) {
+                $quantity=WebsiteCatalogSync::totalStock($p);
+                if(isProductOutOfStock($p)||$quantity===null||$quantity<=(int)substr($f_stock,3))return false;
+            } elseif($f_stock==='unknown') {
+                if(WebsiteCatalogSync::inventory($p)!=='unknown')return false;
+            } elseif ($f_stock === 'stock_gte_5' || $f_stock === 'stock_agg_gte') {
                 $aggStock = getProductAggregatedStock($p, $familyStockMap);
                 if ($aggStock < $f_stock_min) {
                     return false;
@@ -2514,7 +2444,7 @@ if (!empty($raw_all_project_products)) {
                     return false;
                 }
             } elseif ($f_stock === 'in_stock') {
-                if (isProductOutOfStock($p)) {
+                if (WebsiteCatalogSync::inventory($p)!=='in_stock') {
                     return false;
                 }
             } elseif ($f_stock === 'out_of_stock') {
@@ -2558,7 +2488,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
 </script>
 
     <!-- Faceted Search Filters card (Collapsible for Clean UX) -->
-    <div class="bg-white border border-slate-100 rounded-3xl shadow-sm mb-8 overflow-hidden" onclick="event.stopPropagation();">
+    <div class="portal-product-filters bg-white border border-slate-100 rounded-3xl shadow-sm mb-8 overflow-hidden" onclick="event.stopPropagation();">
         <button onclick="toggleFilterAccordion()" class="w-full p-4 px-6 bg-slate-50/70 hover:bg-slate-100/80 flex items-center justify-between text-right cursor-pointer transition-all">
             <div class="flex items-center gap-3">
                 <span class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-base font-bold">🔍</span>
@@ -2574,10 +2504,11 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                 <span id="filter-accordion-arrow" class="text-xs text-slate-400 font-bold transition-transform transform <?php echo (!empty($f_q) || !empty($f_cat) || !empty($f_price) || !empty($f_stock) || !empty($f_creator)) ? 'rotate-180' : ''; ?>">▼</span>
             </div>
         </button>
-        <div id="filter-accordion-content" class="<?php echo (!empty($f_q) || !empty($f_cat) || !empty($f_price) || !empty($f_stock) || !empty($f_creator)) ? '' : 'hidden'; ?> p-4 sm:p-6 border-t border-slate-100 bg-slate-50/30">
+        <div id="filter-accordion-content" class="<?php echo ($active_tab==='library'||!empty($f_q)||!empty($f_cat)||!empty($f_price)||!empty($f_stock)||!empty($f_creator))?'':'hidden'; ?> p-4 sm:p-6 border-t border-slate-100 bg-slate-50/30">
             <form id="filter-form" method="GET" action="portal.php" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3 sm:gap-4 items-end">
                 <input type="hidden" name="tab" value="<?php echo htmlspecialchars($active_tab ?? 'overview'); ?>">
-                <input type="hidden" name="p" value="1">
+                <input type="hidden" name="p" value="1"><input type="hidden" name="project" value="<?php echo htmlspecialchars($project['id'],ENT_QUOTES,'UTF-8'); ?>">
+                <?php if($active_tab==='library'): ?><div><label for="portal-library-status">وضعیت محصول</label><select id="portal-library-status" name="library_status"><?php foreach(ProductWorkflow::filters() as $key=>$label): ?><option value="<?php echo $key; ?>" <?php echo $portalLibraryFilter===$key?'selected':''; ?>><?php echo htmlspecialchars($label); ?></option><?php endforeach; ?></select></div><?php endif; ?>
                 
                 <div>
                     <label class="text-[10px] font-black text-slate-400 block mb-1.5 uppercase">جستجوی عنوان / SKU</label>
@@ -2615,7 +2546,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                         <option value="stock_agg_gte" <?php echo ($f_stock === 'stock_agg_gte' || $f_stock === 'stock_gte_5') ? 'selected' : ''; ?>>🔥 موجودی تجمیعی بالای <?php echo $f_stock_min; ?> عدد</option>
                         <option value="stock_direct_gte" <?php echo $f_stock === 'stock_direct_gte' ? 'selected' : ''; ?>>📦 موجودی مستقیم بالای <?php echo $f_stock_min; ?> عدد</option>
                         <option value="stock_low" <?php echo $f_stock === 'stock_low' ? 'selected' : ''; ?>>⚠️ کم‌موجودی (۱ تا <?php echo $f_stock_min - 1; ?> عدد)</option>
-                        <option value="in_stock" <?php echo $f_stock === 'in_stock' ? 'selected' : ''; ?>>موجود</option>
+                        <option value="in_stock" <?php echo $f_stock === 'in_stock' ? 'selected' : ''; ?>>موجود</option><option value="unknown" <?php echo $f_stock==='unknown'?'selected':''; ?>>موجودی نامشخص</option><?php foreach([5=>'۵',10=>'۱۰',15=>'۱۵',20=>'۲۰'] as $number=>$label): ?><option value="gt_<?php echo $number; ?>" <?php echo $f_stock==='gt_'.$number?'selected':''; ?>>موجودی کل بیشتر از <?php echo $label; ?></option><?php endforeach; ?>
                         <option value="out_of_stock" <?php echo $f_stock === 'out_of_stock' ? 'selected' : ''; ?>>بدون موجودی</option>
                     </select>
                 </div>
@@ -2661,51 +2592,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
         </div>
     </div>
     
-    <!-- Primary Navigation Bar -->
-    <nav class="bg-white/90 backdrop-blur-md border border-slate-200/60 p-1.5 sm:p-2 rounded-2xl sm:rounded-3xl flex gap-1.5 mb-6 sm:mb-8 overflow-x-auto custom-scrollbar whitespace-nowrap scroll-smooth shadow-sm" style="-webkit-overflow-scrolling: touch;">
-        <button class="tab-btn px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 shrink-0 text-slate-500 hover:text-slate-800 <?php echo (($active_tab ?? 'overview') === 'overview') ? 'bg-indigo-600 shadow-md text-white' : 'hover:bg-slate-50'; ?>" id="btn-overview" onclick="switchTab('overview')">
-            <span>📊</span> 
-            <span>داشبورد کلی</span>
-        </button>
-        <button class="tab-btn px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 shrink-0 text-slate-500 hover:text-slate-800 <?php echo (($active_tab ?? 'overview') === 'pending') ? 'bg-brand-600 shadow-md text-white' : 'hover:bg-slate-50'; ?>" id="btn-pending" onclick="switchTab('pending')">
-            <span>⏳</span> 
-            <span>منتظر تایید</span>
-            <span class="px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] <?php echo (($active_tab ?? 'overview') === 'pending') ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'; ?>"><?php echo $count_pending; ?></span>
-        </button>
-        <button class="tab-btn px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 shrink-0 text-slate-500 hover:text-slate-800 <?php echo (($active_tab ?? 'overview') === 'calendar') ? 'bg-brand-600 shadow-md text-white' : 'hover:bg-slate-50'; ?>" id="btn-calendar" onclick="switchTab('calendar')">
-            <span>🗓️</span> 
-            <span>تقویم محتوایی</span>
-        </button>
-        <button class="tab-btn px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 shrink-0 text-slate-500 hover:text-slate-800 <?php echo (($active_tab ?? 'overview') === 'library') ? 'bg-brand-600 shadow-md text-white' : 'hover:bg-slate-50'; ?>" id="btn-library" onclick="switchTab('library')">
-            <span>📚</span> 
-            <span>محصولات تایید شده</span>
-            <span class="px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] <?php echo (($active_tab ?? 'overview') === 'library') ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'; ?>"><?php echo $count_library; ?></span>
-        </button>
-        <button class="tab-btn px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 shrink-0 text-slate-500 hover:text-slate-800 <?php echo (($active_tab ?? 'overview') === 'out-of-stock') ? 'bg-brand-600 shadow-md text-white' : 'hover:bg-slate-50'; ?>" id="btn-out-of-stock" onclick="switchTab('out-of-stock')">
-            <span>📦</span> 
-            <span>بدون موجودی</span>
-            <span class="px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] <?php echo (($active_tab ?? 'overview') === 'out-of-stock') ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'; ?>"><?php echo $count_out_of_stock; ?></span>
-        </button>
-        <button class="tab-btn px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 shrink-0 text-slate-500 hover:text-slate-800 <?php echo (($active_tab ?? 'overview') === 'rejected') ? 'bg-brand-600 shadow-md text-white' : 'hover:bg-slate-50'; ?>" id="btn-rejected" onclick="switchTab('rejected')">
-            <span>🚫</span>
-            <span>رد شده</span>
-            <span class="px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] <?php echo (($active_tab ?? 'overview') === 'rejected') ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'; ?>"><?php echo $count_rejected; ?></span>
-        </button>
-        <button class="tab-btn px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 shrink-0 text-slate-500 hover:text-slate-800 <?php echo (($active_tab ?? 'overview') === 'no-image') ? 'bg-brand-600 shadow-md text-white' : 'hover:bg-slate-50'; ?>" id="btn-no-image" onclick="switchTab('no-image')">
-            <span>📷</span>
-            <span>بدون تصویر</span>
-            <span class="px-1.5 sm:px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] <?php echo (($active_tab ?? 'overview') === 'no-image') ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'; ?>"><?php echo $count_no_image; ?></span>
-        </button>
-        <button class="tab-btn px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 shrink-0 text-slate-500 hover:text-slate-800 <?php echo (($active_tab ?? 'overview') === 'occasions') ? 'bg-brand-600 shadow-md text-white' : 'hover:bg-slate-50'; ?>" id="btn-occasions" onclick="switchTab('occasions')">
-            <span>🏮</span> 
-            <span>تقویم مناسبتی و سایر</span>
-        </button>
-        <a href="prompthub.php<?php echo isset($project['id']) ? '?project=' . urlencode($project['id']) : ''; ?>" class="tab-btn px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 shrink-0 text-slate-500 hover:text-slate-800 hover:bg-slate-50" id="btn-prompthub">
-            <span>🧠</span> 
-            <span>پرامپت هاب</span>
-            <span class="px-1.5 py-0.5 text-[8px] bg-violet-600 text-white rounded-md font-black">جدید</span>
-        </a>
-    </nav>
+
 
     <!-- Tab 0: Executive Overview Dashboard -->
     <div id="tab-overview" class="tab-content <?php echo (($active_tab ?? 'overview') === 'overview') ? 'active' : ''; ?>">
@@ -2875,7 +2762,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
         $top_pending = array_filter((array)($project['products'] ?? []), function($p) {
             $isNoImg = is_product_without_image($p);
             $isOut = isProductOutOfStock($p);
-            return ($p['status'] ?? 'active') === 'pending' && !$isNoImg && !$isOut;
+            return getProductWorkflowStatus($p)==='pending_approval';
         });
         $top_pending = array_slice($top_pending, 0, 4);
         if (!empty($top_pending)):
@@ -2925,15 +2812,16 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
             $pending = array_filter((array)($project['products'] ?? []), function($p) {
                 $isNoImg = is_product_without_image($p);
                 $isOut = isProductOutOfStock($p);
-                return ($p['status'] ?? 'active') === 'pending' && !$isNoImg && !$isOut;
+                return getProductWorkflowStatus($p)==='pending_approval';
             });
             usort($pending, function($a, $b) { return (int)($b['extractedAt'] ?? 0) - (int)($a['extractedAt'] ?? 0); });
             
             $limit = 12;
-            $page = (int)($_GET['p'] ?? 1);
+            $page = max(1,(int)($_GET['p']??1));
 
             $total_pending = count($pending);
-            $total_pending_pages = ceil($total_pending / $limit);
+            $total_pending_pages = max(1,(int)ceil($total_pending/$limit));
+            $page=min($page,$total_pending_pages);
             if (($active_tab ?? 'pending') === 'pending') {
                 $pending = array_slice($pending, ($page - 1) * $limit, $limit);
             } else {
@@ -2951,7 +2839,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
             ?>
                 <?php $p['uploader_info'] = getUploaderDetails($p, $project); ?>
                 <script>window.portalProducts['<?php echo $p['id']; ?>'] = <?php echo json_encode($p, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
-                <div class="bg-white rounded-[2rem] border border-slate-100 hover:border-brand-300 shadow-premium hover:shadow-elevated hover-lift overflow-hidden flex flex-col cursor-pointer animate-fade-in" onclick="openDetailById('<?php echo $p['id']; ?>')">
+                <div class="portal-product-card bg-white rounded-[2rem] border border-slate-100 hover:border-brand-300 shadow-premium hover:shadow-elevated hover-lift overflow-hidden flex flex-col cursor-pointer animate-fade-in" data-product-id="<?php echo htmlspecialchars($p['id'],ENT_QUOTES,'UTF-8'); ?>" data-workflow="<?php echo htmlspecialchars(getProductWorkflowStatus($p,$project)); ?>" onclick="openDetailById('<?php echo $p['id']; ?>')">
                     <div class="relative aspect-[4/5] overflow-hidden bg-slate-50">
                         <?php renderCardImageCarousel($p); ?>
                         
@@ -3381,6 +3269,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
     <!-- Tab 3: Library (Approved) -->
     <div id="tab-library" class="tab-content <?php echo (($active_tab ?? 'pending') === 'library') ? 'active' : ''; ?>">
         
+        <details class="portal-inventory-report"><summary>گزارش موجودی و آمار کتابخانه</summary>
         <!-- Status & Inventory Intelligence Panel -->
         <div class="mb-8 p-6 sm:p-8 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-[2.5rem] text-white shadow-2xl border border-indigo-500/30 relative overflow-hidden">
             <!-- Ambient Glow -->
@@ -3559,9 +3448,10 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
             </div>
         </div>
 
+        </details>
         <?php if ($can_request_content_gen): ?>
         <!-- Bulk Action Header Bar for Publish/Calendar Priority -->
-        <div class="flex flex-wrap items-center justify-between gap-4 p-5 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-[2rem] border border-indigo-100/60 mb-6 shadow-sm">
+        <div class="portal-bulk-bar flex flex-wrap items-center justify-between gap-4 p-5 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-[2rem] border border-indigo-100/60 mb-6 shadow-sm">
             <div class="flex items-center gap-3">
                 <input type="checkbox" id="library-select-all" class="w-5 h-5 cursor-pointer rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500" onclick="toggleSelectAllLibrary(this)">
                 <div>
@@ -3584,7 +3474,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
 
         <?php if ($can_create_couples): ?>
         <!-- Couple/Set Creation Header Bar -->
-        <div class="flex flex-wrap items-center justify-between gap-4 p-5 bg-gradient-to-r from-rose-50 to-pink-50 rounded-[2rem] border border-rose-100/60 mb-8 shadow-sm">
+        <div class="portal-bulk-bar flex flex-wrap items-center justify-between gap-4 p-5 bg-gradient-to-r from-rose-50 to-pink-50 rounded-[2rem] border border-rose-100/60 mb-8 shadow-sm">
             <div class="flex items-center gap-3 font-bold text-slate-800">
                 <?php if (!$can_request_content_gen): ?>
                     <!-- If the content gen bar isn't rendered, render the select all checkbox here -->
@@ -3609,7 +3499,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
 
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             <?php 
-            $active_products = array_filter((array)($project['products'] ?? []), function($p) { $st = $p['status'] ?? 'active'; $isNoImg = is_product_without_image($p); return ($st === 'active' || empty($st)) && !$isNoImg; });
+            $active_products = array_filter((array)($project['products'] ?? []), fn($p)=>ProductWorkflow::matches($project,$p,$portalLibraryFilter));
             
             // Pre-calculate group-representative values
             $groupMaxScore = [];
@@ -3735,12 +3625,12 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
             ?>
                 <?php $p['uploader_info'] = getUploaderDetails($p, $project); ?>
                 <script>window.portalProducts['<?php echo $p['id']; ?>'] = <?php echo json_encode($p, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
-                <div class="bg-white rounded-[2rem] border border-slate-100 hover:border-brand-300 shadow-premium hover:shadow-elevated hover-lift overflow-hidden flex flex-col cursor-pointer animate-fade-in group" onclick="openDetailById('<?php echo $p['id']; ?>')">
+                <div class="portal-product-card bg-white rounded-[2rem] border border-slate-100 hover:border-brand-300 shadow-premium hover:shadow-elevated hover-lift overflow-hidden flex flex-col cursor-pointer animate-fade-in group" data-product-id="<?php echo htmlspecialchars($p['id'],ENT_QUOTES,'UTF-8'); ?>" data-workflow="<?php echo htmlspecialchars(getProductWorkflowStatus($p,$project)); ?>" onclick="openDetailById('<?php echo $p['id']; ?>')">
                     <div class="relative aspect-[4/5] overflow-hidden bg-slate-50">
                         <?php renderCardImageCarousel($p); ?>
                         
                         <!-- Bulk Selection Checkbox for Library -->
-                        <?php if ($can_request_content_gen || $can_create_couples): ?>
+                        <?php if (($can_request_content_gen||$can_create_couples)&&getProductWorkflowStatus($p,$project)==='active'): ?>
                             <div class="absolute top-4 left-4 z-30" onclick="event.stopPropagation();">
                                 <input type="checkbox" name="selected_library_products[]" value="<?php echo $p['id']; ?>" class="w-6 h-6 rounded-lg border-slate-200 text-indigo-600 focus:ring-indigo-500 cursor-pointer shadow-md bg-white/90 backdrop-blur-md transition-all duration-200 transform hover:scale-110" onchange="updateSelectedLibraryCount()">
                             </div>
@@ -3748,9 +3638,9 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
 
                         <!-- Top Badges -->
                         <div class="absolute top-4 right-4 flex flex-col gap-2 z-20 pointer-events-none">
-                            <span class="bg-emerald-500/90 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
-                                <span>✅</span>
-                                <span>تایید شده</span>
+                            <span class="portal-status-badge bg-emerald-500/90 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
+                                <span aria-hidden="true"><?php echo getProductWorkflowStatus($p,$project)==='active'?'✓':'◷'; ?></span>
+                                <span><?php echo htmlspecialchars(ProductWorkflow::label(getProductWorkflowStatus($p,$project))); ?></span>
                             </span>
                             <?php if (!empty($p['publish_priority'])): ?>
                                 <span class="bg-indigo-650/95 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1.5 animate-pulse">
@@ -3950,7 +3840,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
             ?>
                 <?php $p['uploader_info'] = getUploaderDetails($p, $project); ?>
                 <script>window.portalProducts['<?php echo $p['id']; ?>'] = <?php echo json_encode($p, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
-                <div class="bg-white rounded-[2rem] border border-slate-100 overflow-hidden flex flex-col opacity-75 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-300 shadow-premium" onclick="openDetailById('<?php echo $p['id']; ?>')">
+                <div class="portal-product-card bg-white rounded-[2rem] border border-slate-100 overflow-hidden flex flex-col opacity-75 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-300 shadow-premium" data-product-id="<?php echo htmlspecialchars($p['id'],ENT_QUOTES,'UTF-8'); ?>" data-workflow="<?php echo htmlspecialchars(getProductWorkflowStatus($p,$project)); ?>" onclick="openDetailById('<?php echo $p['id']; ?>')">
                     <div class="relative aspect-[4/5] bg-slate-50 overflow-hidden">
                         <?php renderCardImageCarousel($p); ?>
                         <div class="absolute top-4 right-4 z-20 pointer-events-none">
@@ -4034,7 +3924,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
             ?>
                 <?php $p['uploader_info'] = getUploaderDetails($p, $project); ?>
                 <script>window.portalProducts['<?php echo $p['id']; ?>'] = <?php echo json_encode($p, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
-                <div class="bg-white rounded-[2rem] border border-slate-100 overflow-hidden flex flex-col opacity-75 shadow-premium cursor-pointer hover:opacity-100 transition-all duration-300 hover-lift" onclick="openDetailById('<?php echo $p['id']; ?>')">
+                <div class="portal-product-card bg-white rounded-[2rem] border border-slate-100 overflow-hidden flex flex-col opacity-75 shadow-premium cursor-pointer hover:opacity-100 transition-all duration-300 hover-lift" data-product-id="<?php echo htmlspecialchars($p['id'],ENT_QUOTES,'UTF-8'); ?>" data-workflow="<?php echo htmlspecialchars(getProductWorkflowStatus($p,$project)); ?>" onclick="openDetailById('<?php echo $p['id']; ?>')">
                     <div class="relative aspect-[4/5] bg-slate-50 overflow-hidden">
                         <?php renderCardImageCarousel($p); ?>
                         <div class="absolute top-4 right-4 z-20 pointer-events-none">
@@ -4102,7 +3992,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
     <!-- Tab 6: No Image Products (Content Gen & Reference Desk) -->
     <div id="tab-no-image" class="tab-content <?php echo (($active_tab ?? 'pending') === 'no-image') ? 'active' : ''; ?>">
         <?php
-        $no_image_products = array_filter((array)($project['products'] ?? []), 'is_product_without_image');
+        $no_image_products = array_filter((array)($project['products']??[]),fn($p)=>ProductWorkflow::matches($project,$p,'needs_image'));
 
         // Ensure products with tag/requested tag come first (higher)
         usort($no_image_products, function($a, $b) {
@@ -4121,7 +4011,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
         ?>
 
         <!-- Bulk Action Header Bar -->
-        <div class="flex flex-wrap items-center justify-between gap-4 p-5 bg-gradient-to-r from-rose-50 to-amber-50 rounded-[2rem] border border-rose-100/60 mb-8 shadow-sm">
+        <div class="portal-bulk-bar flex flex-wrap items-center justify-between gap-4 p-5 bg-gradient-to-r from-rose-50 to-amber-50 rounded-[2rem] border border-rose-100/60 mb-8 shadow-sm">
             <div class="flex items-center gap-3">
                 <input type="checkbox" id="no-img-select-all" class="w-5 h-5 cursor-pointer rounded border-rose-300 text-rose-600 focus:ring-rose-500" onclick="toggleSelectAllNoImages(this)">
                 <div>
@@ -5299,43 +5189,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
     }
 
     function loadUrlAjax(url, pushState = true) {
-        showLoader(true);
-        fetch(url)
-            .then(res => res.text())
-            .then(html => {
-                showLoader(false);
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                
-                // Swap main container
-                const newMain = doc.querySelector('#portal-main-container');
-                const oldMain = document.querySelector('#portal-main-container');
-                if (newMain && oldMain) {
-                    oldMain.innerHTML = newMain.innerHTML;
-                }
-                
-                // Re-initialize any JS variables that PHP rendered in the new content
-                const scripts = doc.querySelectorAll('#portal-main-container script');
-                scripts.forEach(scr => {
-                    try {
-                        eval(scr.textContent);
-                    } catch(e) {
-                        console.error('Error running script:', e);
-                    }
-                });
-
-                if (pushState) {
-                    history.pushState(null, '', url);
-                }
-                
-                // Scroll to top smoothly
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            })
-            .catch(err => {
-                showLoader(false);
-                console.error('AJAX load error:', err);
-                window.location.href = url;
-            });
+        window.location.assign(url);
     }
 
     // Capture submit events on filter form
@@ -5351,18 +5205,6 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
         const form = document.getElementById('filter-form');
         if (form && form.contains(e.target) && e.target.tagName === 'SELECT') {
             applyFiltersAjax(form);
-        }
-    });
-
-    // Instantly filter as user types with debounce
-    let debounceTimer;
-    document.addEventListener('input', function(e) {
-        const form = document.getElementById('filter-form');
-        if (form && form.contains(e.target) && e.target.name === 'f_q') {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-                applyFiltersAjax(form);
-            }, 300);
         }
     });
 

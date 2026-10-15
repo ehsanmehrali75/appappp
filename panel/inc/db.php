@@ -1,13 +1,6 @@
 <?php
-// Database Connection Configuration
-$db_config = [
-    'driver' => 'mysql', // Default driver, will auto-fallback to sqlite if connection fails
-    'host' => 'localhost',
-    'dbname' => 'maarksho_flow',
-    'user' => 'maarksho_flow',
-    'pass' => 'EhSaN._1375',
-    'sqlite_path' => __DIR__ . '/../db/maarksho_flow.sqlite'
-];
+require_once __DIR__.'/DatabaseConfig.php';
+$db_config=DatabaseConfig::load();
 
 // Helper classes to make SQLite behave exactly like MySQLi
 class SQLite3ResultWrapper {
@@ -325,7 +318,7 @@ function getConn() {
         }
 
         // 2. Fallback to relational SQLite if MySQL failed or is disabled
-        if (!$connected && class_exists('SQLite3')) {
+        if (!$connected && class_exists('SQLite3') && (($db_config['driver']??'')==='sqlite'||!empty($db_config['allow_fallback']))) {
             try {
                 $conn = new SQLite3ToMysqliWrapper($db_config['sqlite_path']);
                 if (!$conn->connect_error) {
@@ -342,6 +335,11 @@ function getConn() {
         }
     }
     
+    if($conn===null&&($db_config['driver']??'mysql')!=='json'&&empty($db_config['allow_fallback'])) {
+        http_response_code(503);
+        throw new RuntimeException('پایگاه دادهٔ انتخاب‌شده در دسترس نیست. برای جلوگیری از ثبت در منبع اشتباه، ذخیره‌ساز تغییر نکرد.');
+    }
+
     if ($conn !== null && !$migrationsRun) {
         $migrationsRun = true;
         db_get_all();
@@ -356,7 +354,7 @@ function isSqlActive() {
 }
 
 function fetchDB() {
-    $default = ['super_users' => [['username' => 'admin', 'password' => '1375']], 'projects' => []];
+    $default = ['super_users' => [], 'projects' => []];
     
     if (isSqlActive()) {
         $conn = getConn();
@@ -526,15 +524,6 @@ function db_get_all() {
             $check = $conn->query("SHOW COLUMNS FROM schedules LIKE '$col'");
             if ($check && $check->num_rows == 0) {
                 $conn->query("ALTER TABLE schedules ADD COLUMN $col $type");
-            }
-        }
-        
-        // Auto-seed default super_admin if table is empty
-        $checkSu = $conn->query("SELECT COUNT(*) as cnt FROM super_users");
-        if ($checkSu) {
-            $rowSu = $checkSu->fetch_assoc();
-            if ((int)($rowSu['cnt'] ?? 0) === 0) {
-                $conn->query("INSERT INTO super_users (username, password) VALUES ('admin', '1375')");
             }
         }
         

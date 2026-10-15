@@ -54,4 +54,12 @@
         catch(error){show(error.message);button.disabled=false;}
     }));
     byId('queue').addEventListener('change',()=>byId('queue').form.requestSubmit());
+    panel.querySelectorAll('.website-catalog-request-image').forEach(button=>button.addEventListener('click',async()=>{
+        button.disabled=true;
+        try{const result=await request('website_catalog_request_image',{product_id:button.dataset.id});show(result.msg);location.reload();}
+        catch(error){show(error.message);button.disabled=false;}
+    }));
+    panel.querySelectorAll('.website-catalog-reference').forEach(button=>button.addEventListener('click',()=>{
+        if(typeof window.openFastReferenceModal==='function')window.openFastReferenceModal(JSON.parse(button.dataset.product));
+    }));
 })();

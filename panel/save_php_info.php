@@ -1,6 +1,5 @@
 <?php
-ob_start();
-phpinfo();
-$info = ob_get_clean();
-file_put_contents('php_info.txt', $info);
-echo "PHP Info saved to php_info.txt\n";
+// Retired diagnostic endpoint. Use the authenticated system monitoring page.
+http_response_code(404);
+header('Cache-Control: no-store');
+exit;

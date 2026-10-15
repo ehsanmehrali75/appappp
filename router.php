@@ -5,6 +5,12 @@
 
 $uri = urldecode(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
 
+// Match the deployment's private-file rules when using the development server.
+if(preg_match('~(?:^|/)(?:\.git|\.env(?:\.[^/]*)?|db|inc|tmp|tests|tools)(?:/|$)|\.(?:sqlite(?:3)?|log|cache|sql|lock)$~i',$uri)
+    ||preg_match('~/(?:panel/)?uploads/.*\.(?:php\d*|phtml|phar|cgi|html?|svg)(?:\.|$)~i',$uri)) {
+    http_response_code(404);return true;
+}
+
 // 1. Direct Static File Check
 $filePath = __DIR__ . $uri;
 if ($uri !== '/' && file_exists($filePath) && !is_dir($filePath)) {
@@ -13,11 +19,13 @@ if ($uri !== '/' && file_exists($filePath) && !is_dir($filePath)) {
 
 // 1.1 Instagram OAuth 2.0 Start & Callback Routes
 if (preg_match('#^/instagram/oauth/start(?:/.*)?$#', $uri)) {
+    $_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/panel/instagram_oauth_start.php';
     require __DIR__ . '/panel/instagram_oauth_start.php';
     return true;
 }
 
 if (preg_match('#^/callback/account/[iI]nstagram(?:/.*)?$#', $uri)) {
+    $_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/panel/callback_instagram.php';
     require __DIR__ . '/panel/callback_instagram.php';
     return true;
 }
@@ -38,6 +46,8 @@ if (preg_match('#^/admin/projects/([^/]+)/vm(?:/(.*))?$#', $uri, $matches)) {
         $_GET['view'] = $_GET['view'] ?? 'overview';
     }
 
+    $_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/panel/vm/index.php';
+
     require __DIR__ . '/panel/vm/index.php';
     return true;
 }
@@ -53,6 +63,8 @@ if (preg_match('#^/admin/(?:business|projects)/([^/]+)/seo(?:/(.*))?$#', $uri, $
     } else {
         $_GET['view'] = $_GET['view'] ?? 'overview';
     }
+
+    $_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/panel/seo_intel/index.php';
 
     require __DIR__ . '/panel/seo_intel/index.php';
     return true;
@@ -75,18 +87,21 @@ if (preg_match('#^/(?:admin|panel)/seo(?:/(.*))?$#', $uri, $matches)) {
     if (!empty($sub)) {
         $_GET['view'] = $sub;
     }
+    $_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/panel/seo_intel/index.php';
     require __DIR__ . '/panel/seo_intel/index.php';
     return true;
 }
 
 // 3. Admin shorthand route
 if ($uri === '/admin' || $uri === '/admin/') {
+    $_SERVER['SCRIPT_FILENAME'] = __DIR__ . '/panel/admin.php';
     require __DIR__ . '/panel/admin.php';
     return true;
 }
 
 // 4. Directory index
 if (is_dir($filePath) && file_exists($filePath . '/index.php') && $uri !== '/') {
+    $_SERVER['SCRIPT_FILENAME'] = $filePath . '/index.php';
     require $filePath . '/index.php';
     return true;
 }

@@ -1,6 +1,5 @@
 <?php
-require_once 'inc/functions.php';
-
-$db = fetchDB();
-header('Content-Type: application/json');
-echo json_encode($db['projects'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+// Retired diagnostic endpoint. Use the authenticated system monitoring page.
+http_response_code(404);
+header('Cache-Control: no-store');
+exit;

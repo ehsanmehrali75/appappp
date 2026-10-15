@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__.'/inc/functions.php';
+if(!isMainAdmin())AccessControl::deny();
+header('Cache-Control: no-store');
 header('Content-Type: application/json');
 $logFile = __DIR__ . '/scraper/scraper_debug.log';
 

@@ -5,6 +5,15 @@
  */
 require_once 'inc/functions.php';
 
+// The global worker changes multiple projects; only CLI or an authenticated main administrator may run it.
+if (PHP_SAPI !== 'cli') {
+    header('Cache-Control: no-store');
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {header('Allow: POST');http_response_code(405);exit('POST required');}
+    RequestSecurity::enforce();
+    if (!isMainAdmin()) AccessControl::deny();
+}
+
+
 // Deterministic 48-hour support-quote expiry; independent of scraper outcome.
 try { require_once __DIR__ . '/panel/inc/SupportTickets.php'; (new SupportTickets())->expire(); }
 catch (Throwable $e) { error_log('Support quote expiry maintenance could not run.'); }

@@ -1,9 +1,17 @@
 # Maarksho Root .htaccess
 AcceptPathInfo On
 
+Options -Indexes
+<FilesMatch "^(?:\.env(?:\..*)?|.*\.(?:sqlite3?|sql|log|cache|lock))$">
+    Require all denied
+</FilesMatch>
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /
+
+    RewriteRule (^|/)(?:\.git|db|inc|tmp|tests|tools)(?:/|$) - [F,L,NC]
+    RewriteRule (?:^|/)uploads/.*\.(?:php[0-9]*|phtml|phar|cgi|html?|svg)(?:\.|$) - [F,L,NC]
 
     # 1. Enterprise SEO & Analytics Routes: /admin/business/{slug}/seo ...
     RewriteRule ^admin/business/([^/]+)/seo/?$ panel/seo_intel/index.php?business=$1&view=overview [QSA,L]
@@ -34,9 +42,4 @@ AcceptPathInfo On
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^admin/projects/(.*)$ admin/projects/index.php [QSA,L]
-</IfModule>
-
-# CORS & Font headers
-<IfModule mod_headers.c>
-    Header always set Access-Control-Allow-Origin "*"
 </IfModule>

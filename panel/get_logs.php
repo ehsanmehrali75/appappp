@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__.'/inc/functions.php';
+if(!isMainAdmin())AccessControl::deny();
+header('Cache-Control: no-store');
 header('Content-Type: text/plain');
 $logFile = __DIR__ . '/scraper/worker.log';
 
@@ -8,10 +11,7 @@ if (file_exists($logFile)) {
     $lastLines = array_slice($lines, -50);
     echo implode("", $lastLines);
     
-    // Optional: Auto-clear if too large
-    if (count($lines) > 2000) {
-        file_put_contents($logFile, implode("", array_slice($lines, -100)));
-    }
+
 } else {
     echo "No logs found yet. System idle.";
 }

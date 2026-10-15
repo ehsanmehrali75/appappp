@@ -1,0 +1,36 @@
+name: Regression checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  isolated-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.2', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli, sqlite3, pdo_sqlite, gd, zip, mbstring, fileinfo, curl, dom, exif
+          coverage: none
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: PHP syntax
+        run: git ls-files -z '*.php' | xargs -0 -n1 php -l > /tmp/php-lint.txt
+      - name: Isolated PHP regressions
+        run: |
+          for suite in access_control system_admins owner_recovery support_tickets erp_inventory_contract tiam_inventory tiam_factinventory website_catalog_sync website_workflow website_export image_production request_security; do
+            php "tests/$suite.php" || exit 1
+          done
+      - name: Python agent and real HTTP regressions
+        env:
+          PHP_BINARY: php
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Validate deployment package
+        run: python tools/build_release.py --output /tmp/maarksho-release.zip

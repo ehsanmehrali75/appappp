@@ -6,3 +6,7 @@ __pycache__/
 *.pyc
 
 /panel/db/owner-recovery-key.php
+/.env
+/panel/db/database.local.php
+/panel/db/cache/
+*.local.php

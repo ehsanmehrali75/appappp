@@ -7,7 +7,7 @@
 ob_start();
 date_default_timezone_set('Asia/Tehran');
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', getenv('MAARKSHO_DEBUG')==='1'?'1':'0');
 
 if (session_status() === PHP_SESSION_NONE) {
     if (
@@ -20,12 +20,23 @@ if (session_status() === PHP_SESSION_NONE) {
             'path' => '/',
             'secure' => true,
             'httponly' => true,
-            'samesite' => 'None'
+            'samesite' => 'Lax'
         ]);
     }
     session_start();
 }
 
+require_once __DIR__.'/RequestSecurity.php';
+RequestSecurity::protectBrowser();
+if(PHP_SAPI!=='cli')set_exception_handler(static function($error){
+    $reference=bin2hex(random_bytes(6));
+    error_log('Application failure '.$reference.' '.get_class($error).' code='.$error->getCode().' at '.$error->getFile().':'.$error->getLine());
+    if(http_response_code()<400)http_response_code(500);
+    header('Cache-Control: no-store');
+    $message='عملیات انجام نشد. دوباره تلاش کنید؛ در صورت تکرار، کد پیگیری '.$reference.' را به پشتیبانی بدهید.';
+    if(($_SERVER['REQUEST_METHOD']??'GET')!=='GET') {header('Content-Type: application/json; charset=utf-8');echo json_encode(['status'=>'error','msg'=>$message,'reference'=>$reference],JSON_UNESCAPED_UNICODE);}
+    else {header('Content-Type: text/html; charset=utf-8');echo '<!doctype html><html lang="fa" dir="rtl"><meta charset="utf-8"><title>خطای موقت سامانه</title><body><p>'.htmlspecialchars($message,ENT_QUOTES,'UTF-8').'</p><a href="/panel/support.php">پشتیبانی</a></body></html>';}
+});
 require_once __DIR__ . '/auto_admin_engine.php';
 require_once __DIR__ . '/FeatureFlags.php';
 require_once __DIR__ . '/InstagramAdapter.php';
@@ -35,6 +46,7 @@ require_once __DIR__ . '/TiamVpnManager.php';
 require_once __DIR__ . '/TiamConnector.php';
 require_once __DIR__ . '/TiamInventory.php';
 require_once __DIR__ . '/WebsiteCatalogSync.php';
+require_once __DIR__.'/ProductWorkflow.php';
 
 // بررسی پیش‌نیازها و وضعیت اکستنشن‌ها
 define('HAS_CURL_EXTENSION', extension_loaded('curl') && function_exists('curl_init'));
@@ -406,7 +418,7 @@ function formatPersianDate($timestamp, $format = 'd M Y') {
 function getJsonDB() {
     $default = [
         'super_users' => [
-            ['username' => 'admin', 'password' => '1375'] // Keep plain for compatibility or use hash in production
+            // Initial owners are created using the setup/CLI flow.
         ],
         'projects' => [],
         'scraping_jobs' => []
@@ -779,39 +791,18 @@ function getCurrentProject($id = null, $forceReload = false) {
     return null;
 }
 
+/** Approval is explicit; ordinary persistence must never approve an image. */
+function approveProductImages(&$product) {
+    $images=$product['images_list']??[];if(is_string($images))$images=json_decode($images,true)?:[];
+    $product['images_list']=is_array($images)?$images:[];
+    foreach($product['images_list'] as $key=>$image)if(is_array($image)) {
+        $product['images_list'][$key]['approved']=true;
+        $product['images_list'][$key]['approved_at']=time();
+        $product['images_list'][$key]['approved_by']=$_SESSION['user']['username']??'';
+    }
+    $product['approved_at']=time();
+}
 function saveProject($project, $onlyProducts = null, $onlySchedules = null) {
-    if ($onlyProducts !== null && is_array($onlyProducts)) {
-        foreach ($onlyProducts as &$p) {
-            if (isset($p['status']) && $p['status'] === 'active') {
-                if (empty($p['approved_at'])) {
-                    $p['approved_at'] = time();
-                }
-                if (!empty($p['images_list']) && is_array($p['images_list'])) {
-                    foreach ($p['images_list'] as &$imgObj) {
-                        $imgObj['approved'] = true;
-                    }
-                    unset($imgObj);
-                }
-            }
-        }
-        unset($p);
-    }
-    if (isset($project['products']) && is_array($project['products'])) {
-        foreach ($project['products'] as &$p) {
-            if (isset($p['status']) && $p['status'] === 'active') {
-                if (empty($p['approved_at'])) {
-                    $p['approved_at'] = time();
-                }
-                if (!empty($p['images_list']) && is_array($p['images_list'])) {
-                    foreach ($p['images_list'] as &$imgObj) {
-                        $imgObj['approved'] = true;
-                    }
-                    unset($imgObj);
-                }
-            }
-        }
-        unset($p);
-    }
     $res = db_save_project($project, $onlyProducts, $onlySchedules);
     if (!empty($project['id'])) {
         if (class_exists('MaarkshoCache')) {
@@ -953,54 +944,7 @@ function normalizeDigitsToEnglish($str) {
  * اگر وضعیت out_of_stock باشد یا موجودی آنلاین و کل صفر/ناموجود باشد، محصول ناموجود است
  */
 function isProductOutOfStock($p) {
-    if (empty($p) || !is_array($p)) return false;
-    
-    // ۱. بررسی وضعیت مستقیم محصول
-    $status = trim((string)($p['status'] ?? ''));
-    if ($status === 'out_of_stock') {
-        return true;
-    }
-    
-    // ۲. بررسی وجود عبارت "ناموجود" در فیلدهای متنی موجودی
-    $stockOnlineRaw = trim((string)($p['stock_online'] ?? ''));
-    $stockTotalRaw = trim((string)($p['stock_total'] ?? ''));
-    $stockRaw = trim((string)($p['stock'] ?? ''));
-    
-    if (mb_stripos($stockOnlineRaw, 'ناموجود') !== false || 
-        mb_stripos($stockTotalRaw, 'ناموجود') !== false || 
-        mb_stripos($stockRaw, 'ناموجود') !== false) {
-        return true;
-    }
-    
-    $stockOnlineStr = normalizeDigitsToEnglish($stockOnlineRaw);
-    $stockTotalStr = normalizeDigitsToEnglish($stockTotalRaw);
-    $stockStr = normalizeDigitsToEnglish($stockRaw);
-    
-    // ۳. بررسی مقادیر عددی موجودی
-    $hasOnline = ($stockOnlineStr !== '');
-    $hasTotal = ($stockTotalStr !== '');
-    $hasStock = ($stockStr !== '');
-
-    if ($hasOnline || $hasTotal || $hasStock) {
-        $onlineVal = $hasOnline ? (float)preg_replace('/[^0-9\.\-]/', '', $stockOnlineStr) : null;
-        $totalVal = $hasTotal ? (float)preg_replace('/[^0-9\.\-]/', '', $stockTotalStr) : null;
-        $stockVal = $hasStock ? (float)preg_replace('/[^0-9\.\-]/', '', $stockStr) : null;
-
-        // اگر هر دو موجودی آنلاین و کل تعریف شده باشند
-        if ($hasOnline && $hasTotal) {
-            if ($onlineVal <= 0 && $totalVal <= 0) {
-                return true;
-            }
-        } elseif ($hasOnline && $onlineVal <= 0) {
-            return true;
-        } elseif ($hasTotal && $totalVal <= 0) {
-            return true;
-        } elseif ($hasStock && $stockVal <= 0) {
-            return true;
-        }
-    }
-    
-    return false;
+    return is_array($p)&&WebsiteCatalogSync::inventory($p)==='out_of_stock';
 }
 
 function isValidProductImage($url) {
@@ -1058,41 +1002,14 @@ if (!function_exists('is_product_without_image')) {
  * آیا محصول دارای حداقل یک عکس رفرنس معتبر است؟
  */
 function hasProductReferenceImages($p) {
-    if (empty($p) || !is_array($p)) return false;
-    if (empty($p['reference_gallery'])) return false;
-    $ref = $p['reference_gallery'];
-    if (is_string($ref)) {
-        $ref = json_decode($ref, true) ?: [];
-    }
-    if (is_array($ref)) {
-        foreach ($ref as $r) {
-            $rUrl = is_array($r) ? ($r['url'] ?? ($r['src'] ?? ($r['image'] ?? ''))) : (string)$r;
-            if (!empty($rUrl) && isValidProductImage($rUrl)) {
-                return true;
-            }
-        }
-    }
-    return false;
+    return is_array($p)&&(bool)ImageProduction::references($p);
 }
 
 /**
  * دریافت لیست آرایه‌ای عکس‌های رفرنس محصول
  */
 function getProductReferenceImagesList($p) {
-    if (empty($p) || !is_array($p) || empty($p['reference_gallery'])) return [];
-    $ref = $p['reference_gallery'];
-    if (is_string($ref)) {
-        $ref = json_decode($ref, true) ?: [];
-    }
-    if (!is_array($ref)) return [];
-    $res = [];
-    foreach ($ref as $r) {
-        $rUrl = is_array($r) ? ($r['url'] ?? ($r['src'] ?? ($r['image'] ?? ''))) : (string)$r;
-        if (!empty($rUrl) && isValidProductImage($rUrl)) {
-            $res[] = $rUrl;
-        }
-    }
-    return array_values(array_unique($res));
+    return is_array($p)?ImageProduction::references($p):[];
 }
 
 /**
@@ -1136,19 +1053,17 @@ function hasProductFinalImages($p) {
 /**
  * آیا محصول فاقد جدول سایز است؟
  */
-function isProductMissingSizeChart($p) {
-    if (empty($p) || !is_array($p)) return true;
-    $chart = $p['size_chart'] ?? $p['sizeChart'] ?? '';
-    if (!empty($chart) && strpos($chart, 'placehold') === false) return false;
-    if (!empty($p['size_chart_template_id'])) return false;
-    return true;
+function isProductMissingSizeChart($p, $project = null) {
+    if(empty($p)||!is_array($p))return true;
+    $project=$project??getCurrentProject();
+    return !ProductSizeChartCatalog::forProduct($project??[], $p)['exists'];
 }
 
 /**
  * آیا محصول دارای جدول سایز است؟
  */
-function hasProductSizeChart($p) {
-    return !isProductMissingSizeChart($p);
+function hasProductSizeChart($p, $project = null) {
+    return !isProductMissingSizeChart($p,$project);
 }
 
 /**
@@ -1168,15 +1083,15 @@ function isProductSizeChartPendingUpload($p) {
  * 6. active: تایید نهایی شده و منتظر آپلود/ارسال
  * 7. rejected: رد شده
  */
-function getProductWorkflowStatus($p) {
+function getProductWorkflowStatus($p, $project = null) {
     if (empty($p) || !is_array($p)) return 'no_image';
     if (isProductOutOfStock($p)) {
         return 'out_of_stock';
     }
     
-    $hasFinal = hasProductFinalImages($p);
+    $hasFinal = (bool)WebsiteCatalogSync::photos($p);
     $hasRef = hasProductReferenceImages($p) || !empty($p['waiting_final_photo']);
-    $hasSizeChart = hasProductSizeChart($p);
+    $hasSizeChart = hasProductSizeChart($p,$project);
     $hasPriority = !empty($p['content_gen_requested']) || !empty($p['publish_priority']);
     $rawStatus = $p['status'] ?? 'active';
     $hasUnapprovedImages = (bool)WebsiteCatalogSync::pendingApprovalPhotos($p,true);
@@ -1185,28 +1100,16 @@ function getProductWorkflowStatus($p) {
         return 'rejected';
     }
     
-    // ۱. اگر تصویر نهایی ندارد و رفرنس یا جدول سایز هم ندارد
-    if (!$hasFinal && !$hasRef && !$hasSizeChart) {
-        if ($hasPriority) {
-            return 'waiting_reference';
-        }
+    if($hasUnapprovedImages)return 'pending_approval';
+    if(!$hasFinal) {
+        $context=$project??getCurrentProject();
+        $production=ImageProduction::state($context??[],$p,false,false);
+        if($production['needs_image_request'])return 'image_request';
+        if($production['needs_reference']&&$production['reference_required'])return 'waiting_reference';
+        if($hasRef||$hasSizeChart||$hasPriority)return 'waiting_ai_image';
         return 'no_image';
     }
-    
-    // ۲. اگر رفرنس یا جدول سایز دارد ولی هنوز تصویر نهایی تولید/آپلود نشده است
-    if (!$hasFinal && ($hasRef || $hasSizeChart || !empty($p['waiting_final_photo']))) {
-        return 'waiting_ai_image';
-    }
-    
-    // ۳. اگر عکس ساخته شده دارد ولی وضعیت آن در انتظار تایید است (در پورتال یا سیستم)
-    if ($hasFinal && $hasUnapprovedImages && ($rawStatus === 'pending' || $rawStatus === 'waiting_approval' || !empty($p['portal_pending']))) {
-        return 'pending_approval';
-    }
 
-    // ۴. اگر هیچ تصویر نهایی ندارد ولی وضعیت pending دارد (در صف تولید)
-    if (!$hasFinal && $rawStatus === 'pending') {
-        return 'waiting_ai_image';
-    }
     
     return 'active';
 }
@@ -1330,9 +1233,26 @@ function hasPermission($perm) {
     return ($member['role'] ?? '') === 'project_admin' || in_array($perm, $member['permissions'] ?? [], true);
 }
 
+/** Transparently retire plaintext legacy passwords after a successful authentication. */
+function upgradeLegacyLoginPassword($username,$password,$projectId=null) {
+    $hash=password_hash($password,PASSWORD_DEFAULT);
+    if(isSqlActive()) {
+        $conn=getConn();
+        $stmt=$conn->prepare($projectId===null?'UPDATE super_users SET password=? WHERE username=? AND password=?':'UPDATE project_users SET password=? WHERE username=? AND project_id=? AND password=?');
+        if(!$stmt)return;
+        if($projectId===null)$stmt->bind_param('sss',$hash,$username,$password);
+        else $stmt->bind_param('ssss',$hash,$username,$projectId,$password);
+        $stmt->execute();$stmt->close();return;
+    }
+    $db=getJsonDB();
+    if($projectId===null){foreach($db['super_users'] as &$user)if(($user['username']??'')===$username&&($user['password']??'')===$password)$user['password']=$hash;unset($user);}
+    else {foreach($db['projects'] as &$prj)if(($prj['id']??'')===$projectId){foreach($prj['users'] as &$user)if(($user['username']??'')===$username&&($user['password']??'')===$password)$user['password']=$hash;unset($user);}unset($prj);}
+    saveJsonDB($db);
+}
+
 function canAccessManagement() {
     if (isMainAdmin() || isProjectAdmin()) return true;
-    return ($_SESSION['user']['role'] ?? '') === 'manager';
+    return in_array($_SESSION['user']['role']??'',['manager','editor'],true);
 }
 
 function checkModuleSettingAccess($module, $settings) {
@@ -3468,6 +3388,7 @@ function autoApprovePendingProducts(&$project) {
                         } else {
                             if (empty($p['userVotes'])) {
                                 $p['status'] = 'active';
+                                approveProductImages($p);
                                 $p['system_approved'] = true;
                                 addDebugLog('AUTO_APPROVE', "Product Image {$p['id']} auto-approved due to image timeout.", ['pid' => $p['id']]);
                             }
@@ -3501,6 +3422,7 @@ function autoApprovePendingProducts(&$project) {
                         } else {
                             if (empty($p['userVotes'])) {
                                 $p['status'] = 'active';
+                                approveProductImages($p);
                                 $p['system_approved'] = true;
                                 addDebugLog('AUTO_APPROVE', "Product {$p['id']} auto-approved due to library timeout.", ['pid' => $p['id']]);
                             }
@@ -5871,6 +5793,7 @@ function refreshProductSplitStatus(&$p, $project) {
     if ($p['stage1_decision'] !== 'pending' && $p['stage2_decision'] !== 'pending') {
         if ($p['stage1_decision'] === 'approved' && $p['stage2_decision'] === 'approved') {
             $p['status'] = 'active';
+            approveProductImages($p);
             cleanupProductApprovedReferenceImages($p);
             
             // Rebuild images_list to tag manual/instagram sources

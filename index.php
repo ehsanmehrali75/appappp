@@ -243,6 +243,7 @@ if (isset($_POST['verify_code'])) {
             
             savePortalUser($mobile, $pUser['display_name'], $pUser['user_icon'] ?? '', '', 0);
             
+            session_regenerate_id(true);
             $_SESSION['portal_user'] = $mobile;
             $_SESSION['portal_user_icon'] = $pUser['user_icon'] ?? '';
             $_SESSION['portal_user_display_name'] = $pUser['display_name'] ?? ('کاربر پورتال ' . substr($mobile, -4));
@@ -279,7 +280,8 @@ if (isset($_POST['verify_code'])) {
                     'role' => 'portal_viewer',
                     'permissions' => ['dashboard']
                 ];
-                $_SESSION['project_id'] = $firstPrjId;
+                unset($_SESSION['project_id']);
+                redirect('panel/support.php');
             }
             
             redirect(canAccessManagement() ? 'panel/admin.php' : 'panel/portal.php');
@@ -292,13 +294,18 @@ if (isset($_POST['verify_code'])) {
 }
 
 // Handle Admin password login
-if (isset($_POST['login'])) {
+require_once __DIR__.'/panel/inc/LoginThrottle.php';
+if(isset($_POST['login'])&&!LoginThrottle::check(trim((string)($_POST['user']??'')))) {
+    http_response_code(429);
+    $login_error='تعداد تلاش‌های ورود زیاد است؛ ۱۵ دقیقه بعد دوباره تلاش کنید.';
+} elseif (isset($_POST['login'])) {
     $u = trim($_POST['user'] ?? '');
     $p = trim($_POST['pass'] ?? '');
     
     require_once __DIR__ . '/panel/inc/SystemAdmins.php';
     $systemAdmin = SystemAdmins::authenticate($u, $p);
     if ($systemAdmin) {
+        LoginThrottle::check($u,true);
         session_regenerate_id(true);
         $_SESSION['user'] = $systemAdmin;
         redirect('panel/admin.php');
@@ -316,6 +323,9 @@ if (isset($_POST['login'])) {
             }
 
             if ($matched) {
+                if(!password_get_info($su['password'])['algo'])upgradeLegacyLoginPassword($u,$p);
+                LoginThrottle::check($u,true);
+                session_regenerate_id(true);
                 $_SESSION['user'] = ['username' => $u, 'role' => 'superadmin'];
                 redirect('panel/admin.php');
             }
@@ -334,6 +344,9 @@ if (isset($_POST['login'])) {
                 }
 
                 if ($matched) {
+                    if(!password_get_info($user['password'])['algo'])upgradeLegacyLoginPassword($u,$p,$project['id']);
+                    LoginThrottle::check($u,true);
+                    session_regenerate_id(true);
                     $_SESSION['user'] = $user;
                     $_SESSION['project_id'] = $project['id'];
                     redirect(canAccessManagement() ? 'panel/admin.php' : 'panel/portal.php');
