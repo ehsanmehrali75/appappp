@@ -58,4 +58,7 @@ $cancelled=TiamInventory::cancelJob('queue-test',$q['id'],'owner-a');check($canc
 $running=TiamInventory::createJob($queueProject,'preview','owner-a');$running['state']='running';$running['agent_last_seen']=time();TiamInventory::write('queue-test',$running);
 $cancelled=TiamInventory::cancelJob('queue-test',$running['id'],'admin',true);check($cancelled['state']==='cancelled' && !isset($cancelled['products']),'administrator cancels running job');
 $next=TiamInventory::createJob($queueProject,'preview','owner-a');check($next['id']!==$running['id'] && $next['agent_last_seen']===$running['agent_last_seen'],'replacement preserves agent presence');
+$manual=$input;$manual['vpn_enabled']='0';$manual['vpn_secret']='existing-secret';
+$manualCfg=TiamInventory::config([],$manual);check($manualCfg['vpn_enabled']===false,'existing-network selection is a real boolean false');
+$managed=$manual;$managed['vpn_enabled']='1';check(TiamInventory::config($manualCfg,$managed)['vpn_enabled']===true,'managed VPN remains opt-in');
 echo "$count Tiam inventory checks passed\n";

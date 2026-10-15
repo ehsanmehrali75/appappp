@@ -30,6 +30,22 @@ class AgentTests(unittest.TestCase):
         self.assertIn('HTTP 401',output.getvalue())
         self.assertNotIn('private driver detail',output.getvalue())
 
+    def test_existing_network_reaches_sql_without_vpn_commands(self):
+        cfg={'host':'192.0.2.1','database':'Test','view':'Stock','username':'reader','password':'sql-secret','vpn_enabled':False,'vpn_secret':'old-vpn-secret'}
+        with patch.object(agent,'connect_vpn') as vpn, patch.object(agent.subprocess,'run') as commands, patch.object(agent.socket,'create_connection'), patch.object(agent,'read_view',return_value=(['Code'],[{'Code':'A'}])) as read:
+            result=agent.execute_job({'kind':'view_test','config':cfg},'p1')
+        self.assertTrue(result['success'])
+        vpn.assert_not_called()
+        commands.assert_not_called()
+        read.assert_called_once_with(cfg,True)
+        self.assertEqual(result['logs'][1]['status'],'skipped')
+        self.assertNotIn('old-vpn-secret',str(result))
+
+    def test_direct_connection_never_invokes_windows_vpn_tools(self):
+        with patch.object(agent.os,'name','nt'), patch.object(agent.subprocess,'run') as commands:
+            agent.connect_vpn({'vpn_enabled':False},'p1')
+        commands.assert_not_called()
+
     def test_identifiers_and_dsn_escape(self):
         self.assertEqual(agent.identifier('Factinventory'), '[Factinventory]')
         self.assertEqual(agent.dsn_value('a};PWD=x'), '{a}};PWD=x}')

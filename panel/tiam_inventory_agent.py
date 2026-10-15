@@ -132,7 +132,7 @@ def execute_job(job, project):
         if cfg.get('vpn_enabled'):
             stage(logs, 'vpn', lambda: connect_vpn(cfg, project), 'VPN client connection/service completed; TCP route is checked next')
         else:
-            logs.append({'stage': 'vpn', 'status': 'skipped', 'message': 'Direct LAN route selected', 'elapsed_ms': 0})
+            logs.append({'stage': 'vpn', 'status': 'skipped', 'message': 'Using current system network (LAN or existing VPN); agent does not change VPN connections', 'elapsed_ms': 0})
         def probe():
             with socket.create_connection((cfg['host'], int(cfg.get('port', 1433))), timeout=10):
                 pass

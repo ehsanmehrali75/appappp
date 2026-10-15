@@ -73,6 +73,7 @@ try {
             if (($job['state'] ?? '') === 'running') return ['status' => 'idle'];
             $job['state'] = 'running'; $job['started_at'] = time(); TiamInventory::write($id, $job);
             unset($cfg['agent_token_hash'], $cfg['approved']);
+            if (empty($cfg['vpn_enabled'])) foreach (['vpn_server','vpn_username','vpn_password','vpn_secret','vpn_service'] as $field) unset($cfg[$field]);
             return ['status' => 'job', 'job' => $job['id'], 'kind' => $job['kind'], 'config' => $cfg];
         } elseif ($action === 'agent_result') {
             if (!hash_equals($job['id'] ?? '', $body['job'] ?? '') || ($job['state'] ?? '') !== 'running' || ($job['expires'] ?? 0) <= time()) throw new RuntimeException('نتیجهٔ تکراری یا منقضی دریافت شد.');
