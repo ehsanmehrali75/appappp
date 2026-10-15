@@ -17,6 +17,8 @@ from bs4 import BeautifulSoup
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError, async_playwright
 
 OUTPUT = 'output/products.json'
+SCRAPER_VERSION = '2.1.0'
+DEFAULT_SIZE_GUIDE_WAIT_MS = 8000
 CHROME_PATHS = [
     r'C:\Program Files\Google\Chrome\Application\chrome.exe',
     r'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe',
@@ -324,11 +326,8 @@ def parse_html(html, url, fields):
             element = soup.select_one(selector)
             data[field] = element.get_text(' ', strip=True) if element else ''
         elif field == 'size_guide':
-            element = soup.select_one(selector)
-            source = (element.get('data-link') or '').strip() if element else ''
-            resolved = urljoin(url, source) if source and not source.startswith('#') else ''
-            parsed = urlparse(resolved)
-            data[field] = resolved if parsed.scheme in ('http', 'https') and parsed.netloc else None
+            data[field] = next((resolved for element in soup.select(selector)
+                                if (resolved := size_guide_url(element.get('data-link'), url))), None)
         elif field == 'gallery':
             gallery = []
             for image in soup.select(selector):
@@ -340,8 +339,25 @@ def parse_html(html, url, fields):
     return data
 
 
+def size_guide_url(source, page_url):
+    if not isinstance(source, str):
+        return None
+    source = source.strip()
+    if (not source or source.startswith('#') or source.lower() in ('null', 'undefined', 'false')
+            or '\\' in source or any(char.isspace() or ord(char) < 32 for char in source)):
+        return None
+    try:
+        resolved = urljoin(page_url, source)
+        parsed = urlparse(resolved)
+        if parsed.scheme in ('http', 'https') and parsed.hostname and not parsed.username and not parsed.password:
+            return resolved
+    except ValueError:
+        pass
+    return None
+
+
 async def parse_product_page(page, url, fields, controller, log, timeout_ms, dynamic_wait_ms,
-                             size_guide_wait_ms=5000):
+                             size_guide_wait_ms=DEFAULT_SIZE_GUIDE_WAIT_MS):
     await navigate(page, url, 'h1.product-name, #product-code', controller, log, timeout_ms)
     await page.wait_for_function(
         "() => ['h1.product-name','#product-code'].some(s => document.querySelector(s)?.textContent.trim())",
@@ -367,19 +383,24 @@ async def parse_product_page(page, url, fields, controller, log, timeout_ms, dyn
             return
         try:
             await page.wait_for_function(
-                '''selector => {
-                    const source = document.querySelector(selector)?.getAttribute('data-link')?.trim();
-                    if (!source || source.startsWith('#')) return false;
-                    try { return ['http:', 'https:'].includes(new URL(source, location.href).protocol); }
-                    catch (_) { return false; }
-                }''',
-                arg=SELECTORS['size_guide'], timeout=size_guide_wait_ms,
+                r'''selector => Array.from(document.querySelectorAll(selector)).some(element => {
+                    const source = element.getAttribute('data-link')?.trim();
+                    if (!source || source.startsWith('#') || ['null','undefined','false'].includes(source.toLowerCase()) || /[\s\\]/.test(source)) return false;
+                    try {
+                        const parsed = new URL(source, location.href);
+                        return ['http:', 'https:'].includes(parsed.protocol) && parsed.hostname && !parsed.username && !parsed.password;
+                    } catch (_) { return false; }
+                })''',
+                arg=SELECTORS['size_guide'], timeout=size_guide_wait_ms, polling=100,
             )
         except PlaywrightTimeoutError:
             log(f'SIZE GUIDE => no valid link within {size_guide_wait_ms}ms: {url}')
 
     await asyncio.gather(wait_optional_fields(), wait_size_guide())
-    return parse_html(await page.content(), url, fields)
+    data = parse_html(await page.content(), url, fields)
+    if 'size_guide' in fields and data.get('size_guide'):
+        log(f'SIZE GUIDE => found: {data["size_guide"]} | product: {url}')
+    return data
 
 
 async def extract_links(browser, page_url):
@@ -405,7 +426,7 @@ async def run_scraper(url, mode, fields, log, progress, batch_size=None,
                       controller=None, use_system_proxy=True, *, concurrency=4,
                       output=None, checkpoint_every=10, timeout_ms=20000,
                       dynamic_wait_ms=800, refresh_existing=False, block_assets=True,
-                      size_guide_wait_ms=5000):
+                      size_guide_wait_ms=DEFAULT_SIZE_GUIDE_WAIT_MS):
     """Drop-in API. Legacy update/continue both skip already collected URLs.
 
     Set refresh_existing=True with mode='update' to actually refresh old URLs.
@@ -432,6 +453,7 @@ async def run_scraper(url, mode, fields, log, progress, batch_size=None,
         try:
             playwright, browser, page = await create_browser(use_system_proxy, block_assets)
             context = page.context
+            log(f'Engine => {SCRAPER_VERSION}; size-guide wait => {size_guide_wait_ms}ms; refresh existing => {mode == "update" and refresh_existing}')
             log(f'Workers => {concurrency}; proxy => {"system" if use_system_proxy else "direct"}')
             log('Pause prevents new requests; requests already in flight may finish.')
             discover_started = time.monotonic()

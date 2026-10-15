@@ -6,7 +6,9 @@ from PyQt5.QtCore import *
 
 from crawler.scraper import (
     run_scraper,
-    scraper_controller
+    scraper_controller,
+    SCRAPER_VERSION,
+    DEFAULT_SIZE_GUIDE_WAIT_MS,
 )
 
 
@@ -28,7 +30,8 @@ class Worker(QThread):
     done_signal = pyqtSignal(str)
     error_signal = pyqtSignal(str)
 
-    def __init__(self, url, mode, fields, batch_size, use_system_proxy, concurrency=4, refresh_existing=False):
+    def __init__(self, url, mode, fields, batch_size, use_system_proxy, concurrency=4, refresh_existing=False,
+                 size_guide_wait_ms=DEFAULT_SIZE_GUIDE_WAIT_MS):
         super().__init__()
         self.url = url
         self.mode = mode
@@ -37,6 +40,7 @@ class Worker(QThread):
         self.use_system_proxy = use_system_proxy
         self.concurrency = concurrency
         self.refresh_existing = refresh_existing
+        self.size_guide_wait_ms = size_guide_wait_ms
 
     def run(self):
         try:
@@ -52,6 +56,7 @@ class Worker(QThread):
                     use_system_proxy=self.use_system_proxy,
                     concurrency=self.concurrency,
                     refresh_existing=self.refresh_existing,
+                    size_guide_wait_ms=self.size_guide_wait_ms,
                 )
             )
             self.done_signal.emit(result)
@@ -63,47 +68,53 @@ class Window(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Tanedorost Scraper — Fast Edition")
+        self.setWindowTitle(f"Tanedorost Scraper — Fast Edition {SCRAPER_VERSION}")
         self.resize(900, 850)
 
         layout = QVBoxLayout()
+        settings = QWidget()
+        settings_layout = QVBoxLayout(settings)
 
-        layout.addWidget(QLabel("لینک دسته بندی"))
+        settings_layout.addWidget(QLabel("لینک دسته بندی"))
         self.url = QLineEdit()
         self.url.setPlaceholderText("https://www.tanedorost.com/search/...")
-        layout.addWidget(self.url)
+        settings_layout.addWidget(self.url)
 
-        layout.addWidget(QLabel("حالت اجرا"))
+        settings_layout.addWidget(QLabel("حالت اجرا"))
         self.mode = QComboBox()
         self.mode.addItem("شروع جدید", "fresh")
-        self.mode.addItem("ادامه از فایل قبلی", "continue")
-        self.mode.addItem("آپدیت", "update")
-        layout.addWidget(self.mode)
+        self.mode.addItem("ادامه؛ رد کردن محصولات ذخیره‌شده", "continue")
+        self.mode.addItem("به‌روزرسانی اطلاعات محصولات", "update")
+        settings_layout.addWidget(self.mode)
 
-        layout.addWidget(QLabel("تعداد محصولات در هر اجرا"))
+        settings_layout.addWidget(QLabel("تعداد محصولات در هر اجرا"))
         self.batch = QComboBox()
         self.batch.addItem("50 محصول", 50)
         self.batch.addItem("100 محصول", 100)
         self.batch.addItem("همه محصولات", 0)
-        layout.addWidget(self.batch)
+        settings_layout.addWidget(self.batch)
 
-        layout.addWidget(QLabel("اتصال اینترنت"))
+        settings_layout.addWidget(QLabel("اتصال اینترنت"))
         self.proxy = QComboBox()
         self.proxy.addItem("استفاده از پروکسی سیستم", True)
         self.proxy.addItem("بدون پروکسی - اتصال مستقیم", False)
-        layout.addWidget(self.proxy)
+        settings_layout.addWidget(self.proxy)
 
-        layout.addWidget(QLabel("تعداد دریافت هم‌زمان (مستقل از تعداد محصولات)"))
+        settings_layout.addWidget(QLabel("تعداد دریافت هم‌زمان (مستقل از تعداد محصولات)"))
         self.concurrency = QSpinBox()
         self.concurrency.setRange(1, 8)
         self.concurrency.setValue(4)
         self.concurrency.setToolTip("از ۲ تا ۴ شروع کنید؛ در صورت خطای سایت کاهش دهید.")
-        layout.addWidget(self.concurrency)
-        self.refresh_existing = QCheckBox("در حالت آپدیت، اطلاعات محصولات قبلی هم تازه شود")
-        self.refresh_existing.setChecked(False)
-        layout.addWidget(self.refresh_existing)
+        settings_layout.addWidget(self.concurrency)
+        self.refresh_existing = QCheckBox("بازخوانی محصولات قبلی در آپدیت؛ برای اصلاح جدول‌های سایز خالی")
+        self.refresh_existing.setChecked(True)
+        self.refresh_existing.setEnabled(False)
+        self.mode.currentIndexChanged.connect(
+            lambda _: self.refresh_existing.setEnabled(self.mode.currentData() == 'update')
+        )
+        settings_layout.addWidget(self.refresh_existing)
 
-        layout.addWidget(QLabel("فیلدهای مورد نیاز"))
+        settings_layout.addWidget(QLabel("فیلدهای مورد نیاز"))
         self.checks = {}
         grid = QGridLayout()
         row = 0
@@ -119,7 +130,25 @@ class Window(QWidget):
                 col = 0
                 row += 1
 
-        layout.addLayout(grid)
+        settings_layout.addLayout(grid)
+
+        guide_wait = QHBoxLayout()
+        guide_wait.addWidget(QLabel("حداکثر انتظار برای جدول سایز (ثانیه)"))
+        self.size_guide_wait = QSpinBox()
+        self.size_guide_wait.setRange(2, 30)
+        self.size_guide_wait.setValue(DEFAULT_SIZE_GUIDE_WAIT_MS // 1000)
+        self.size_guide_wait.setToolTip("با آماده‌شدن لینک جدول، انتظار فوراً تمام می‌شود؛ برای صفحات کند زمان را بیشتر کنید.")
+        self.checks['size_guide'].toggled.connect(self.size_guide_wait.setEnabled)
+        guide_wait.addWidget(self.size_guide_wait)
+        settings_layout.addLayout(guide_wait)
+
+        # Keep run controls and logs visible on smaller laptop screens.
+        settings_scroll = QScrollArea()
+        settings_scroll.setWidgetResizable(True)
+        settings_scroll.setFrameShape(QFrame.NoFrame)
+        settings_scroll.setMinimumHeight(220)
+        settings_scroll.setWidget(settings)
+        layout.addWidget(settings_scroll, 2)
 
         buttons = QHBoxLayout()
         self.start_btn = QPushButton("شروع استخراج")
@@ -174,6 +203,7 @@ class Window(QWidget):
         self.progress.setValue(0)
         self.logs.appendPlainText("================================")
         self.logs.appendPlainText("🚀 Scraper Started")
+        self.logs.appendPlainText(f"Engine => {SCRAPER_VERSION}")
         self.logs.appendPlainText(f"Mode => {mode}")
         self.logs.appendPlainText(f"Batch => {batch_size if batch_size else 'ALL'}")
         self.logs.appendPlainText(
@@ -193,6 +223,7 @@ class Window(QWidget):
             use_system_proxy=use_system_proxy,
             concurrency=self.concurrency.value(),
             refresh_existing=self.refresh_existing.isChecked(),
+            size_guide_wait_ms=self.size_guide_wait.value() * 1000,
         )
         self.worker.log_signal.connect(self.logs.appendPlainText)
         self.worker.progress_signal.connect(self.progress.setValue)
