@@ -1,0 +1,60 @@
+/* Independent prompt and task workspaces. No public, canvas or export templates. */
+body.neo-module{background:var(--ms-surface)!important;color:var(--ms-ink);--primary:var(--ms-accent);line-height:1.9}
+.neo-module :focus-visible{outline:3px solid #28634c!important;outline-offset:3px}
+.neo-module :is(header,aside,.modal-card,.bg-white){background-color:var(--ms-surface)!important;border-color:#ffffffb3;box-shadow:var(--ms-raised);border-radius:20px}
+.neo-module>header{border-radius:0;padding-block:20px}
+.neo-module :is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=hidden]),select,textarea){background:var(--ms-surface)!important;color:var(--ms-ink)!important;border:1px solid #bdcbc4!important;border-radius:12px;box-shadow:var(--ms-inset);min-height:46px;padding:11px 14px;max-width:100%;font:inherit;font-size:13px}
+.neo-module textarea{resize:vertical;line-height:1.9;user-select:text}
+.neo-module :is(input[type=checkbox],input[type=radio]){accent-color:var(--ms-accent);width:18px;height:18px}
+.neo-module :is(button,.btn,a[class*='px-']){min-height:44px;border-radius:12px;letter-spacing:0;line-height:1.8}
+.neo-module :is(button.bg-violet-600,button.bg-indigo-600,.bg-primary){background:var(--ms-accent)!important;color:#fff;box-shadow:3px 3px 9px #c7cfd4,-3px -3px 9px #fff}
+.neo-module :is(.text-slate-400,.text-slate-500){color:var(--ms-muted)}
+.neo-module :is(.text-violet-600,.text-indigo-600){color:var(--ms-accent)}
+.neo-module :is(.grid>*,.flex-1){min-width:0}
+.neo-module [hidden]{display:none!important}
+.neo-module .modal-card{max-height:calc(100dvh - 24px)}
+.neo-module :is(.modal-body,[id$='-modal'] .overflow-y-auto){overscroll-behavior:contain}
+.neo-module .modal-foot{background:transparent;flex-wrap:wrap}
+.neo-module .pill.is-active{background:var(--ms-accent)!important;border-color:var(--ms-accent)!important;color:#fff!important}
+.neo-module #tabs{max-width:100%;overflow-x:auto;flex-wrap:nowrap;scrollbar-width:thin}
+.neo-module #tabs .pill{flex-shrink:0}
+.neo-module .neo-board-nav{display:none}
+.neo-module .neo-task-board>div{background:var(--ms-surface);border:1px solid #fff;box-shadow:var(--ms-inset);border-radius:20px;min-width:0}
+.neo-module .neo-task-board [id^='col-']>.bg-white{box-shadow:3px 3px 8px #cdd4da,-3px -3px 8px #fff;border-radius:14px}
+@media(min-width:768px) and (max-width:1199px){.neo-module .neo-task-board{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1100px){.neo-module #btnFilters{display:flex!important}.neo-module .sidebar{background:var(--ms-surface)!important}}
+@media(max-width:767px){
+body.neo-module{padding:16px}.neo-module.neo-tasks{padding:0}
+.neo-module>header{flex-wrap:wrap;gap:16px;padding-inline:16px}
+.neo-module :is(input,select,textarea){font-size:16px!important}
+.neo-module :is(.modal-head,.modal-body,.modal-foot){padding:20px}
+.neo-module .modal-card :is(.grid-cols-2,.grid-cols-3){grid-template-columns:minmax(0,1fr)}
+.neo-module .modal-card :is(.col-span-2,.col-span-3){grid-column:auto}
+.neo-module #topbar{padding:20px}
+.neo-module #topbar h1{line-height:1.7}
+.neo-module .neo-board-nav{display:flex;gap:8px;overflow-x:auto;max-width:100%;padding-block:4px 12px;scrollbar-width:thin}
+.neo-module .neo-board-nav button{flex:0 0 auto;padding:10px 14px;background:var(--ms-surface);border:1px solid #bccbc2;color:var(--ms-ink);font-size:12px}
+.neo-module .neo-board-nav button[aria-pressed=true]{background:var(--ms-accent);color:#fff;border-color:var(--ms-accent)}
+.neo-module .neo-task-board{height:auto;grid-template-columns:minmax(0,1fr)}
+.neo-module .neo-task-board>div{min-height:250px}
+.neo-module #task-detail-modal .grid-cols-4{grid-template-columns:repeat(2,minmax(0,1fr))}
+.neo-module #create-task-modal>div,.neo-module #task-detail-modal>div{max-height:calc(100dvh - 24px);padding:20px}
+}
+@media(prefers-reduced-motion:reduce){.neo-module *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+.neo-prompts #topbar>div{min-width:0;max-width:100%}
+.neo-prompts #topbar>div:last-child{flex-wrap:wrap}
+.neo-prompts #tabs{min-width:0;max-width:100%;width:100%}
+.neo-prompts #policyBox{flex-wrap:wrap;max-width:100%}
+.neo-prompts #policyBox select{min-width:0;flex:1}
+@media(max-width:767px){.neo-prompts #topbar>div>.flex{min-width:0;max-width:100%}.neo-prompts #policyBox{width:100%;gap:10px}.neo-prompts #policyBox select{width:100%;flex-basis:100%}}
+.neo-module .neo-task-filters-toggle{display:none}
+@media(max-width:767px){.neo-module .neo-task-filters-toggle{display:block;padding:12px 18px;border:1px solid #b9c9bf;background:var(--ms-surface);box-shadow:var(--ms-raised);color:var(--ms-ink);text-align:start;font-size:13px}.neo-prompts #topbar>div:first-child>div:last-child{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.neo-prompts #topbar>div:first-child>div:last-child button{padding:12px 10px;min-width:0}}
+.neo-tasks>div.grid{align-content:start}
+.neo-module .neo-task-filters-toggle{align-self:start}
+.neo-module #task-search{padding-inline:38px}
+.neo-prompts .premium-card{background:var(--ms-surface);box-shadow:var(--ms-raised);border:1px solid #fff;border-radius:20px;transform:none;min-width:0}
+.neo-prompts .modal-head,.neo-prompts .modal-foot{flex-shrink:0}
+.neo-prompts #promptForm{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.neo-prompts .modal-body{min-height:0}
+@media(max-width:1100px){.neo-prompts .sidebar{overflow-y:auto;max-height:100dvh}}
+@media(max-width:767px){.neo-prompts #useModal .modal-body>.flex{flex-wrap:wrap}}

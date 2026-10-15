@@ -1,4 +1,4 @@
-/* Administrative workspaces only. Never loaded by product/image editors or public pages. */
+/* Administrative workspaces and ordinary forms only; public pages and visual editors keep their own styles. */
 .neo-workspace .admin-content{padding-block:8px 56px;line-height:1.9}
 .neo-workspace .admin-content h2{font-size:clamp(21px,2.3vw,29px);line-height:1.7;letter-spacing:-.4px}
 .neo-workspace .admin-content h3{font-size:18px;line-height:1.8;letter-spacing:0}
@@ -41,3 +41,38 @@
 @media(max-width:767px){.neo-workspace .neo-section-nav a{max-width:180px}}
 @media(max-width:767px){.neo-workspace .admin-content .flex-1{max-width:100%;width:100%}.neo-workspace .admin-content .flex.items-center.justify-between{flex-wrap:wrap;gap:12px}}
 @media(max-width:767px){.neo-workspace.tab-extract .admin-content .flex>div{min-width:0;max-width:100%}.neo-workspace.tab-extract #erp_tiam_panel,.neo-workspace.tab-extract #erp_manual_panel{width:100%;min-width:0}.neo-workspace.tab-extract .w-fit{max-width:100%;flex-wrap:wrap}.neo-workspace.tab-extract #tiam-inventory-panel{padding:16px}}
+
+/* Library: quiet surfaces around the original product imagery and workflow data. */
+.neo-workspace .neo-library-toolbar{background:var(--neo-surface);box-shadow:var(--neo-shadow);border:1px solid #fff;border-radius:24px}
+.neo-workspace #neo-workflow-report{background:#35564c;background-image:none;box-shadow:var(--neo-shadow);border-color:#42695b}
+.neo-workspace #neo-workflow-report :is(.text-slate-300,.text-slate-400){color:#d4e5dc}
+.neo-workspace .admin-content [hidden]{display:none!important}
+.neo-workspace .ig-grid{gap:22px;grid-template-columns:repeat(3,minmax(0,1fr))}
+.neo-workspace .ig-post-card{border-radius:20px;border:1px solid #fff;box-shadow:var(--neo-shadow);background:var(--neo-surface);min-width:0}
+.neo-workspace .ig-post-card:hover{transform:translateY(-3px)}
+.neo-workspace .ig-post-card:focus-visible{outline:3px solid #28634c!important;outline-offset:4px}
+.neo-workspace #productSearch{padding-inline:38px}
+.neo-workspace .neo-file-input{position:absolute;width:1px!important;height:1px;min-height:0!important;padding:0!important;opacity:0;overflow:hidden}
+.neo-workspace #neo-import-dropzone{position:relative;background:var(--neo-surface);border:2px dashed #9aafa4;border-radius:20px;box-shadow:var(--neo-inset)}
+.neo-workspace #neo-import-dropzone:focus-within,.neo-workspace #neo-import-dropzone.neo-drag-over{outline:3px solid #28634c!important;outline-offset:4px;background:#dce7df}
+.neo-workspace #neo-import-feedback{color:#9b352e;font-size:13px;white-space:normal}
+.neo-workspace [class*='from-slate-900'] :is(.text-slate-400,.text-slate-500){color:#cbd5e1}
+.neo-workspace .admin-content .grid{min-width:0}
+.neo-workspace .admin-content pre{max-width:100%;overflow:auto}
+@media(max-width:1100px){.neo-workspace .ig-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:767px){
+.neo-workspace .admin-content :is(.grid-3,.grid-4){grid-template-columns:minmax(0,1fr)}
+.neo-workspace .admin-content :is(.flex>div,.grid>div){min-width:0;max-width:100%}
+.neo-workspace .admin-content .w-fit{max-width:100%}
+.neo-workspace .admin-content .flex.gap-4{flex-wrap:wrap}
+.neo-workspace .admin-content .col-span-2{grid-column:auto}
+.neo-workspace .ig-grid{grid-template-columns:minmax(0,1fr);gap:20px}
+.neo-workspace #neo-import-dropzone{padding:28px 20px}
+.neo-workspace #neo-workflow-report{padding:20px}
+}
+/* Standard forms in known dialogs, excluding the visual content preview/editor. */
+.neo-workspace :is(#editModal,#editUserModal,#contentScheduleModal,#add-occasion-modal,#formula-modal) :is(.edit-modal-content,.card){background:var(--neo-surface);border:1px solid #fff;border-radius:22px;box-shadow:var(--neo-shadow);max-height:calc(100dvh - 32px);overscroll-behavior:contain}
+.neo-workspace :is(#editModal,#editUserModal,#contentScheduleModal,#add-occasion-modal) :is(.input,.select){min-height:46px;border:1px solid #bdcbc4;border-radius:12px;background:var(--neo-surface);box-shadow:var(--neo-inset)}
+@media(max-width:767px){.neo-workspace :is(#editModal,#editUserModal,#contentScheduleModal,#add-occasion-modal,#formula-modal) :is(.edit-modal-content,.card){padding:20px;width:calc(100% - 24px)}.neo-workspace :is(#editModal,#editUserModal,#contentScheduleModal,#add-occasion-modal) :is(.grid-2,.grid-3){grid-template-columns:minmax(0,1fr)}.neo-workspace :is(#editModal,#editUserModal,#contentScheduleModal,#add-occasion-modal) :is(.input,.select){font-size:16px}.neo-workspace :is(#editModal,#editUserModal,#contentScheduleModal,#add-occasion-modal) button{min-height:44px}}
+@media(max-width:767px){.neo-workspace.tab-markshow_customers .admin-content>.flex{flex-direction:column;align-items:stretch}.neo-workspace.tab-markshow_customers .admin-content>.flex>button{align-self:flex-start}}
+@media(max-width:767px){.neo-workspace.tab-markshow_customers .admin-content .flex.items-center.gap-3{flex-wrap:wrap}.neo-workspace.tab-markshow_customers .admin-content form.relative{max-width:100%}}

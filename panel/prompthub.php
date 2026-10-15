@@ -596,8 +596,13 @@ if (isset($_POST['ajax_action'])) {
         font-weight: 800;
     }
   </style>
+<?php if (($_GET['design'] ?? '') !== 'legacy'): ?>
+<link rel="stylesheet" href="/panel/assets/neo-tokens.css?v=1">
+<link rel="stylesheet" href="/panel/assets/neo-modules.css?v=<?php echo filemtime(__DIR__.'/assets/neo-modules.css'); ?>">
+<script src="/panel/assets/neo-modules.js?v=<?php echo filemtime(__DIR__.'/assets/neo-modules.js'); ?>" defer></script>
+<?php endif; ?>
 </head>
-<body class="bg-slate-50 antialiased p-4 md:p-8" dir="rtl">
+<body class="<?php echo ($_GET['design'] ?? '') !== 'legacy' ? 'neo-module neo-prompts ' : ''; ?>bg-slate-50 antialiased p-4 md:p-8" dir="rtl">
 
     <!-- Screen Loader -->
     <div id="pageLoader" class="loader-overlay">

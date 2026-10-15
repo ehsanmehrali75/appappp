@@ -483,8 +483,13 @@ if (isset($_GET['action'])) {
             background: rgba(0,0,0,0.25);
         }
     </style>
+<?php if (($_GET['design'] ?? '') !== 'legacy'): ?>
+<link rel="stylesheet" href="/panel/assets/neo-tokens.css?v=1">
+<link rel="stylesheet" href="/panel/assets/neo-modules.css?v=<?php echo filemtime(__DIR__.'/panel/assets/neo-modules.css'); ?>">
+<script src="/panel/assets/neo-modules.js?v=<?php echo filemtime(__DIR__.'/panel/assets/neo-modules.js'); ?>" defer></script>
+<?php endif; ?>
 </head>
-<body class="min-h-screen flex flex-col bg-slate-50 text-slate-800">
+<body class="<?php echo ($_GET['design'] ?? '') !== 'legacy' ? 'neo-module neo-tasks ' : ''; ?>min-h-screen flex flex-col bg-slate-50 text-slate-800">
 
     <!-- Header layout matching other app sections -->
     <header class="bg-white border-b border-slate-200 shrink-0 px-6 py-4 flex items-center justify-between shadow-xs sticky top-0 z-40">
@@ -622,7 +627,7 @@ if (isset($_GET['action'])) {
             </div>
 
             <!-- Columns Layout -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 h-full align-start">
+            <div class="neo-task-board grid grid-cols-1 md:grid-cols-4 gap-4 h-full align-start">
                 
                 <!-- Column 1: Not Started -->
                 <div class="bg-slate-100/80 p-3.5 rounded-3xl border border-slate-200/50 flex flex-col h-full min-h-[500px]">

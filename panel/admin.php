@@ -6110,18 +6110,22 @@ if ($project) {
                 $content = file_get_contents($tmpPath);
                 // Remove BOM
                 $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
-                // Force UTF-8 conversion if possible
-                $encoding = mb_detect_encoding($content, ['UTF-8', 'WINDOWS-1256', 'ISO-8859-1', 'CP1256']);
-                if ($encoding && $encoding !== 'UTF-8') {
-                    $content = mb_convert_encoding($content, 'UTF-8', $encoding);
+                // mbstring does not support Windows-1256 on common PHP builds.
+                // Keep valid UTF-8 intact; use iconv for legacy Persian CSV files.
+                if (!mb_check_encoding($content, 'UTF-8')) {
+                    $converted = function_exists('iconv') ? @iconv('Windows-1256', 'UTF-8', $content) : false;
+                    if ($converted === false) {
+                        redirect('admin.php?tab=excel&msg=' . urlencode('رمزگذاری فایل قابل خواندن نیست؛ فایل را با فرمت CSV UTF-8 ذخیره کنید.'));
+                    }
+                    $content = $converted;
                 }
                 
                 // Better CSV parsing with support for multiple lines/quotes
                 $stream = fopen('php://temp', 'r+');
                 fwrite($stream, $content);
                 rewind($stream);
-                $header = fgetcsv($stream);
-                while (($data = fgetcsv($stream)) !== FALSE) {
+                $header = fgetcsv($stream, 0, ',', '"', '');
+                while (($data = fgetcsv($stream, 0, ',', '"', '')) !== FALSE) {
                     if (count($header) == count($data)) {
                         $rows[] = array_combine($header, $data);
                     }
@@ -6894,12 +6898,22 @@ $suggestions = getCalendarSuggestions($project);
         }
     </style>
 <?php $neoPilot = ($tab === 'dashboard' && !empty($project) && ($_GET['design'] ?? '') !== 'legacy'); ?>
-<?php $neoWorkspace = !empty($project) && in_array($tab, ['settings', 'extract', 'users', 'calendar'], true) && ($_GET['design'] ?? '') !== 'legacy'; $neoShell = $neoPilot || $neoWorkspace; ?>
+<?php
+$neoWorkspaceTabs = [
+    'settings', 'extract', 'users', 'calendar', 'products', 'excel', 'website_export',
+    'occasions', 'adv_plan', 'auto_admin', 'auto_admin_logs', 'users_performance', 'logs',
+    'projects', 'main_orders', 'main_plans', 'main_settings', 'storage_monitor', 'system_debug',
+    'feature_flags', 'markshow_org', 'markshow_customers', 'markshow_roles', 'markshow_tickets', 'markshow_financial',
+];
+$neoWorkspace = in_array($tab, $neoWorkspaceTabs, true) && ($_GET['design'] ?? '') !== 'legacy';
+$neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET['design'] ?? '') !== 'legacy');
+?>
 <?php if ($neoShell): ?>
     <link rel="stylesheet" href="/panel/assets/neo-tokens.css?v=1">
     <link rel="stylesheet" href="/panel/assets/neo-app-shell.css?v=<?php echo filemtime(__DIR__.'/assets/neo-app-shell.css'); ?>">
     <?php if ($neoWorkspace): ?><link rel="stylesheet" href="/panel/assets/neo-workspace.css?v=<?php echo filemtime(__DIR__.'/assets/neo-workspace.css'); ?>"><?php endif; ?>
     <?php if ($neoPilot): ?><link rel="stylesheet" href="/panel/assets/neo-dashboard.css?v=<?php echo filemtime(__DIR__.'/assets/neo-dashboard.css'); ?>"><?php endif; ?>
+    <?php if ($neoWorkspace): ?><script src="/panel/assets/neo-workspace.js?v=<?php echo filemtime(__DIR__.'/assets/neo-workspace.js'); ?>" defer></script><?php endif; ?>
     <script src="/panel/assets/neo-shell.js?v=<?php echo filemtime(__DIR__.'/assets/neo-shell.js'); ?>" defer></script>
 <?php endif; ?>
 </head>
@@ -7322,10 +7336,10 @@ $suggestions = getCalendarSuggestions($project);
             <?php if($project): ?>
             <div class="mt-4 p-5 bg-white/70 backdrop-blur-md border border-slate-100 rounded-[2rem] shadow-sm flex-shrink-0">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-[10px] font-black text-slate-400"><?php echo $neoPilot?'پروژهٔ انتخاب‌شده':'سلامت هسته'; ?></span>
+                    <span class="text-[10px] font-black text-slate-400"><?php echo $neoShell?'پروژهٔ انتخاب‌شده':'سلامت هسته'; ?></span>
                     <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-lg shadow-emerald-200"></span>
                 </div>
-                <p class="text-[10px] text-slate-500 leading-relaxed font-medium"><?php echo $neoPilot?htmlspecialchars($project['name'], ENT_QUOTES, 'UTF-8'):'سیستم در وضعیت پایدار است. پایش خودکار Maarksho Engine فعال می‌باشد.'; ?></p>
+                <p class="text-[10px] text-slate-500 leading-relaxed font-medium"><?php echo $neoShell?htmlspecialchars($project['name'], ENT_QUOTES, 'UTF-8'):'سیستم در وضعیت پایدار است. پایش خودکار Maarksho Engine فعال می‌باشد.'; ?></p>
             </div>
             <?php endif; ?>
         </aside>
@@ -8416,7 +8430,7 @@ $suggestions = getCalendarSuggestions($project);
                     $productsByNameAdmin[$normName][] = $prod;
                 }
             ?>
-                <div class="bg-white p-6 md:p-7 rounded-3xl border border-slate-200/80 shadow-sm mb-8 space-y-6" dir="rtl">
+                <div class="neo-library-toolbar bg-white p-6 md:p-7 rounded-3xl border border-slate-200/80 shadow-sm mb-8 space-y-6" dir="rtl">
                     <!-- ردیف عنوان، خلاصه آمار و دکمه‌های اصلی -->
                     <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-slate-100 pb-5">
                         <div class="flex items-center gap-3.5">
@@ -8478,8 +8492,11 @@ $suggestions = getCalendarSuggestions($project);
                         $contentReadyPercent = $allProdsCount > 0 ? round(($stats['active'] / $allProdsCount) * 100, 1) : 0;
                     ?>
 
+                    <?php if ($neoWorkspace): ?>
+                    <button type="button" id="neo-workflow-toggle" class="btn btn-outline" aria-expanded="true" aria-controls="neo-workflow-report">گزارش گردش‌کار محصولات <span aria-hidden="true">⌄</span></button>
+                    <?php endif; ?>
                     <!-- داشبورد گزارش وضعیت فرآیند تولید محتوا (Status Report Dashboard) -->
-                    <div class="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden border border-indigo-900/50">
+                    <div id="neo-workflow-report" class="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden border border-indigo-900/50">
                         <div class="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
                         <div class="absolute bottom-0 left-0 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none -ml-20 -mb-20"></div>
                         
@@ -8675,7 +8692,7 @@ $suggestions = getCalendarSuggestions($project);
                                 <input type="hidden" name="f_sort" value="<?php echo htmlspecialchars($adminSort); ?>">
                                 <input type="hidden" name="f_stock" value="<?php echo htmlspecialchars($adminStock); ?>">
                                 <input type="hidden" name="f_price" value="<?php echo htmlspecialchars($adminPrice); ?>">
-                                <input type="text" name="admin_q" id="productSearch" value="<?php echo htmlspecialchars($admin_q); ?>" onkeyup="filterProducts()" placeholder="جستجو نام کالا، کد SKU، رنگ..." class="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 pr-9 pl-8 py-2.5 text-xs font-bold text-slate-700 rounded-xl transition outline-none shadow-inner">
+                                <input type="text" name="admin_q" id="productSearch" aria-label="جست‌وجوی محصولات بر اساس نام، کد یا رنگ" value="<?php echo htmlspecialchars($admin_q); ?>" onkeyup="filterProducts()" placeholder="جستجو نام کالا، کد SKU، رنگ..." class="w-full bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 pr-9 pl-8 py-2.5 text-xs font-bold text-slate-700 rounded-xl transition outline-none shadow-inner">
                                 <span class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">🔍</span>
                                 <?php if (!empty($admin_q)): ?>
                                     <a href="admin.php?tab=products&filter=<?php echo htmlspecialchars($filter); ?>&f_sort=<?php echo htmlspecialchars($adminSort); ?>&f_stock=<?php echo htmlspecialchars($adminStock); ?>&f_price=<?php echo htmlspecialchars($adminPrice); ?>" class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500 text-xs font-bold" title="پاک کردن جستجو">✕</a>
@@ -9092,7 +9109,7 @@ $suggestions = getCalendarSuggestions($project);
                         ];
                         $dataSearch = strtolower(implode(' ', array_filter(array_map('trim', $searchParts))));
                         ?>
-                        <div class="ig-post-card group product-item relative" data-name="<?php echo strtolower($p['name']); ?>" data-sku="<?php echo strtolower($p['sku']??''); ?>" data-search="<?php echo htmlspecialchars($dataSearch); ?>" onclick="showManualInfo(<?php echo htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8'); ?>)">
+                        <div tabindex="0" role="button" aria-label="<?php echo htmlspecialchars('مشاهدهٔ محصول '.($p['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" class="ig-post-card group product-item relative" data-name="<?php echo strtolower($p['name']); ?>" data-sku="<?php echo strtolower($p['sku']??''); ?>" data-search="<?php echo htmlspecialchars($dataSearch); ?>" onclick="showManualInfo(<?php echo htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8'); ?>)">
                             <img src="<?php echo $image; ?>" loading="lazy" onerror="this.src='https://placehold.co/400x500?text=Maarksho'">
                             
                             <!-- Selection Checkbox for couples creator in active admin filter -->
@@ -10476,15 +10493,16 @@ $suggestions = getCalendarSuggestions($project);
                     
                     <?php if ($step === 'upload'): ?>
                         <form method="POST" enctype="multipart/form-data">
-                            <div class="border-2 border-dashed border-indigo-100 rounded-3xl p-12 text-center hover:border-indigo-300 transition-all group bg-indigo-50/30">
-                                <input type="file" name="excel" id="excel-file" class="hidden" onchange="this.form.submit()">
+                            <div id="neo-import-dropzone" class="border-2 border-dashed border-indigo-100 rounded-3xl p-12 text-center hover:border-indigo-300 transition-all group bg-indigo-50/30">
+                                <input type="file" name="excel_file" id="excel-file" accept=".csv<?php echo file_exists(__DIR__.'/inc/SimpleXLSX.php') ? ',.xlsx,.xls' : ''; ?>" class="neo-file-input" onchange="this.form.requestSubmit()" aria-describedby="neo-import-help">
+                                <p id="neo-import-feedback" role="status" aria-live="polite"></p>
                                 <label for="excel-file" class="cursor-pointer">
                                     <div class="w-20 h-20 bg-white rounded-2xl shadow-xl flex items-center justify-center text-3xl mx-auto mb-6 group-hover:scale-110 transition-transform">📊</div>
-                                    <div class="text-slate-800 font-black text-xl mb-2">انتخاب فایل اکسل یا CSV</div>
-                                    <p class="text-slate-400 text-sm">فایل را اینجا رها کنید یا کلیک کنید</p>
+                                    <div class="text-slate-800 font-black text-xl mb-2">انتخاب فایل CSV<?php echo file_exists(__DIR__.'/inc/SimpleXLSX.php') ? ' یا اکسل' : ''; ?></div>
+                                    <p id="neo-import-help" class="text-slate-400 text-sm">فایل CSV را انتخاب کنید یا اینجا رها کنید؛ قبل از ورود داده، ستون‌ها را تطبیق می‌دهید.</p>
                                 </label>
                             </div>
-                            <input type="hidden" name="upload_excel" value="1">
+                            <input type="hidden" name="import_excel" value="1">
                         </form>
                     <?php elseif ($step === 'map' && isset($_SESSION['import_mapping'])): ?>
                         <?php $headers = $_SESSION['import_mapping']; ?>
@@ -10527,7 +10545,9 @@ $suggestions = getCalendarSuggestions($project);
                                         <select name="map[<?php echo $key; ?>]" class="select text-xs">
                                             <option value="">-- عدم انتخاب --</option>
                                             <?php if(is_array($headers ?? null)): ?>
-                                                <?php foreach($headers as $h) echo "<option value='$h' " . (stripos($h, $key)!==false ? 'selected' : '') . ">$h</option>"; ?>
+                                                <?php foreach ($headers as $h): $safeHeader = htmlspecialchars((string)$h, ENT_QUOTES, 'UTF-8'); ?>
+                                                    <option value="<?php echo $safeHeader; ?>" <?php echo stripos((string)$h, $key) !== false ? 'selected' : ''; ?>><?php echo $safeHeader; ?></option>
+                                                <?php endforeach; ?>
                                             <?php endif; ?>
                                         </select>
                                     </div>
