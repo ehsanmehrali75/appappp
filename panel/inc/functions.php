@@ -7533,7 +7533,8 @@ function enforceFeatureRequestAccess() {
     if ($key === null && preg_match('#^/(vm|seo_intel)/(?:index|api)\.php$#', $relative, $m)) {
         $key = $m[1] === 'vm' ? 'vm_studio' : 'seo_intel';
     }
-    if ($key === null) return;
+    // Support has its own ownership gate and is available to panel users without management permissions.
+    if ($key === null || $key === 'support') return;
     if (FeatureFlags::isUnrestrictedAdmin()) return;
     // Main administrators must retain access to repair project settings.
     if ($key === 'settings' && isMainAdmin()) return;

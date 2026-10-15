@@ -38,6 +38,7 @@ class FeatureFlags {
      */
     public static function getCatalog() {
         return [
+            'support' => ['key'=>'support','title'=>'پشتیبانی','icon'=>'🎫','category'=>'settings_users','category_title'=>'⚙️ مدیریت و دسترسی‌ها','desc'=>'ثبت درخواست، پاسخ ادمین اصلی و تأیید هزینه با مهلت ۴۸ ساعت','url'=>'support.php','type'=>'page'],
             // ==========================================
             // دسته ۱: مدیریت کلان وب‌سایت (Core System)
             // ==========================================

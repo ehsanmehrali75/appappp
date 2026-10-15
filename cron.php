@@ -5,6 +5,11 @@
  */
 require_once 'inc/functions.php';
 
+// Deterministic 48-hour support-quote expiry; independent of scraper outcome.
+try { require_once __DIR__ . '/panel/inc/SupportTickets.php'; (new SupportTickets())->expire(); }
+catch (Throwable $e) { error_log('Support quote expiry maintenance could not run.'); }
+
+
 $logFile = __DIR__ . '/scraper/worker.log';
 function logSystem($msg) {
     global $logFile;

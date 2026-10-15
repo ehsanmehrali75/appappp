@@ -6951,6 +6951,7 @@ $suggestions = getCalendarSuggestions($project);
     <div class="container admin-layout">
         <aside class="admin-sidebar">
             <nav class="sidebar-glass flex-1">
+                <?php if(isFeatureAvailable('support')): ?><a href="/panel/support.php" class="nav-link"><span>🎫</span><span>پشتیبانی</span></a><?php endif; ?>
                 <!-- Search Input in Sidebar -->
                 <div class="px-2 mb-3">
                     <div class="relative">

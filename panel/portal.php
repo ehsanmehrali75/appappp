@@ -1914,6 +1914,7 @@ if ($isAjax && isset($_POST['action'])) {
                 <span><?php echo htmlspecialchars($_SESSION['display_name'] ?? $_SESSION['user']['username'] ?? 'کاربر مهمان'); ?></span>
             </div>
 
+            <?php if(isFeatureAvailable('support')): ?><a href="/panel/support.php" class="px-3 py-2 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold">🎫 پشتیبانی</a><?php endif; ?>
             <?php if (canAccessManagement()): ?>
                 <a href="admin.php" class="px-3 py-2 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold">پنل مدیریت</a>
             <?php endif; ?>

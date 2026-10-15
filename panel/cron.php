@@ -5,6 +5,11 @@
  */
 require_once 'inc/functions.php';
 
+// Deterministic 48-hour support-quote expiry; independent of scraper outcome.
+try { require_once __DIR__ . '/inc/SupportTickets.php'; (new SupportTickets())->expire(); }
+catch (Throwable $e) { error_log('Support quote expiry maintenance could not run.'); }
+
+
 // Release session lock immediately so browser requests are never blocked
 if (session_status() === PHP_SESSION_ACTIVE) {
     @session_write_close();

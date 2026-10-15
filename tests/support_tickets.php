@@ -1,0 +1,40 @@
+<?php
+require __DIR__.'/../panel/inc/db.php';
+require __DIR__.'/../panel/inc/SupportTickets.php';
+$dir=sys_get_temp_dir().'/support-test-'.bin2hex(random_bytes(8));mkdir($dir,0700);
+$db=new SQLite3ToMysqliWrapper($dir.'/db.sqlite');$now=2000000000;$s=new SupportTickets($db,$dir,fn()=>$GLOBALS['now']);$count=0;
+register_shutdown_function(function()use($dir){foreach(glob($dir.'/*') as $f)@unlink($f);@rmdir($dir);});
+function check($v,$m){global$count;if(!$v)throw new RuntimeException($m);$count++;}
+function denied($fn,$m){try{$fn();}catch(RuntimeException$e){check(true,$m);return;}throw new RuntimeException($m);}
+$id=$s->create('p1','alice','VPN issue','tiam','Details and log');
+check($s->get($id,'alice',false,'p1')['status']==='pending_review','new ticket pending');
+denied(fn()=>$s->get($id,'bob',false,'p1'),'other user cannot read');
+denied(fn()=>$s->get($id,'alice',false,'p2'),'other project cannot read');
+check(count($s->list('bob',false,'p1'))===0,'list isolation');
+check(count($s->list('root',true))===1,'main admin sees all');
+denied(fn()=>$s->offer($id,'alice',false,'100','two days',0),'user cannot price');
+$s->reply($id,'root',true,null,'We are checking');check($s->get($id,'alice',false,'p1')['status']==='answered','response visible with status');
+$s->reply($id,'alice',false,'p1','More details');check($s->get($id,'alice',false,'p1')['status']==='pending_review','user followup awaits review');
+$s->offer($id,'root',true,'100000','3 working days',$now+3*86400);$t=$s->get($id,'alice',false,'p1');
+check($t['status']==='waiting_approval','paid quote waits for decision');
+denied(fn()=>$s->decide($id,'bob','p1',1,true),'other user cannot approve a quote');
+check($s->get($id,'alice',false,'p1')['status']==='waiting_approval','unauthorized decision leaves state unchanged');check((int)$t['quote_expires_at']===$now+48*3600,'48 hours exact');
+denied(fn()=>$s->transition($id,'root',true,'queued'),'cannot execute before acceptance');
+$s->reply($id,'root',true,null,'Cost details');check($s->get($id,'alice',false,'p1')['status']==='waiting_approval','reply does not bypass approval');
+$s->offer($id,'root',true,'120000','3 working days',0);
+denied(fn()=>$s->decide($id,'alice','p1',1,true),'old quote cannot be accepted');
+$s->decide($id,'alice','p1',2,true);$t=$s->get($id,'alice',false,'p1');check($t['status']==='approved' && (int)$t['quote_amount']===120000,'current cost accepted');
+denied(fn()=>$s->decide($id,'alice','p1',2,true),'decision cannot replay');
+denied(fn()=>$s->offer($id,'root',true,'130000','two days',0),'accepted cost immutable');
+$s->transition($id,'root',true,'queued');$s->transition($id,'root',true,'in_progress');$s->reply($id,'root',true,null,'Fixed');$s->transition($id,'root',true,'resolved');
+check($s->get($id,'alice',false,'p1')['status']==='resolved','resolution visible');
+$decline=$s->create('p1','alice','Change','feature','Details');$s->offer($decline,'root',true,'500','one day',0);$s->decide($decline,'alice','p1',1,false);
+check($s->get($decline,'alice',false,'p1')['cancel_reason']==='cost_rejected','reject cancels');
+$late=$s->create('p1','alice','Late','bug','Details');$s->offer($late,'root',true,'500','one day',0);$now+=48*3600;
+denied(fn()=>$s->decide($late,'alice','p1',1,true),'exact deadline cannot accept');
+check($s->get($late,'alice',false,'p1')['cancel_reason']==='approval_timeout','expired quote permanently cancelled');
+$free=$s->create('p1','alice','Free','access','Help');$s->offer($free,'root',true,'0','today',0);check($s->get($free,'alice',false,'p1')['status']==='approved','free work needs no cost approval');$s->transition($free,'root',true,'queued');
+$early=$s->create('p1','alice','Near deadline','other','Help');$s->offer($early,'root',true,'1','tomorrow',0);$now+=48*3600-1;$s->decide($early,'alice','p1',1,true);check($s->get($early,'alice',false,'p1')['status']==='approved','accept one second before deadline');
+denied(fn()=>$s->transition($free,'alice',false,'resolved'),'non-main cannot resolve');
+check(count($s->get($id,'alice',false,'p1')['messages'])>=7,'conversation and workflow history retained');
+echo "$count support workflow checks passed\n";
