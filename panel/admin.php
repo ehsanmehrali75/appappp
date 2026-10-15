@@ -7135,7 +7135,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             </select>
                         </div>
                     <?php else: ?>
-                        <div class="px-3 mb-3 text-[10px] font-black text-indigo-700 bg-indigo-50/80 py-2 rounded-xl border border-indigo-100 text-center shadow-xs">
+                        <div class="neo-single-project px-3 mb-3 text-[10px] font-black text-indigo-700 bg-indigo-50/80 py-2 rounded-xl border border-indigo-100 text-center shadow-xs">
                             پروژه: <?php echo htmlspecialchars($project['name']); ?>
                         </div>
                     <?php endif; ?>

@@ -40,6 +40,23 @@
         svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','1.7');svg.setAttribute('stroke-linecap','round');svg.setAttribute('stroke-linejoin','round');svg.setAttribute('aria-hidden','true');svg.classList.add('neo-icon');
         const path = document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d',iconPaths[key]);svg.append(path);slot.replaceChildren(svg);
     });
+    const toolbar = document.querySelector('.navbar > .container > div:last-child');
+    if (toolbar) {
+        const more = document.createElement('details');more.className = 'neo-toolbar-more';
+        const summary = document.createElement('summary');summary.textContent = 'سایر دسترسی‌ها';
+        const items = document.createElement('div');items.className = 'neo-toolbar-menu';
+        more.append(summary,items);
+        toolbar.querySelectorAll('a').forEach(link => {
+            const file = new URL(link.href).pathname.split('/').pop();
+            if (!['task_manager.php','user_chat.php'].includes(file)) items.append(link);
+            else link.classList.add('neo-toolbar-primary');
+        });
+        if (items.childElementCount) toolbar.append(more);
+        document.addEventListener('click', event => {if (!more.contains(event.target)) more.open = false;});
+        more.addEventListener('keydown', event => {if (event.key === 'Escape') {more.open=false;summary.focus();event.stopPropagation();}});
+    }
+    const close = document.createElement('button');close.type='button';close.className='neo-drawer-close';
+    close.textContent='بستن منو ×';close.addEventListener('click',()=>window.toggleSidebar());sidebar.prepend(close);
     const search = document.getElementById('sidebar-search-input');
     if (search) search.setAttribute('aria-label', 'جست‌وجو در بخش‌های پنل');
     const media = window.matchMedia('(max-width:1024px)');
@@ -74,25 +91,106 @@
         if (event.shiftKey && document.activeElement === first) {event.preventDefault();last.focus();}
         else if (!event.shiftKey && document.activeElement === last) {event.preventDefault();first.focus();}
     });
-    document.querySelectorAll('.nav-category-group').forEach(group => {
+    const nav = sidebar.querySelector('nav');
+    const groups = Array.from(nav.querySelectorAll('.nav-category-group'));
+    const findLink = tab => nav.querySelector(`a[href="?tab=${tab}"]`);
+    const shortcuts = document.createElement('div');
+    shortcuts.className = 'neo-daily-nav';
+    shortcuts.setAttribute('aria-label', 'دسترسی‌های روزانه');
+    const dailyHeading = document.createElement('p');
+    dailyHeading.className = 'neo-nav-caption';dailyHeading.textContent = 'کارهای روزانه';
+    shortcuts.append(dailyHeading);
+    ['dashboard','products','calendar'].forEach(tab => {
+        const link = findLink(tab);
+        if (!link) return;
+        if (tab === 'dashboard') link.children[1].textContent = 'نمای کلی پروژه';
+        if (tab === 'products') link.children[1].textContent = 'محصولات و محتوا';
+        shortcuts.append(link);
+    });
+    const support = nav.querySelector('a[href="/panel/support.php"]');
+    if (support) {support.classList.add('neo-support-link');nav.append(support);}
+    const searchBox = search?.closest('.px-2.mb-3') || search?.parentElement;
+    const projectSelect = nav.querySelector('select[onchange*="switch_project"]');
+    const projectContext = projectSelect?.parentElement || nav.querySelector('.neo-single-project');
+    if (projectContext) nav.prepend(projectContext);
+    if (projectSelect) {
+        const label = projectSelect.parentElement.querySelector('label');
+        projectSelect.id = 'neo-project-select';
+        if (label) {label.htmlFor = projectSelect.id;label.textContent = 'پروژهٔ جاری';}
+        projectSelect.parentElement.classList.add('neo-project-picker');
+        nav.prepend(projectSelect.parentElement);
+    }
+    if (searchBox) {
+        search.placeholder = 'جست‌وجوی ابزار…';
+        search.removeAttribute('onkeyup');
+        searchBox.classList.add('neo-nav-search');
+        if (projectContext) projectContext.after(searchBox);
+        else nav.prepend(searchBox);
+        searchBox.after(shortcuts);
+    }
+    // Move the authorized nodes themselves: no duplicated routes or new permissions.
+    // Global groups are only emitted for super admins; identify by their existing routes.
+    const globalGroups = groups.filter(g => g.querySelector('a[href^="?tab=main_"],a[href="?tab=feature_flags"],a[href^="?tab=markshow_"],a[href="?tab=projects"],a[href="?tab=storage_monitor"],a[href="?tab=system_debug"]'));
+    groups.forEach((group, index) => {
         const heading = group.firstElementChild;
-        if (!heading || heading.matches('a,input')) return;
+        const links = Array.from(group.querySelectorAll(':scope > a.nav-link'));
+        if (!links.length) {group.remove();return;}
+        const isGlobal = globalGroups.includes(group);
+        const label = isGlobal ? (group.querySelector('a[href*="tab=markshow_"]') ? 'سازمان مرکزی' : 'مدیریت کل سیستم') : heading.textContent.trim();
+        // Route-derived labels stay correct even when optional groups are not emitted.
+        let title = label;
+        if (group.querySelector('a[href="?tab=settings"],a[href="?tab=users"]')) title = 'تنظیمات و تیم پروژه';
+        else if (group.querySelector('a[href*="/vm"],a[href^="vm/"]')) title = 'چیدمان فروشگاه';
+        else if (group.querySelector('a[href*="/seo/"],a[href*="/seo"]')) title = 'سئو و هوش داده';
+        else if (group.querySelector('a[href^="seo.php"],a[href^="sale.php"]')) title = 'تحلیل فروش و سئو';
+        else if (group.querySelector('a[href="?tab=extract"],a[href="?tab=excel"],a[href="?tab=website_export"],a[href^="wp-crm.php"]')) title = 'داده و اتصال فروشگاه';
+        else if (group.querySelector('a[href="?tab=occasions"],a[href^="prompthub.php"],a[href^="size/"]')) title = 'تولید و انتشار محتوا';
+        else if (group.querySelector('a[href^="chat.php"]')) title = 'ارتباط با مشتری';
         const toggle = document.createElement('button');
         toggle.type = 'button';toggle.className = 'neo-category-toggle';
-        while (heading.firstChild) toggle.append(heading.firstChild);
-        heading.append(toggle);toggle.setAttribute('aria-expanded', 'true');
+        const text = document.createElement('span');text.textContent = title || heading.textContent.trim();
+        const count = document.createElement('span');count.className = 'neo-nav-count';count.textContent = links.length.toLocaleString('fa-IR');
+        toggle.append(text,count);heading.replaceChildren(toggle);
+        const panel = document.createElement('div');panel.className = 'neo-category-links';panel.id = `neo-nav-group-${index}`;
+        panel.append(...links);group.append(panel);
+        toggle.setAttribute('aria-controls',panel.id);
+        group.dataset.open = String(links.some(link => link.classList.contains('active')));
+        const setOpen = open => {group.classList.toggle('neo-category-closed',!open);toggle.setAttribute('aria-expanded',String(open));panel.hidden = !open;};
+        setOpen(group.dataset.open === 'true');
         toggle.addEventListener('click', () => {
-            const closed = group.classList.toggle('neo-category-closed');
-            toggle.setAttribute('aria-expanded', String(!closed));
+            if (search?.value.trim()) return;
+            const open = group.dataset.open !== 'true';
+            group.dataset.open = String(open);setOpen(open);
         });
+        group._setOpen = setOpen;
+        if (isGlobal) {group.classList.add('neo-system-group');nav.append(group);}
     });
-    if (search) search.addEventListener('input', () => {
-        if (!search.value.trim()) return;
-        document.querySelectorAll('.neo-category-closed').forEach(group => {
-            group.classList.remove('neo-category-closed');
-            group.querySelector('.neo-category-toggle').setAttribute('aria-expanded', 'true');
+    if (support) nav.append(support);
+    nav.querySelectorAll('.h-px').forEach(el => el.remove());
+    nav.querySelectorAll('a.active').forEach(link => link.setAttribute('aria-current','page'));
+    const searchStatus = document.createElement('p');searchStatus.className = 'neo-search-status';
+    searchStatus.setAttribute('role','status');searchStatus.hidden = true;
+    if (searchBox) searchBox.after(searchStatus);
+    const normalize = value => value.toLowerCase().replace(/ي/g,'ی').replace(/ك/g,'ک').replace(/[\u200c\u064b-\u065f]/g,'').replace(/\s+/g,' ').trim();
+    const filter = () => {
+        const query = normalize(search?.value || '');let count = 0;
+        nav.querySelectorAll('a.nav-link').forEach(link => {
+            const matches = !query || normalize(link.textContent).includes(query) || normalize(link.closest('.nav-category-group')?.querySelector('button')?.textContent || '').includes(query);
+            link.hidden = !matches;link.style.removeProperty('display');if (matches) count++;
         });
-    });
+        groups.forEach(group => {
+            if (!group.isConnected) return;
+            const matches = Array.from(group.querySelectorAll('a.nav-link')).some(link => !link.hidden);
+            group.hidden = !matches;
+            group._setOpen?.(query ? matches : group.dataset.open === 'true');
+        });
+        shortcuts.hidden = !Array.from(shortcuts.querySelectorAll('a')).some(link => !link.hidden);
+        searchStatus.hidden = !query;
+        searchStatus.textContent = count ? `${count.toLocaleString('fa-IR')} ابزار پیدا شد` : 'ابزاری پیدا نشد؛ عبارت دیگری بنویسید.';
+    };
+    if (search) search.addEventListener('input',filter);
+    window.filterSidebarNav = filter;
+    filter();
     document.querySelectorAll('.maarksho-pilot .admin-content table tbody tr').forEach(row => {
         const headings = Array.from(row.closest('table').querySelectorAll('thead th'));
         Array.from(row.cells).forEach((cell, index) => {
