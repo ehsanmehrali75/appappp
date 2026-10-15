@@ -4,6 +4,7 @@ if (empty($_SESSION['system_admin_csrf'])) $_SESSION['system_admin_csrf'] = bin2
 ?>
 <section class="p-5 my-5 bg-amber-50 rounded-xl border border-amber-200 space-y-3">
     <h3 class="font-black">حساب مدیر کل سامانه</h3>
+    <a href="/panel/system-admin-setup.php" class="underline">باز کردن صفحهٔ مستقل فعال‌سازی مدیر کل</a>
     <p class="text-xs">مدیر کل بدون محدودیت به تمام پروژه‌ها و بخش‌ها، حتی بخش‌های غیرفعال، دسترسی دارد. رمز فقط به‌صورت هش روی همین هاست ذخیره می‌شود و حساب موجود بازنویسی نمی‌شود.</p>
     <div class="grid md:grid-cols-2 gap-3">
         <label class="text-xs">نام کاربری<input id="system-admin-username" value="ehsanmehrali" autocomplete="off" class="input" dir="ltr"></label>

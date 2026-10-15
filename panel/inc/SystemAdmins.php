@@ -10,6 +10,9 @@ class SystemAdmins {
     }
     public static function create($username, $password, $unrestricted = false) {
         if (!is_string($username) || !preg_match('/^[a-zA-Z0-9_.-]{3,64}$/D', $username) || !is_string($password) || strlen($password) < 10) throw new RuntimeException('نام کاربری معتبر و رمز حداقل ۱۰ کاراکتری لازم است.');
+        $directory = dirname(self::file());
+        if (!is_dir($directory) && !mkdir($directory, 0700, true)) throw new RuntimeException('پوشهٔ خصوصی حساب مدیر قابل ساخت نیست.');
+        if (!is_writable($directory)) throw new RuntimeException('پوشهٔ خصوصی حساب مدیر روی هاست قابل نوشتن نیست.');
         $lock = fopen(self::file() . '.lock', 'c');
         if (!$lock || !flock($lock, LOCK_EX)) throw new RuntimeException('ذخیره حساب مدیر ممکن نیست.');
         try {

@@ -6,7 +6,8 @@ $db=new SQLite3ToMysqliWrapper($dir.'/db.sqlite');$now=2000000000;$s=new Support
 register_shutdown_function(function()use($dir){foreach(glob($dir.'/*') as $f)@unlink($f);@rmdir($dir);});
 function check($v,$m){global$count;if(!$v)throw new RuntimeException($m);$count++;}
 function denied($fn,$m){try{$fn();}catch(RuntimeException$e){check(true,$m);return;}throw new RuntimeException($m);}
-$id=$s->create('p1','alice','VPN issue','tiam','Details and log');
+$id=$s->create('p1','alice','خطای اتصال 🎨','tiam','توضیحات و لاگ ✅');
+check($s->get($id,'alice',false,'p1')['messages'][0]['body']==='توضیحات و لاگ ✅','Persian and emoji round trip');
 check($s->get($id,'alice',false,'p1')['status']==='pending_review','new ticket pending');
 denied(fn()=>$s->get($id,'bob',false,'p1'),'other user cannot read');
 denied(fn()=>$s->get($id,'alice',false,'p2'),'other project cannot read');

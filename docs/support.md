@@ -25,3 +25,13 @@
 مجوزهای مشاهده/استفاده و وضعیت جهانی «پشتیبانی» در تنظیمات امکانات قابل کنترل است. مجوز عادی مدیریت پروژه اجازهٔ دیدن یا پاسخ‌گویی به تیکت کاربران دیگر را ایجاد نمی‌کند. تمام POSTها به توکن CSRF نیاز دارند.
 
 آزمون گردش واقعی SQLite و مرز ۴۸ ساعت: `php tests/support_tickets.php`.
+
+### Unicode database compatibility and diagnostics
+
+Support tables explicitly use InnoDB and utf8mb4 on MySQL/MariaDB. Existing tables with a different character set are converted once, preserving rows; back up the database before deployment as with any schema migration. The database user needs CREATE and ALTER permissions. SQLite uses its native Unicode storage. Database failures show a reference code; the PHP error log records that reference, operation, numeric error and SQLSTATE, without ticket contents or connection credentials. A live-host failure still needs its matching log entry to establish its cause.
+
+Run `php tests/support_tickets.php` for SQLite workflow checks. An isolated MySQL/MariaDB server can run `SUPPORT_TEST_MYSQL_PORT=3308 php tests/support_mysql.php`; it creates and drops only a random `support_test_*` database. Optional host/user/password environment variables have the same `SUPPORT_TEST_MYSQL_` prefix. This test reproduces the latin1/Persian failure, verifies conversion, emoji, cost consent, resolution, and repeated initialization.
+
+### Activate the owner on the deployed host
+
+While signed in as an existing main administrator, open `/panel/system-admin-setup.php` (also linked in the main panel header and Support). Enter the desired username, password and password confirmation, then create the account. The account is written to this host's private, Git-ignored administrator file. Sign out and sign in with the new account. Git publishing does not create accounts on a remote host. Ordinary users cannot open or submit this page; POST requests require the administrator session and CSRF token. Passwords are neither prefilled nor sent through Git.

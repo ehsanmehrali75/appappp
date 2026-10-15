@@ -12,19 +12,43 @@ class SupportTickets {
         $this->dir = $dir ?: (getenv('SUPPORT_STORAGE_DIR') ?: dirname(__DIR__, 3) . '/.maarksho-support-' . substr(hash('sha256', __DIR__),0,12));
         if (!is_dir($this->dir) && !mkdir($this->dir,0700,true)) throw new RuntimeException('فضای خصوصی پیوست‌ها قابل نوشتن نیست.');
         $this->clock = $clock ?: fn()=>time();
-        $this->exec('CREATE TABLE IF NOT EXISTS support_tickets (id VARCHAR(64) PRIMARY KEY, project_id VARCHAR(128) NOT NULL, creator VARCHAR(100) NOT NULL, subject VARCHAR(255) NOT NULL, category VARCHAR(50) NOT NULL, status VARCHAR(50) NOT NULL, quote_amount BIGINT DEFAULT 0, quote_version INT DEFAULT 0, quote_expires_at BIGINT DEFAULT 0, accepted_at BIGINT DEFAULT 0, estimate TEXT, finish_at BIGINT DEFAULT 0, cancel_reason VARCHAR(50), created_at BIGINT, updated_at BIGINT)');
-        $this->exec('CREATE TABLE IF NOT EXISTS support_messages (id INT AUTO_INCREMENT PRIMARY KEY, ticket_id VARCHAR(64) NOT NULL, sender VARCHAR(100) NOT NULL, sender_type VARCHAR(20) NOT NULL, body TEXT NOT NULL, attachments TEXT, created_at BIGINT)');
+        $tableOptions = $this->db instanceof mysqli ? ' ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' : '';
+        $this->exec('CREATE TABLE IF NOT EXISTS support_tickets (id VARCHAR(64) PRIMARY KEY, project_id VARCHAR(128) NOT NULL, creator VARCHAR(100) NOT NULL, subject VARCHAR(255) NOT NULL, category VARCHAR(50) NOT NULL, status VARCHAR(50) NOT NULL, quote_amount BIGINT DEFAULT 0, quote_version INT DEFAULT 0, quote_expires_at BIGINT DEFAULT 0, accepted_at BIGINT DEFAULT 0, estimate TEXT, finish_at BIGINT DEFAULT 0, cancel_reason VARCHAR(50), created_at BIGINT, updated_at BIGINT)' . $tableOptions);
+        $this->exec('CREATE TABLE IF NOT EXISTS support_messages (id INT AUTO_INCREMENT PRIMARY KEY, ticket_id VARCHAR(64) NOT NULL, sender VARCHAR(100) NOT NULL, sender_type VARCHAR(20) NOT NULL, body TEXT NOT NULL, attachments TEXT, created_at BIGINT)' . $tableOptions);
+        $this->ensureUnicodeTables();
+    }
+    private function ensureUnicodeTables() {
+        if (!($this->db instanceof mysqli)) return;
+        // Older installations inherited the database default (often latin1).
+        foreach (['support_tickets', 'support_messages'] as $table) {
+            $columns = $this->db->query("SHOW FULL COLUMNS FROM `$table`");
+            if (!$columns) $this->databaseFailure('schema');
+            $convert = false;
+            while ($column = $columns->fetch_assoc()) {
+                if (!empty($column['Collation']) && strpos($column['Collation'], 'utf8mb4_') !== 0) $convert = true;
+            }
+            $columns->free();
+            if ($convert && !$this->db->query("ALTER TABLE `$table` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")) $this->databaseFailure('unicode_migration');
+        }
+    }
+    private function databaseFailure($operation, $statement = null) {
+        $reference = bin2hex(random_bytes(5));
+        // No SQL, bound values, ticket text, or credentials go into logs.
+        $errno = (int)($statement->errno ?? $this->db->errno ?? 0);
+        $state = (string)($statement->sqlstate ?? $this->db->sqlstate ?? 'unknown');
+        error_log('Support database failure ref='.$reference.' operation='.$operation.' errno='.$errno.' sqlstate='.$state);
+        throw new RuntimeException('عملیات پایگاه دادهٔ پشتیبانی ناموفق بود. کد پیگیری: '.$reference);
     }
     public function now() { return ($this->clock)(); }
     public function directory() { return $this->dir; }
     private function statement($sql,$params=[]) {
-        $stmt=$this->db->prepare($sql); if(!$stmt) throw new RuntimeException('آماده‌سازی پایگاه دادهٔ پشتیبانی ناموفق بود.');
+        $stmt=$this->db->prepare($sql); if(!$stmt) $this->databaseFailure('prepare');
         if($params) { $types='';foreach($params as $p)$types.=is_int($p)?'i':'s'; $stmt->bind_param($types,...$params); }
-        if(!$stmt->execute()) { $stmt->close(); throw new RuntimeException('عملیات پایگاه دادهٔ پشتیبانی ناموفق بود.'); }
+        if(!$stmt->execute()) { $this->databaseFailure('execute', $stmt); }
         return $stmt;
     }
     private function exec($sql,$params=[]) {
-        if(strpos($sql,'CREATE TABLE')===0){if(!$this->db->query($sql))throw new RuntimeException('ایجاد جدول پشتیبانی ناموفق بود.');return;}
+        if(strpos($sql,'CREATE TABLE')===0){if(!$this->db->query($sql))$this->databaseFailure('create_table');return;}
         $s=$this->statement($sql,$params);$s->close();
     }
     private function rows($sql,$params=[]) { $s=$this->statement($sql,$params);$r=$s->get_result();$rows=[];while($r && $row=$r->fetch_assoc())$rows[]=$row;$s->close();return $rows; }
