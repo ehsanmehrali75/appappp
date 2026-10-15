@@ -77,10 +77,10 @@ class TiamConnector {
                 'id' => 'vpn_auth',
                 'title' => 'مرحله ۲: بررسی پروتکل L2TP/IPSec و کلید امنیتی (Secret)',
                 'target' => "کاربر: $vpnUser | کلید: " . ($hasSecret ? str_repeat('•', strlen($vpnSecret)) : 'خالی'),
-                'status' => $stage2Success ? 'success' : 'error',
+                'status' => $stage2Success ? 'info' : 'error',
                 'latency_ms' => 0,
                 'message' => $stage2Success
-                    ? "تنظیمات هویتی L2TP (یوزر: $vpnUser) و کلید امنیتی Secret معتبر و آماده برقراری تونل است. $tunnelStatusText"
+                    ? "تنظیمات هویتی L2TP (یوزر: $vpnUser) و کلید امنیتی Secret ذخیره شده است؛ احراز هویت VPN با این بررسی تأیید نمی‌شود. $tunnelStatusText"
                     : "کلید امنیتی Secret یا مشخصات کاربری VPN ناقص است.",
                 'tunnel_active' => $tunnelActive
             ];
@@ -139,6 +139,7 @@ class TiamConnector {
         // Stage 5: Sample Data Inspection & Warehouse Check
         // -------------------------------------------------------------
         $sampleResult = self::fetchSampleData($tconfig, $authResult['token'] ?? '');
+        if (($sampleResult['status'] ?? '') !== 'success') $overallSuccess = false;
         $stages[] = [
             'id' => 'erp_sample',
             'title' => 'مرحله ۵: آزمایش واکشی انبار، قیمت‌ها و کالاها',
@@ -210,8 +211,8 @@ class TiamConnector {
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json', 'Accept: application/json']);
         curl_setopt($ch, CURLOPT_TIMEOUT, 4);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 
         $res = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -228,16 +229,6 @@ class TiamConnector {
                 'latency_ms' => $latency,
                 'message' => "احراز هویت کاربری با موفقیت انجام شد و نشست ارتباطی دریافت گردید.",
                 'token' => $token
-            ];
-        }
-
-        // If direct local connection is unrouted or in container, provide resilient simulated validation
-        if (!empty($erpUser) && !empty($erpPass)) {
-            return [
-                'success' => true,
-                'latency_ms' => $latency ?: 12,
-                'message' => "اعتبارسنجی ساختار کاربری $erpUser با موفقیت تایید شد (رمز عبور و پروتکل ست گردید).",
-                'token' => 'tiam_verified_bearer'
             ];
         }
 
@@ -272,8 +263,8 @@ class TiamConnector {
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($ch, CURLOPT_TIMEOUT, 3);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 
         $res = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -292,19 +283,7 @@ class TiamConnector {
             ];
         }
 
-        // Return structured ready-to-sync mock sample
-        $mockSamples = [
-            ['sku' => 'TM-1092-BK', 'name' => 'مانتو تار و پود طرح ارکیده', 'price' => 780000, 'stock' => 15, 'warehouse' => 'انبار مرکزی'],
-            ['sku' => 'TM-2081-BL', 'name' => 'شلوار کتان تار و پود مدل یاس', 'price' => 540000, 'stock' => 24, 'warehouse' => 'انبار مرکزی'],
-            ['sku' => 'TM-3044-WH', 'name' => 'شومیز لنین یقه چین‌دار مارال', 'price' => 620000, 'stock' => 18, 'warehouse' => 'انبار فروشگاه']
-        ];
-
-        return [
-            'status' => 'success',
-            'latency_ms' => $latency ?: 15,
-            'message' => 'الگوی دریافت محصولات، انبارها و قیمت‌ها با موفقیت ست شد و آماده همگام‌سازی است.',
-            'sample_items' => $mockSamples
-        ];
+        return ['status' => 'error', 'latency_ms' => $latency, 'message' => 'واکشی واقعی ناموفق بود؛ دادهٔ نمونه جایگزین نمی‌شود.', 'sample_items' => []];
     }
 
     /**
@@ -333,7 +312,6 @@ class TiamConnector {
 
         $logDetails = "";
         $rawItems = [];
-        $isUsingMock = false;
 
         // Fast probe check on ERP port (1.5 seconds max) to prevent blocking
         $probe = TiamVpnManager::isSubnetReachable($erpServerIp, $erpPort, 1.5);
@@ -356,8 +334,8 @@ class TiamConnector {
                 curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
                 curl_setopt($ch, CURLOPT_TIMEOUT, 5);
                 curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
-                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 
                 if (!empty($project['settings']['connections']['telegram']['proxy'])) {
                     applyCurlProxySettings($ch, $project['settings']['connections']['telegram']['proxy']);
@@ -386,8 +364,8 @@ class TiamConnector {
             curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
             curl_setopt($ch, CURLOPT_TIMEOUT, 6);
             curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 
             if (!empty($project['settings']['connections']['telegram']['proxy'])) {
                 applyCurlProxySettings($ch, $project['settings']['connections']['telegram']['proxy']);
@@ -474,17 +452,7 @@ class TiamConnector {
             }
         }
 
-        // Resilient Fallback Dataset
-        if (empty($rawItems)) {
-            $isUsingMock = true;
-            $rawItems = [
-                ['sku' => 'TM-1092-BK', 'name' => 'مانتو تار و پود طرح ارکیده', 'color' => 'مشکی', 'price' => 780000, 'stock' => 15, 'size' => 'L'],
-                ['sku' => 'TM-1092-RD', 'name' => 'مانتو تار و پود طرح ارکیده', 'color' => 'قرمز', 'price' => 780000, 'stock' => 24, 'size' => 'M'],
-                ['sku' => 'TM-2081-BL', 'name' => 'شلوار کتان تار و پود مدل یاس', 'color' => 'آبی', 'price' => 540000, 'stock' => 5, 'size' => '38'],
-                ['sku' => 'TM-2081-GR', 'name' => 'شلوار کتان تار و پود مدل یاس', 'color' => 'سبز', 'price' => 540000, 'stock' => 9, 'size' => '40'],
-                ['sku' => 'TM-3044-WH', 'name' => 'شومیز لنین یقه چین‌دار مارال', 'color' => 'سفید', 'price' => 620000, 'stock' => 18, 'size' => 'Free Size']
-            ];
-        }
+        if (empty($rawItems)) return ['status' => 'error', 'msg' => 'دریافت دادهٔ واقعی تیام ناموفق یا خالی بود؛ هیچ محصولی تغییر نکرد.'];
 
         // Map to unified products array
         $mapped = [];
@@ -503,7 +471,9 @@ class TiamConnector {
             }
 
             $priceStr = is_numeric($rawPrice) ? ($rawPrice . ' تومان') : trim((string)$rawPrice);
-            $stock = isset($item['stock']) ? (int)$item['stock'] : 10;
+            $sourceStock = $item['stock'] ?? $item['quantity'] ?? $item['inventory'] ?? null;
+            if (!is_numeric($sourceStock) || !is_finite((float)$sourceStock)) return ['status' => 'error', 'msg' => 'موجودی معتبر در پاسخ تیام وجود ندارد؛ هیچ تغییری اعمال نشد.'];
+            $stock = (float)$sourceStock;
             $size = trim((string)($item['size'] ?? 'Free Size'));
 
             $mapped[] = [
@@ -529,7 +499,7 @@ class TiamConnector {
 
         // Update timestamps and logs
         $todayStr = date('Y-m-d H:i');
-        $project['settings']['tiam']['last_sync_date'] = $todayStr;
+        $project['settings']['tiam']['last_sync_date'] = date('Y-m-d');
         $project['settings']['tiam']['last_sync_status'] = 'success';
         $project['settings']['tiam']['last_sync_log'] = "همگام‌سازی {$syncRes['new']} جدید و {$syncRes['updated']} ویرایش شده در $todayStr";
 
@@ -537,7 +507,7 @@ class TiamConnector {
             $project['logs'] = [];
         }
 
-        $sourceType = $isUsingMock ? "شبیه‌ساز هوشمند تیام" : "وب‌سرویس زنده تیام (سرور $erpServerIp)";
+        $sourceType = "وب‌سرویس زنده تیام (سرور $erpServerIp)";
         $vpnNote = $vpnEnabled ? "از طریق تونل L2TP ($vpnServerIp)" : "اتصال مستقیم شبکه";
 
         $project['logs'][] = [

@@ -1,0 +1,6 @@
+
+# Deployment credentials and Python bytecode
+/panel/db/system_admins.php
+/panel/db/system_admins.php.lock
+__pycache__/
+*.pyc

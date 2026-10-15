@@ -296,8 +296,16 @@ if (isset($_POST['login'])) {
     $u = trim($_POST['user'] ?? '');
     $p = trim($_POST['pass'] ?? '');
     
+    require_once __DIR__ . '/panel/inc/SystemAdmins.php';
+    $systemAdmin = SystemAdmins::authenticate($u, $p);
+    if ($systemAdmin) {
+        session_regenerate_id(true);
+        $_SESSION['user'] = $systemAdmin;
+        redirect('panel/admin.php');
+        exit;
+    }
     $db = getDB();
-    
+
     foreach ($db['super_users'] as $su) {
         if ($su['username'] === $u) {
             $matched = false;

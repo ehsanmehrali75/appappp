@@ -26,7 +26,11 @@ class FeatureFlags {
         }
         $user = $_SESSION['user'] ?? null;
         if (!$user) return false;
-        return in_array($user['role'] ?? '', ['main_admin', 'superadmin'], true);
+        return in_array($user['role'] ?? '', ['owner', 'main_admin', 'superadmin'], true);
+    }
+
+    public static function isUnrestrictedAdmin() {
+        return ($_SESSION['user']['role'] ?? '') === 'owner';
     }
 
     /**
@@ -652,6 +656,8 @@ class FeatureFlags {
      * @return bool True if the feature should be shown and accessible to the current user
      */
     public static function isAvailable($featureKey) {
+        if (self::isUnrestrictedAdmin()) return true;
+        if ($featureKey === 'settings' && self::isMainAdmin()) return true;
         $parent = strpos($featureKey, 'seo_intel_') === 0 ? 'seo_intel' :
             (strpos($featureKey, 'vm_') === 0 && $featureKey !== 'vm_studio' ? 'vm_studio' : null);
         if ($parent !== null && !self::isAvailable($parent)) return false;

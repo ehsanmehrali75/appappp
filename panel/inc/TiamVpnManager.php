@@ -62,13 +62,16 @@ class TiamVpnManager {
             @fclose($fp4500);
         }
 
+        // UDP socket creation does not prove remote reachability or VPN authentication.
+        $result['is_reachable'] = false;
+        $result['ports'] = ['l2tp_1701' => null, 'ike_500' => null, 'natt_4500' => null];
         $latency = round((microtime(true) - $t0) * 1000, 1);
         $result['latency_ms'] = $latency;
 
         if ($result['is_reachable']) {
             $result['log'] = "ارتباط اولیه با سرور وی‌پی‌ان ($cleanHost) با زمان تاخیر {$latency}ms برقرار شد.";
         } else {
-            $result['log'] = "عدم پاسخگویی پورت‌های UDP وی‌پی‌ان در هاست $cleanHost. لطفا فایروال یا باز بودن پورت‌های 1701، 500 و 4500 را بررسی فرمایید.";
+            $result['log'] = "احراز هویت یا باز بودن پورت VPN با ساخت سوکت UDP قابل تأیید نیست؛ تست واقعی را از ایجنت اجرا کنید.";
         }
 
         return $result;

@@ -235,9 +235,11 @@ if ($project && isset($project['settings']['tiam']['enabled']) && $project['sett
             $currentTime = date('H:i');
             if (strcmp($currentTime, $syncHour) >= 0) {
                 // Time has come or passed today! Let's trigger sync!
-                syncWithTiam($project);
-                $project['settings']['tiam']['last_sync_date'] = $todayStr;
-                saveProject($project);
+                $syncResult = syncWithTiam($project);
+                if (($syncResult['status'] ?? '') === 'success') {
+                    $project['settings']['tiam']['last_sync_date'] = $todayStr;
+                    saveProject($project);
+                }
             }
         }
     }
@@ -755,6 +757,9 @@ $sections_json
     }
 
     if ($action === 'tiam_trigger_sync') {
+        if (!empty($project['settings']['tiam_inventory']['host'])) {
+            echo json_encode(['status'=>'error', 'msg'=>'برای اتصال SQL از دریافت و پیش‌نمایش تغییرات استفاده کنید؛ اعمال مستقیم مجاز نیست.'], JSON_UNESCAPED_UNICODE); exit;
+        }
         if (isset($_POST['erp_server_ip']) || isset($_POST['endpoint']) || isset($_POST['vpn_server_ip'])) {
             $t_existing = $project['settings']['tiam'] ?? [];
             $project['settings']['tiam'] = [
@@ -5386,7 +5391,7 @@ if ($project) {
         if (isset($_POST['tiam_endpoint']) || isset($_POST['tiam_erp_server_ip']) || isset($_POST['tiam_vpn_server_ip'])) {
             $t_prev = $project['settings']['tiam'] ?? [];
             $project['settings']['tiam'] = [
-                'enabled' => isset($_POST['tiam_enabled']) ? 1 : 0,
+                'enabled' => !empty($project['settings']['tiam_inventory']['enabled']) ? 0 : (isset($_POST['tiam_enabled']) ? 1 : 0),
                 'vpn_enabled' => isset($_POST['tiam_vpn_enabled']) ? 1 : 0,
                 'vpn_type' => trim($_POST['tiam_vpn_type'] ?? ($t_prev['vpn_type'] ?? 'l2tp_ipsec')),
                 'vpn_server_ip' => trim($_POST['tiam_vpn_server_ip'] ?? ($t_prev['vpn_server_ip'] ?? '79.127.70.17')),
@@ -11130,6 +11135,7 @@ $suggestions = getCalendarSuggestions($project);
                             }
                             
                             function triggerTiamManualSync() {
+                                if (typeof tiamInventoryAction === 'function' && window.tiamInventoryConfigured) return tiamInventoryAction('preview');
                                 const spinner = document.getElementById('tiam_sync_spinner');
                                 if (spinner) spinner.classList.remove('hidden');
                                 
@@ -19400,6 +19406,8 @@ export default function CampaignLanding() {
 
                             <!-- Card H: Tiam ERP Integration Autopilot Settings -->
                             <?php 
+                            if (isMainAdmin()) require __DIR__ . '/inc/SystemAdminsView.php';
+                            require __DIR__ . '/inc/TiamInventoryView.php';
                             $tcfg = $project['settings']['tiam'] ?? [];
                             $t_enabled = !empty($tcfg['enabled']);
                             $t_vpn_enabled = isset($tcfg['vpn_enabled']) ? !empty($tcfg['vpn_enabled']) : true;
@@ -19546,13 +19554,13 @@ export default function CampaignLanding() {
                                                 <span class="text-[9px] text-slate-400 block mt-1">قیمت نهایی در وب‌سایت به تومان درج خواهد شد</span>
                                             </div>
                                             <div>
-                                                <label class="text-[10px] font-black text-slate-700 block mb-1">🕒 ساعت هماهنگ‌سازی خودکار شبانه</label>
+                                                <label class="text-[10px] font-black text-slate-700 block mb-1">🕒 ساعت هماهنگ‌سازی روزانه (تهران)</label>
                                                 <select name="tiam_sync_hour" class="w-full py-2.5 px-3 bg-white border border-slate-200 rounded-xl outline-none font-bold text-slate-700 text-xs">
                                                     <?php 
                                                     for($th = 0; $th < 24; $th++): 
                                                         $val_h = sprintf('%02d:00', $th);
                                                     ?>
-                                                        <option value="<?php echo $val_h; ?>" <?php echo $t_sync_hour === $val_h ? 'selected' : ''; ?>>ساعت <?php echo $val_h; ?> بامداد</option>
+                                                        <option value="<?php echo $val_h; ?>" <?php echo $t_sync_hour === $val_h ? 'selected' : ''; ?>>ساعت <?php echo $val_h; ?></option>
                                                     <?php endfor; ?>
                                                 </select>
                                                 <span class="text-[9px] text-slate-400 block mt-1">کوئری‌های اتوپایلوت زمان‌بندی‌شده</span>

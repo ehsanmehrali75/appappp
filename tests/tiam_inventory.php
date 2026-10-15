@@ -1,0 +1,52 @@
+<?php
+require __DIR__ . '/../panel/inc/TiamInventory.php';
+$dir = sys_get_temp_dir() . '/tiam-test-' . bin2hex(random_bytes(6)); putenv('TIAM_STATE_DIR='.$dir);
+register_shutdown_function(function() use ($dir) { foreach (glob($dir.'/*') as $f) unlink($f); if (is_dir($dir)) rmdir($dir); });
+$count=0;
+function check($condition,$name) { global $count; if (!$condition) throw new RuntimeException($name); $count++; }
+function rejects($fn,$name) { try { $fn(); } catch (RuntimeException $e) { check(true,$name); return; } throw new RuntimeException($name); }
+function saveProject($project) { $GLOBALS['saved']=$project; return true; }
+$input=['host'=>'192.0.2.10','port'=>1433,'database'=>'ExampleDB','view'=>'Factinventory','username'=>'reader','password'=>'dummy-test-password','agent_token'=>str_repeat('a',64),'enabled'=>true,'sync_hour'=>'12:00','mapping'=>['sku'=>'Code','name'=>'Title','stock'=>'Qty','size'=>'Size','color'=>'Color','warehouse'=>'Store']];
+$cfg=TiamInventory::config([],$input);
+check(!isset($cfg['agent_token']), 'raw agent token never stored');
+$again=$input;unset($again['password'],$again['agent_token']);$again['password']='';
+check(TiamInventory::config($cfg,$again)['password']==='dummy-test-password','blank preserves secret');
+$rows=[['Code'=>'A-M','Title'=>'Shirt','Qty'=>3,'Size'=>'M','Color'=>'Red','Store'=>'1'],['Code'=>'A-L','Title'=>'Shirt','Qty'=>0,'Size'=>'L','Color'=>'Red','Store'=>'1'],['Code'=>'A-M','Title'=>'Shirt','Qty'=>2,'Size'=>'M','Color'=>'Red','Store'=>'2']];
+$items=TiamInventory::normalize($rows,$cfg);
+$project=['id'=>'p1','products'=>[],'settings'=>['tiam_inventory'=>$cfg]];
+$merged=TiamInventory::merge($project,$items,$cfg);$product=$merged['products'][0];
+check(count($merged['products'])===1,'group follows name/color model');
+check($product['stock_total']===5.0,'warehouses aggregate');
+check($product['variants'][0]['sku']==='A-M' && $product['variants'][1]['sku']==='A-L','variant codes preserved');
+check($product['variants'][1]['inventory']===0.0,'zero stock preserved');
+check(count($product['tiam_warehouses'])===3,'warehouse detail retained');
+rejects(fn()=>TiamInventory::normalize([],$cfg),'empty result rejected');
+rejects(fn()=>TiamInventory::normalize([$rows[0],$rows[0]],$cfg),'duplicate grain rejected');
+$bad=$rows;$bad[0]['Qty']='bad'; rejects(fn()=>TiamInventory::normalize($bad,$cfg),'invalid stock rejected');
+$bad=$rows;unset($bad[0]['Code']); rejects(fn()=>TiamInventory::normalize($bad,$cfg),'schema drift rejected');
+$project['products']=$merged['products'];$project['products'][0]['description']='Editor content';$project['products'][0]['image']='keep.jpg';
+$repeat=TiamInventory::merge($project,$items,$cfg);
+check($repeat['counts']['unchanged']===1,'idempotent import');
+check($repeat['products'][0]['description']==='Editor content' && $repeat['products'][0]['image']==='keep.jpg','editor fields retained');
+$job=TiamInventory::createJob($project,'preview','owner-a');
+rejects(fn()=>TiamInventory::createJob($project,'preview'),'active job cannot be overwritten');
+$job=TiamInventory::preview($project,$job,$rows);
+check($project['products'][0]['stock_total']===5.0 && !isset($GLOBALS['saved']),'preview does not persist');
+$changed=$project;$changed['products'][0]['description']='Changed';rejects(fn()=>TiamInventory::apply($changed,$job),'stale preview rejected');
+$applied=TiamInventory::apply($project,$job);check($applied['state']==='applied','confirmation applies once');
+rejects(fn()=>TiamInventory::apply($project,$applied),'replay rejected');
+$now=new DateTimeImmutable('2026-10-15 12:00:00',new DateTimeZone('Asia/Tehran'));
+$daily=$cfg;$daily['approved']=TiamInventory::fingerprint($cfg);
+check(TiamInventory::due($daily,$now),'daily noon due');
+check(!TiamInventory::due($daily,$now->modify('-1 minute')),'before noon not due');
+$daily['last_success']='2026-10-15';check(!TiamInventory::due($daily,$now),'once per day');
+unset($daily['last_success']);$daily['last_attempt']='2026-10-15';check(!TiamInventory::due($daily,$now),'failed scheduled run not looped');
+$daily=$cfg;check(!TiamInventory::due($daily,$now),'unapproved mapping never runs');
+$daily['approved']=TiamInventory::fingerprint($cfg);$daily['mapping']['stock']='Other';check(!TiamInventory::due($daily,$now),'mapping change invalidates approval');
+$missing=$project;$missing['products'][]=['id'=>'old','name'=>'Old','color'=>'Blue','tiam_key'=>'old|blue','stock_total'=>10,'variants'=>[['sku'=>'OLD','size'=>'S','inventory'=>10]]];
+$keep=TiamInventory::merge($missing,$items,$cfg);check($keep['products'][1]['stock_total']===10,'missing stock preserved by default');
+$zero=TiamInventory::merge($missing,$items,array_replace($cfg,['zero_missing'=>true]));check($zero['products'][1]['stock_total']===0,'full snapshot zeroing explicit');
+$prices=$cfg;$prices['mapping']['price']='Price';$prices['price_unit']='rial';$priced=$rows;foreach($priced as &$r)$r['Price']=1000;unset($r);
+check(TiamInventory::normalize($priced,$prices)[0]['price']===100.0,'rial conversion explicit');
+$badCfg=$input;$badCfg['view']='Factinventory; DELETE FROM x';rejects(fn()=>TiamInventory::config([],$badCfg),'SQL injection rejected');
+echo "$count Tiam inventory checks passed\n";

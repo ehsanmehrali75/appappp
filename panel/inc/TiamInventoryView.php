@@ -1,0 +1,89 @@
+<?php
+if (!isset($project) || !function_exists('hasPermission') || !hasPermission('settings')) { http_response_code(403); exit; }
+if (empty($_SESSION['tiam_csrf'])) $_SESSION['tiam_csrf'] = bin2hex(random_bytes(32));
+$inventoryCfg = $project['settings']['tiam_inventory'] ?? [];
+?>
+<section id="tiam-inventory-panel" class="p-5 my-6 rounded-2xl border border-indigo-200 bg-indigo-50 space-y-4">
+    <h3 class="font-black text-indigo-900">دریافت موجودی تیام از SQL Server — اتصال مخصوص این پروژه</h3>
+    <p class="text-xs leading-6">مناسب هاست اشتراکی: ایجنت روی کامپیوتر یا سرور شما VPN را برقرار می‌کند و ویو را می‌خواند. سایت نیازی به نصب VPN ندارد. ابتدا تست ویو را بزنید، نام ستون‌ها را نگاشت کنید و پیش‌نمایش را تأیید کنید؛ سپس به‌روزرسانی روزانه فعال می‌شود.</p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+    <?php foreach (['host'=>'آدرس SQL Server (مثال 192.168.2.215)', 'port'=>'پورت SQL (معمولاً 1433)', 'database'=>'دیتابیس (مثال SplandDB)', 'schema'=>'Schema (معمولاً dbo)', 'view'=>'نام ویو (مثال Factinventory)', 'username'=>'کاربر SQL (مثال ReportUser)', 'password'=>'رمز SQL — خالی: حفظ مقدار قبلی', 'certificate_hostname'=>'نام سرور مطابق گواهی TLS (اختیاری)', 'vpn_server'=>'سرور VPN', 'vpn_username'=>'نام کاربری VPN', 'vpn_password'=>'رمز VPN — خالی: حفظ مقدار قبلی', 'vpn_secret'=>'Secret / PSK — خالی: حفظ مقدار قبلی', 'vpn_service'=>'نام سرویس VPN در لینوکس (در ویندوز لازم نیست)', 'sync_hour'=>'ساعت روزانه به وقت تهران', 'agent_token'=>'کلید ایجنت (حداقل ۳۲ کاراکتر؛ خالی: حفظ کلید قبلی)'] as $field=>$label):
+        $secret = in_array($field, ['password','vpn_password','vpn_secret','agent_token'], true);
+        $value = $secret ? '' : ($inventoryCfg[$field] ?? (['port'=>1433,'schema'=>'dbo','sync_hour'=>'12:00'][$field] ?? ''));
+    ?>
+        <label class="text-xs font-bold"><?php echo htmlspecialchars($label); ?>
+            <input data-tiam-field="<?php echo $field; ?>" type="<?php echo $secret?'password':($field==='sync_hour'?'time':'text'); ?>" value="<?php echo htmlspecialchars((string)$value); ?>" autocomplete="off" class="input text-xs mt-1" dir="ltr">
+        </label>
+    <?php endforeach; ?>
+    </div>
+    <button type="button" onclick="tiamGenerateKey()" class="text-xs border rounded px-3 py-2 bg-white">ساخت کلید جدید و کپی برای ایجنت</button>
+    <div class="flex flex-wrap gap-4 text-xs">
+        <?php foreach (['vpn_enabled'=>'اتصال VPN پیش از خواندن ویو', 'enabled'=>'همگام‌سازی روزانه پس از تأیید اولیه', 'zero_missing'=>'صفرکردن موجودی کالاهای تیامِ غایب از اسنپ‌شات کامل'] as $field=>$label): ?>
+            <label><input type="checkbox" data-tiam-field="<?php echo $field; ?>" <?php echo !empty($inventoryCfg[$field])?'checked':''; ?>> <?php echo $label; ?></label>
+        <?php endforeach; ?>
+    </div>
+    <label class="text-xs">واحد قیمت در ویو
+        <select data-tiam-field="price_unit" class="input text-xs">
+            <option value="toman" <?php echo ($inventoryCfg['price_unit'] ?? 'toman') === 'toman'?'selected':''; ?>>تومان</option>
+            <option value="rial" <?php echo ($inventoryCfg['price_unit'] ?? '') === 'rial'?'selected':''; ?>>ریال (تبدیل به تومان)</option>
+        </select>
+    </label>
+    <h4 class="font-bold text-sm">نگاشت ستون‌های ویو به ساختار محصولات</h4>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <?php foreach (['sku'=>'کد / بارکد کالا *', 'name'=>'نام کالا *', 'stock'=>'موجودی *', 'size'=>'سایز', 'color'=>'رنگ', 'warehouse'=>'انبار / شعبه', 'price'=>'قیمت (واحد فعلی سیستم)', 'model'=>'کد مدل مادر (اختیاری)'] as $field=>$label): ?>
+        <label class="text-xs"><?php echo $label; ?><input data-tiam-map="<?php echo $field; ?>" value="<?php echo htmlspecialchars($inventoryCfg['mapping'][$field] ?? ''); ?>" class="input text-xs mt-1" dir="ltr"></label>
+    <?php endforeach; ?>
+    </div>
+    <p class="text-xs">کلید ایجنت را فقط روی سیستم اجرای ایجنت وارد کنید. رمزها در خروجی این فرم نمایش داده نمی‌شوند. تغییر اتصال یا نگاشت نیازمند تأیید دوبارهٔ پیش‌نمایش است. ردیف تکراری یا دادهٔ ناقص اعمال نمی‌شود.</p>
+    <div class="flex flex-wrap gap-2">
+        <?php foreach (['save'=>'ذخیرهٔ تنظیمات', 'vpn_test'=>'تست VPN و مسیر شبکه', 'view_test'=>'تست اتصال SQL و نمایش ستون‌ها', 'preview'=>'دریافت و پیش‌نمایش تغییرات', 'latest'=>'آخرین وضعیت و لاگ ایجنت'] as $action=>$label): ?>
+            <button type="button" onclick="tiamInventoryAction('<?php echo $action; ?>')" class="bg-indigo-600 text-white px-3 py-2 rounded-lg text-xs"><?php echo $label; ?></button>
+        <?php endforeach; ?>
+        <a href="<?php echo htmlspecialchars('/panel/tiam_inventory_agent.py'); ?>" download class="px-3 py-2 rounded-lg bg-white text-xs">دانلود ایجنت SQL</a>
+    </div>
+    <p class="text-xs">آخرین روز موفق: <?php echo htmlspecialchars($inventoryCfg['last_success'] ?? 'هنوز اجرا نشده'); ?> — ساعت پیش‌فرض ۱۲:۰۰ تهران. هنگام قطع ایجنت، کار به‌صورت خودکار انجام نمی‌شود.</p>
+    <pre id="tiam-inventory-log" class="text-xs bg-slate-900 text-slate-100 p-4 rounded-lg whitespace-pre-wrap max-h-96 overflow-auto" dir="rtl" aria-live="polite"></pre>
+    <button type="button" id="tiam-inventory-confirm" hidden onclick="tiamInventoryAction('apply')" class="bg-emerald-600 text-white px-5 py-3 rounded-lg font-bold">تأیید پیش‌نمایش و اعمال تغییرات</button>
+</section>
+<script>
+window.tiamInventoryConfigured = <?php echo !empty($inventoryCfg['host'])?'true':'false'; ?>;
+let tiamInventoryJob = null, tiamInventoryTimer = null;
+const tiamInventoryProject = <?php echo json_encode($project['id']); ?>;
+const tiamInventoryCsrf = <?php echo json_encode($_SESSION['tiam_csrf']); ?>;
+async function tiamGenerateKey() {
+    const bytes = new Uint8Array(32); crypto.getRandomValues(bytes);
+    const key = Array.from(bytes, b=>b.toString(16).padStart(2,'0')).join('');
+    document.querySelector('[data-tiam-field="agent_token"]').value = key;
+    try { await navigator.clipboard.writeText(key); alert('کلید کپی شد. آن را در محیط ایجنت وارد و سپس تنظیمات را ذخیره کنید.'); }
+    catch(e) { alert('کپی خودکار ممکن نشد؛ کلید در فیلد کلید ایجنت قرار گرفت.'); }
+}
+async function tiamInventoryAction(action) {
+    clearTimeout(tiamInventoryTimer);
+    const log = document.getElementById('tiam-inventory-log');
+    document.getElementById('tiam-inventory-confirm').hidden = true;
+    const payload = {action, project:tiamInventoryProject, csrf:tiamInventoryCsrf, job:tiamInventoryJob};
+    if (action==='save') {
+        const cfg={mapping:{}};
+        document.querySelectorAll('[data-tiam-field]').forEach(el=>cfg[el.dataset.tiamField]=el.type==='checkbox'?el.checked:el.value);
+        document.querySelectorAll('[data-tiam-map]').forEach(el=>cfg.mapping[el.dataset.tiamMap]=el.value);
+        payload.config=cfg;
+    }
+    try {
+        const response=await fetch(<?php echo json_encode('/panel/tiam_inventory.php'); ?>,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        const data=await response.json(); if(!response.ok || data.error) throw new Error(data.error || 'خطای سرور');
+        if(data.id) tiamInventoryJob=data.id;
+        if(data.status==='saved') {
+            window.tiamInventoryConfigured=true;
+            log.textContent='تنظیمات این پروژه ذخیره شد. ایجنت را با آدرس '+window.location.origin+<?php echo json_encode('/panel/tiam_inventory.php'); ?>+' و شناسهٔ پروژه '+tiamInventoryProject+' اجرا کنید.';
+            document.querySelectorAll('[data-tiam-field][type="password"]').forEach(el=>el.value=''); return;
+        }
+        log.textContent=JSON.stringify(data,null,2);
+        if(data.state==='queued') log.textContent='در انتظار اتصال ایجنت این پروژه…\n'+log.textContent;
+        if(data.state==='preview') {
+            log.textContent='پیش‌نمایش (حداکثر ۱۰۰ تغییر نمایش داده می‌شود؛ تعداد کل در change_count):\n'+log.textContent;
+            document.getElementById('tiam-inventory-confirm').hidden=!data.can_apply;
+        }
+        if(['queued','running'].includes(data.state)) tiamInventoryTimer=setTimeout(()=>tiamInventoryAction(action==='latest'?'latest':'status'),3000);
+    } catch(e) {log.textContent=e.message;}
+}
+</script>

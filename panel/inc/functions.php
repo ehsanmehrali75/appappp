@@ -1303,6 +1303,7 @@ function isProjectAdmin() {
 }
 
 function hasPermission($perm) {
+    if (isMainAdmin()) return true;
     $key = AccessControl::featureKey($perm);
     if (!FeatureFlags::isAvailable($key)) return false;
     if (isMainAdmin()) return true;
@@ -1328,6 +1329,7 @@ function canAccessManagement() {
 }
 
 function checkModuleSettingAccess($module, $settings) {
+    if (FeatureFlags::isUnrestrictedAdmin()) return true;
     if (empty($settings) || !is_array($settings)) {
         return true;
     }
@@ -1384,6 +1386,7 @@ function getModuleVisibilityBadge($module, $project = null) {
 }
 
 function isModuleActive($module) {
+    if (FeatureFlags::isUnrestrictedAdmin() || ($module === 'settings' && isMainAdmin())) return true;
     // Check global feature flag first
     if (!FeatureFlags::isAvailable($module)) {
         return false;
@@ -7531,6 +7534,9 @@ function enforceFeatureRequestAccess() {
         $key = $m[1] === 'vm' ? 'vm_studio' : 'seo_intel';
     }
     if ($key === null) return;
+    if (FeatureFlags::isUnrestrictedAdmin()) return;
+    // Main administrators must retain access to repair project settings.
+    if ($key === 'settings' && isMainAdmin()) return;
     if (!isUser()) { redirect('/index.php'); exit; }
     if (!isMainAdmin()) {
         $pid = $_GET['switch_project'] ?? ($_GET['project'] ?? ($_POST['project_id'] ?? ($_SESSION['project_id'] ?? null)));
