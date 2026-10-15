@@ -2,7 +2,7 @@
 
 The enhanced shell keeps the PHP permission-filtered links as its source of truth. JavaScript moves existing nodes; it never builds a separate route or permission catalog. The legacy design and no-JavaScript navigation remain available.
 
-- Project context and search come first. Overview, products and publication calendar are permanent daily shortcuts when authorized.
+- Project context and search come first. The “دسترسی سریع” section includes overview, products, publication calendar, website export and Size Studio when authorized.
 - Specialist tools are grouped by task. Groups start closed except the current section; opening or closing groups lasts for the current page. System administration follows project work.
 - Search normalizes Persian/Arabic yeh and kaf and removes diacritics and zero-width joiners. Matching group names reveal their tools. Clearing search restores the previous disclosure state. No-result feedback is announced through a status region.
 - All original destinations, visibility badges and real counters remain intact. Active links have `aria-current`; disclosure buttons control hidden panels.

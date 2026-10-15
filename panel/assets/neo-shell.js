@@ -96,17 +96,22 @@
     const findLink = tab => nav.querySelector(`a[href="?tab=${tab}"]`);
     const shortcuts = document.createElement('div');
     shortcuts.className = 'neo-daily-nav';
-    shortcuts.setAttribute('aria-label', 'دسترسی‌های روزانه');
+    shortcuts.setAttribute('aria-label', 'دسترسی سریع');
     const dailyHeading = document.createElement('p');
-    dailyHeading.className = 'neo-nav-caption';dailyHeading.textContent = 'کارهای روزانه';
+    dailyHeading.className = 'neo-nav-caption';dailyHeading.textContent = 'دسترسی سریع';
     shortcuts.append(dailyHeading);
-    ['dashboard','products','calendar'].forEach(tab => {
+    ['dashboard','products','calendar','website_export'].forEach(tab => {
         const link = findLink(tab);
         if (!link) return;
         if (tab === 'dashboard') link.children[1].textContent = 'نمای کلی پروژه';
         if (tab === 'products') link.children[1].textContent = 'محصولات و محتوا';
         shortcuts.append(link);
     });
+    const sizeStudio = nav.querySelector('a.nav-link[href^="size/?project="]');
+    if (sizeStudio) {
+        sizeStudio.children[1].textContent = 'استودیو جدول سایز';
+        shortcuts.append(sizeStudio);
+    }
     const support = nav.querySelector('a[href="/panel/support.php"]');
     if (support) {support.classList.add('neo-support-link');nav.append(support);}
     const searchBox = search?.closest('.px-2.mb-3') || search?.parentElement;
