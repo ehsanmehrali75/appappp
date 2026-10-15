@@ -52,6 +52,32 @@ if (!$project) {
     exit();
 }
 
+// Browser actions use the same project membership and feature gates as the UI.
+$actionFeature = [
+    'get_project_status' => 'settings',
+    'get_pending_browser_relay_posts' => 'calendar',
+    'mark_relay_schedule_status' => 'calendar',
+    'external_sync' => 'products',
+    'track_conversion' => 'proposals',
+    'tiam_agent_push' => 'products',
+    'tiam_agent_get_config' => 'settings'
+][$action] ?? null;
+if ($actionFeature !== null) {
+    $browserAction = in_array($action, ['get_project_status', 'get_pending_browser_relay_posts', 'mark_relay_schedule_status'], true);
+    if ($browserAction && !isUser()) AccessControl::deny();
+    if (isUser() && !isMainAdmin()) {
+        $member = null;
+        foreach (($project['users'] ?? []) as $candidate) {
+            if (($candidate['username'] ?? '') === ($_SESSION['user']['username'] ?? '')) { $member = $candidate; break; }
+        }
+        if (!$member) AccessControl::deny();
+        $_SESSION['project_id'] = $pid;
+        $_SESSION['user'] = $member;
+    }
+    if (!FeatureFlags::isAvailable($actionFeature) || !AccessControl::allowed($actionFeature, 'use') || !checkModuleSettingAccess($actionFeature, $project['settings'] ?? [])) AccessControl::deny();
+    if (isUser() && !hasPermission($actionFeature)) AccessControl::deny();
+}
+
 // Action Handlers
 if ($action === 'get_project_status') {
     $now = time();

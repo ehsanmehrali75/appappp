@@ -8,6 +8,8 @@ if (!defined('FEATURE_FLAGS_FILE')) {
     define('FEATURE_FLAGS_FILE', __DIR__ . '/../db/feature_flags.json');
 }
 
+require_once __DIR__ . '/AccessControl.php';
+
 class FeatureFlags {
     const STATUS_ACTIVE = 'active';           // فعال برای همه کاربران
     const STATUS_MAINTENANCE = 'maintenance'; // در دست تعمیر (فقط ادمین اصلی)
@@ -24,8 +26,7 @@ class FeatureFlags {
         }
         $user = $_SESSION['user'] ?? null;
         if (!$user) return false;
-        $username = strtolower(trim($user['username'] ?? ''));
-        return ($username === 'admin');
+        return in_array($user['role'] ?? '', ['main_admin', 'superadmin'], true);
     }
 
     /**
@@ -651,6 +652,9 @@ class FeatureFlags {
      * @return bool True if the feature should be shown and accessible to the current user
      */
     public static function isAvailable($featureKey) {
+        $parent = strpos($featureKey, 'seo_intel_') === 0 ? 'seo_intel' :
+            (strpos($featureKey, 'vm_') === 0 && $featureKey !== 'vm_studio' ? 'vm_studio' : null);
+        if ($parent !== null && !self::isAvailable($parent)) return false;
         $status = self::getStatus($featureKey);
 
         if ($status === self::STATUS_DISABLED) {
@@ -663,8 +667,7 @@ class FeatureFlags {
             return self::isMainAdmin();
         }
 
-        // 'active': available to everyone (subject to role/permission)
-        return true;
+        return AccessControl::allowed($featureKey);
     }
 
     /**
@@ -702,7 +705,7 @@ class FeatureFlags {
                 ];
             case self::STATUS_MAINTENANCE:
                 return [
-                    'label' => 'در دست تعمیر (فقط ادمین)',
+                    'label' => 'فقط ادمین اصلی',
                     'badge' => 'bg-amber-50 text-amber-700 border-amber-200',
                     'icon' => '🟡',
                     'desc' => 'مخفی از تمام کاربران؛ فقط ادمین اصلی دسترسی دارد'

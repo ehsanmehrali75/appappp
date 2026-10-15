@@ -1279,7 +1279,7 @@ function mergeProductData($existing, $new, $source = 'scraper') {
 // ================================
 
 function isSuperAdmin() {
-    return isset($_SESSION['user']) && ($_SESSION['user']['role'] ?? '') === 'superadmin';
+    return FeatureFlags::isMainAdmin();
 }
 
 function isMainAdmin() {
@@ -1303,12 +1303,28 @@ function isProjectAdmin() {
 }
 
 function hasPermission($perm) {
-    if (isSuperAdmin()) return true;
+    $key = AccessControl::featureKey($perm);
+    if (!FeatureFlags::isAvailable($key)) return false;
+    if (isMainAdmin()) return true;
     $user = $_SESSION['user'] ?? null;
     if (!$user) return false;
-    if (($user['role'] ?? '') === 'project_admin') return true;
-    $permissions = $user['permissions'] ?? [];
-    return in_array($perm, $permissions);
+    // Read the current project's record: another tab may have switched the session.
+    $project = getCurrentProject();
+    $member = null;
+    foreach (($project['users'] ?? []) as $candidate) {
+        if (($candidate['username'] ?? '') === ($user['username'] ?? '')) { $member = $candidate; break; }
+    }
+    if (!$member) return false;
+    $mode = in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true) ? 'view' : 'use';
+    if (!AccessControl::allowed($key, $mode)) return false;
+    if (AccessControl::audience($key, $mode, $member, $project['id']) === true) return true;
+    if ($mode === 'use' && ($member['role'] ?? '') === 'viewer') return false;
+    return ($member['role'] ?? '') === 'project_admin' || in_array($perm, $member['permissions'] ?? [], true);
+}
+
+function canAccessManagement() {
+    if (isMainAdmin() || isProjectAdmin()) return true;
+    return ($_SESSION['user']['role'] ?? '') === 'manager';
 }
 
 function checkModuleSettingAccess($module, $settings) {
@@ -1323,7 +1339,7 @@ function checkModuleSettingAccess($module, $settings) {
                 return false;
             }
             if ($vis === 'admin_only' || $vis === 'maintenance') {
-                return (isSuperAdmin() || isMainAdmin() || isProjectAdmin());
+                return isMainAdmin();
             }
             if ($vis === 'active') {
                 return true;
@@ -1361,7 +1377,7 @@ function getModuleVisibilityBadge($module, $project = null) {
     if (isSuperAdmin() || isMainAdmin() || isProjectAdmin()) {
         $vis = getModuleVisibility($module, $project);
         if ($vis === 'admin_only' || $vis === 'maintenance') {
-            return '<span class="mr-auto px-1.5 py-0.5 text-[8px] bg-amber-500/20 text-amber-700 border border-amber-300/40 rounded font-bold" title="فقط برای ادمین باز است">فقط ادمین</span>';
+            return '<span class="mr-auto px-1.5 py-0.5 text-[8px] bg-amber-500/20 text-amber-700 border border-amber-300/40 rounded font-bold" title="فقط برای ادمین اصلی باز است">فقط ادمین اصلی</span>';
         }
     }
     return '';
@@ -7490,3 +7506,72 @@ function updateProjectStorageQuota($projectId, $newQuotaMb) {
 }
 
 
+/** Enforce the same feature restrictions for direct URLs and POST requests. */
+function enforceFeatureRequestAccess() {
+    if (PHP_SAPI === 'cli') return;
+    $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+    $relative = preg_replace('#^/panel/#', '/', $path);
+    $key = null;
+    if (preg_match('#/(?:admin(?:\.php)?)/?$#', $relative)) {
+        $key = $_GET['tab'] ?? 'dashboard';
+        if ($key === 'feature_flags') {
+            if (!isMainAdmin()) AccessControl::deny();
+            return;
+        }
+    } else {
+        foreach (FeatureFlags::getCatalog() as $featureKey => $feature) {
+            $url = $feature['url'] ?? '';
+            if (strpos($url, 'admin.php?') === 0) continue;
+            $route = '/' . ltrim($url, '/');
+            $pattern = str_replace(preg_quote('{slug}', '#'), '[^/]+', preg_quote(rtrim($route, '/'), '#'));
+            if (preg_match('#^' . $pattern . '(?:/index\.php)?/?$#', $relative)) $key = $featureKey;
+        }
+    }
+    if ($key === null && preg_match('#^/(vm|seo_intel)/(?:index|api)\.php$#', $relative, $m)) {
+        $key = $m[1] === 'vm' ? 'vm_studio' : 'seo_intel';
+    }
+    if ($key === null) return;
+    if (!isUser()) { redirect('/index.php'); exit; }
+    if (!isMainAdmin()) {
+        $pid = $_GET['switch_project'] ?? ($_GET['project'] ?? ($_POST['project_id'] ?? ($_SESSION['project_id'] ?? null)));
+        if (!is_string($pid)) AccessControl::deny();
+        $project = getCurrentProject($pid, true);
+        $member = null;
+        foreach (($project['users'] ?? []) as $candidate) {
+            if (($candidate['username'] ?? '') === ($_SESSION['user']['username'] ?? '')) { $member = $candidate; break; }
+        }
+        if (!$member) AccessControl::deny();
+        $_SESSION['project_id'] = $pid;
+        $_SESSION['user'] = $member;
+    }
+    if (!isMainAdmin() && preg_match('#/(?:admin(?:\.php)?)/?$#', $relative) && !isset($_GET['tab']) && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && !hasPermission($key)) {
+        foreach (array_keys(FeatureFlags::getCatalog()) as $candidate) {
+            if (hasPermission($candidate) && isModuleActive($candidate)) { $key = $candidate; $_GET['tab'] = $candidate; break; }
+        }
+    }
+    $actionFeatures = [
+        'settings' => ['save_project_settings', 'save_settings', 'save_automation', 'save_test_settings', 'send_test_sms', 'register_bale_webhook', 'register_tg_webhook'],
+        'users' => ['add_user', 'edit_user', 'delete_user'],
+        'projects' => ['add_project', 'reset_project'],
+        'main_settings' => ['save_site_settings'], 'main_plans' => ['save_subscription_plans'],
+        'main_orders' => ['update_order_status'], 'storage_monitor' => ['update_project_quota'],
+        'products' => ['add_manual_product', 'delete_product', 'delete_image', 'delete_social_image', 'update_product_data', 'delete_size_chart'],
+        'calendar' => ['add_schedule', 'update_schedule', 'delete_schedule', 'quick_send_schedule', 'batch_fill_calendar', 'add_planner_custom_post', 'delete_day_action'],
+        'extract' => ['add_scraping_job', 'cancel_job', 'clear_jobs', 'reset_extraction'],
+        'auto_admin' => ['save_auto_admin', 'trigger_auto_admin'],
+        'excel' => ['import_excel', 'confirm_import'],
+        'occasions' => ['add_custom_occasion', 'delete_custom_occasion', 'save_occasion_sheet'],
+        'logs' => ['clear_logs'], 'system_debug' => ['clear_debug', 'clear_sms_logs'],
+        'sale_analysis' => ['add_store_action', 'delete_store_action', 'save_store_config_action', 'import_sales_data_action', 'save_sync_settings_action', 'manual_sync_analytics_action']
+    ];
+    foreach ($actionFeatures as $actionFeature => $actions) {
+        foreach ($actions as $action) {
+            if (isset($_POST[$action]) && (!hasPermission($actionFeature) || !isModuleActive($actionFeature) || !AccessControl::allowed($actionFeature, 'use'))) AccessControl::deny();
+        }
+    }
+    $mode = in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true) ? 'view' : 'use';
+    if (!FeatureFlags::isAvailable($key) || !AccessControl::allowed($key, $mode) || !isModuleActive($key)) AccessControl::deny();
+    $permission = ['size_studio' => 'size_chart', 'vm_studio' => 'vm', 'seo_intel' => 'analysis', 'seo_classic' => 'analysis', 'sale_analysis' => 'analysis'][$key] ?? $key;
+    if (!hasPermission($permission)) AccessControl::deny();
+}
+enforceFeatureRequestAccess();

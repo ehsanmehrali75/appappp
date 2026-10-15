@@ -13,12 +13,14 @@ if (!isMainAdmin()) {
     <div class="p-8 bg-rose-50 border border-rose-200 text-rose-800 rounded-3xl text-center my-8 shadow-sm">
         <div class="text-4xl mb-3">⛔</div>
         <h3 class="text-base font-black mb-1">دسترسی غیرمجاز</h3>
-        <p class="text-xs text-rose-600 font-medium">این بخش منحصراً در اختیار مدیر ارشد اصلی سامانه (یوزر admin) می‌باشد.</p>
+        <p class="text-xs text-rose-600 font-medium">این بخش منحصراً در اختیار ادمین اصلی سامانه می‌باشد.</p>
     </div>
     <?php
     return;
 }
 
+if (empty($_SESSION['access_csrf'])) $_SESSION['access_csrf'] = bin2hex(random_bytes(32));
+$accessPolicies = AccessControl::policies();
 $catalog = FeatureFlags::getCatalog();
 $config = FeatureFlags::getConfig();
 
@@ -203,6 +205,12 @@ foreach ($catalog as $k => $item) {
     <!-- Master Form -->
     <form id="form-feature-flags" method="POST" action="admin.php?tab=feature_flags" onsubmit="handleFormSubmit(event)">
         <input type="hidden" name="save_feature_flags" value="1">
+        <input type="hidden" name="access_csrf" value="<?php echo htmlspecialchars($_SESSION['access_csrf']); ?>">
+        <div class="p-4 mb-5 bg-indigo-50 rounded-xl text-xs space-y-2">
+            <p>ادمین اصلی بر پایهٔ نقش main_admin تعیین می‌شود؛ نقش قدیمی superadmin نیز معتبر است. نام کاربری دسترسی ایجاد نمی‌کند.</p>
+            <p>مشاهده و استفاده را جدا تنظیم کنید. خالی = مجوزهای فعلی؛ در صورت انتخاب، فقط نقش‌ها یا افراد یا اعضای پروژه‌های انتخابی مجازند. استفاده به مشاهده هم نیاز دارد. «فقط ادمین اصلی» بر تمام مجوزها اولویت دارد.</p>
+            <p>نقش‌ها: project_admin (ادمین پروژه)، manager (مدیر با دسترسی انتخابی)، editor (کارشناس)، viewer (کاربر پنل).</p>
+        </div>
 
         <div class="space-y-8" id="features-container">
             <?php foreach ($categories as $catKey => $catData): 
@@ -260,6 +268,19 @@ foreach ($catalog as $k => $item) {
                             </p>
                         </div>
 
+                        <details class="my-3 text-xs border rounded-xl p-3">
+                            <summary class="cursor-pointer font-bold">دسترسی نقش، فرد و پروژه</summary>
+                            <?php foreach (['view' => 'مشاهده', 'use' => 'استفاده و عملیات'] as $accessMode => $accessLabel): ?>
+                                <fieldset class="mt-3 space-y-2"><legend class="font-bold"><?php echo $accessLabel; ?></legend>
+                                <?php foreach (['roles' => 'نقش‌ها (شناسه نقش)', 'users' => 'افراد (نام کاربری)', 'projects' => 'پروژه‌ها (شناسه پروژه)'] as $accessScope => $scopeLabel): ?>
+                                    <label class="block"><?php echo $scopeLabel; ?>
+                                        <input type="text" dir="ltr" class="w-full border rounded p-2 mt-1" placeholder="جداشده با ویرگول؛ خالی = ارث‌بری"
+                                            name="access_policy[<?php echo htmlspecialchars($fKey); ?>][<?php echo $accessMode; ?>][<?php echo $accessScope; ?>]"
+                                            value="<?php echo htmlspecialchars(implode(', ', $accessPolicies[$fKey][$accessMode][$accessScope] ?? [])); ?>">
+                                    </label>
+                                <?php endforeach; ?></fieldset>
+                            <?php endforeach; ?>
+                        </details>
                         <!-- 3-State Controls -->
                         <div class="pt-3 border-t border-slate-100">
                             <label class="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-wider">انتخاب وضعیت:</label>
@@ -278,7 +299,7 @@ foreach ($catalog as $k => $item) {
                                 </label>
 
                                 <!-- Option 2: Maintenance (Admin Only) -->
-                                <label class="status-radio-label flex flex-col items-center justify-center py-2 px-1 rounded-lg text-center cursor-pointer transition-all <?php echo $status === 'maintenance' ? 'bg-amber-500 text-slate-950 font-black shadow-xs' : 'text-slate-600 hover:text-slate-900 font-medium hover:bg-slate-200/60'; ?>" title="فقط برای یوزر admin نمایش داده می‌شود">
+                                <label class="status-radio-label flex flex-col items-center justify-center py-2 px-1 rounded-lg text-center cursor-pointer transition-all <?php echo $status === 'maintenance' ? 'bg-amber-500 text-slate-950 font-black shadow-xs' : 'text-slate-600 hover:text-slate-900 font-medium hover:bg-slate-200/60'; ?>" title="فقط برای نقش ادمین اصلی نمایش داده می‌شود">
                                     <input type="radio" 
                                            name="features[<?php echo $fKey; ?>]" 
                                            value="maintenance" 
@@ -286,7 +307,7 @@ foreach ($catalog as $k => $item) {
                                            <?php echo $status === 'maintenance' ? 'checked' : ''; ?>
                                            onchange="updateFeatureStatusUI('<?php echo $fKey; ?>', 'maintenance')">
                                     <span class="text-xs mb-0.5">🟡</span>
-                                    <span class="text-[10px] leading-tight">فقط ادمین</span>
+                                    <span class="text-[10px] leading-tight">فقط ادمین اصلی</span>
                                 </label>
 
                                 <!-- Option 3: Disabled (Hidden Even for Admin) -->

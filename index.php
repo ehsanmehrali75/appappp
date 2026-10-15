@@ -282,7 +282,7 @@ if (isset($_POST['verify_code'])) {
                 $_SESSION['project_id'] = $firstPrjId;
             }
             
-            redirect('panel/portal.php');
+            redirect(canAccessManagement() ? 'panel/admin.php' : 'panel/portal.php');
         } else {
             $login_error = 'کد وارد شده صحیح نیست یا منقضی شده است.';
             $temp_mobile = $mobile;
@@ -328,7 +328,7 @@ if (isset($_POST['login'])) {
                 if ($matched) {
                     $_SESSION['user'] = $user;
                     $_SESSION['project_id'] = $project['id'];
-                    redirect('panel/portal.php');
+                    redirect(canAccessManagement() ? 'panel/admin.php' : 'panel/portal.php');
                 }
             }
         }

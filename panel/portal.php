@@ -1914,6 +1914,9 @@ if ($isAjax && isset($_POST['action'])) {
                 <span><?php echo htmlspecialchars($_SESSION['display_name'] ?? $_SESSION['user']['username'] ?? 'کاربر مهمان'); ?></span>
             </div>
 
+            <?php if (canAccessManagement()): ?>
+                <a href="admin.php" class="px-3 py-2 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold">پنل مدیریت</a>
+            <?php endif; ?>
             <?php if(isSuperAdmin() || isProjectAdmin()): ?>
                 <a href="sale.php<?php echo isSuperAdmin() ? '?project='.$project['id'] : ''; ?>" class="px-2.5 sm:px-4 py-1.5 sm:py-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-700 text-[11px] sm:text-xs font-black rounded-xl transition-all flex items-center gap-1 sm:gap-1.5 shadow-sm shadow-indigo-500/5 shrink-0" title="تحلیل فروش و شعب">
                     <span>💰</span>

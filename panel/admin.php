@@ -11,7 +11,7 @@ if (!isUser()) {
 }
 
 // User specified: If portal access but not admin, shouldn't enter admin section
-if (!isSuperAdmin() && !isProjectAdmin()) {
+if (!canAccessManagement()) {
     redirect('portal.php');
 }
 
@@ -58,11 +58,18 @@ if (isset($_GET['switch_project'])) {
 
 $msg = $_GET['msg'] ?? '';
 
+if (isset($_POST['save_feature_flags']) && !isMainAdmin()) AccessControl::deny();
+
 // --- Super Admin Actions ---
 if (isMainAdmin()) {
     if (isset($_POST['save_feature_flags'])) {
         $flags = $_POST['features'] ?? [];
-        FeatureFlags::saveConfig($flags);
+        if (!isset($_POST['access_csrf']) || !hash_equals($_SESSION['access_csrf'] ?? '', $_POST['access_csrf'])) AccessControl::deny();
+        if (!AccessControl::save($_POST['access_policy'] ?? [])) {
+            http_response_code(500);
+            die('ذخیرهٔ سیاست دسترسی ناموفق بود؛ تغییرات اعمال نشد.');
+        }
+        if (!FeatureFlags::saveConfig($flags)) { http_response_code(500); die('ذخیرهٔ وضعیت امکانات ناموفق بود.'); }
         redirect('admin.php?tab=feature_flags&msg=' . urlencode('وضعیت فعال و غیر فعال‌سازی امکانات سامانه با موفقیت ذخیره شد.'));
         exit;
     }
@@ -358,6 +365,7 @@ if ($project && !isset($_GET['tab'])) {
 
 // Redirect if it's a project admin but no permissions for tab
 if (!isSuperAdmin() && !hasPermission($tab) && !in_array($tab, [])) {
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') AccessControl::deny();
     // default to first allowed tab
     $allowed = ['dashboard', 'products', 'calendar', 'extract', 'settings', 'logs', 'analysis', 'sales_analysis', 'occasions', 'excel', 'website_export', 'users', 'users_performance', 'auto_admin', 'auto_admin_logs'];
     $found = false;
@@ -5525,6 +5533,7 @@ if ($project) {
         if (isset($_POST['billing_price'])) {
             $project['settings']['billing_price'] = (float)$_POST['billing_price'];
         }
+        if (isMainAdmin()) {
         if (isset($_POST['module_visibility']) && is_array($_POST['module_visibility'])) {
             $project['settings']['module_visibility'] = $_POST['module_visibility'];
             $activeList = [];
@@ -5538,6 +5547,8 @@ if ($project) {
             $project['settings']['active_modules'] = $_POST['active_modules'];
         } else if (isset($_POST['settings_category'])) {
             $project['settings']['active_modules'] = [];
+        }
+
         }
 
         // Parse and Save Unified Chat & Support Settings ("پاسخگویی")
@@ -6229,7 +6240,7 @@ if ($project) {
     }
 
     if (isset($_POST['add_user'])) {
-        if (!isSuperAdmin() && !isProjectAdmin()) {
+        if (!hasPermission('users')) {
             redirect('admin.php?tab=users&msg=دسترسی غیرمجاز');
             exit;
         }
@@ -6241,11 +6252,20 @@ if ($project) {
         $u_username = trim($_POST['username']);
         $u_password = $_POST['password'];
         $u_role = $_POST['role'];
+        if (!in_array($u_role, ['project_admin', 'manager', 'editor', 'viewer'], true)) AccessControl::deny();
         $u_mobile = $_POST['mobile'] ?? '';
         $u_telegram = $_POST['telegram_chat_id'] ?? '';
         $u_bale = $_POST['bale_chat_id'] ?? '';
         $u_perms = $_POST['perms'] ?? [];
+        if (!isMainAdmin() && !isProjectAdmin()) {
+            if ($u_role === 'project_admin') AccessControl::deny();
+            foreach ($u_perms as $permission) { if (!hasPermission($permission)) AccessControl::deny(); }
+        }
+
         
+        if (!isMainAdmin()) {
+            foreach ($assigned_pids as $assignedPid) { if ($assignedPid !== $project['id']) AccessControl::deny(); }
+        }
         $db = getDB();
         foreach ($db['projects'] as &$p) {
             if (!isset($p['users']) || !is_array($p['users'])) {
@@ -6271,6 +6291,7 @@ if ($project) {
                     'permissions' => $u_perms
                 ];
                 
+                if ($exists_idx !== -1 && !isMainAdmin() && !isProjectAdmin() && ($p['users'][$exists_idx]['role'] ?? '') === 'project_admin') AccessControl::deny();
                 if ($exists_idx !== -1) {
                     $p['users'][$exists_idx] = $user_data;
                 } else {
@@ -6300,20 +6321,27 @@ if ($project) {
     }
 
     if (isset($_POST['edit_user'])) {
-        if (!isSuperAdmin() && !isProjectAdmin()) {
+        if (!hasPermission('users')) {
             redirect('admin.php?tab=users&msg=دسترسی غیرمجاز');
             exit;
         }
         $uidx = (int)($_POST['user_idx'] ?? -1);
         if (isset($project['users'][$uidx])) {
+            if (!isMainAdmin() && !isProjectAdmin() && ($project['users'][$uidx]['role'] ?? '') === 'project_admin') AccessControl::deny();
             $orig_username = $project['users'][$uidx]['username'];
             
             $u_username = trim($_POST['username']);
             $u_role = $_POST['role'];
+            if (!in_array($u_role, ['project_admin', 'manager', 'editor', 'viewer'], true)) AccessControl::deny();
             $u_mobile = $_POST['mobile'] ?? '';
             $u_telegram = $_POST['telegram_chat_id'] ?? '';
             $u_bale = $_POST['bale_chat_id'] ?? '';
             $u_perms = $_POST['perms'] ?? [];
+            if (!isMainAdmin() && !isProjectAdmin()) {
+                if ($u_role === 'project_admin') AccessControl::deny();
+                foreach ($u_perms as $permission) { if (!hasPermission($permission)) AccessControl::deny(); }
+            }
+
             
             $u_password = $project['users'][$uidx]['password'];
             if (!empty($_POST['password'])) {
@@ -6325,8 +6353,13 @@ if ($project) {
                 $assigned_pids = [$project['id']];
             }
             
+            if (!isMainAdmin()) {
+                if ($u_username !== $orig_username) AccessControl::deny();
+                foreach ($assigned_pids as $assignedPid) { if ($assignedPid !== $project['id']) AccessControl::deny(); }
+            }
             $db = getDB();
             foreach ($db['projects'] as &$p) {
+                if (!isMainAdmin() && $p['id'] !== $project['id']) continue;
                 if (!isset($p['users']) || !is_array($p['users'])) {
                     $p['users'] = [];
                 }
@@ -6382,12 +6415,13 @@ if ($project) {
     }
 
     if (isset($_POST['delete_user'])) {
-        if (!isSuperAdmin() && !isProjectAdmin()) {
+        if (!hasPermission('users')) {
             redirect('admin.php?tab=users&msg=دسترسی غیرمجاز');
             exit;
         }
         $uidx = (int)($_POST['user_idx'] ?? -1);
         if (isset($project['users'][$uidx])) {
+            if (!isMainAdmin() && !isProjectAdmin() && ($project['users'][$uidx]['role'] ?? '') === 'project_admin') AccessControl::deny();
             unset($project['users'][$uidx]);
             $project['users'] = array_values($project['users']);
             saveProject($project);
@@ -7242,7 +7276,7 @@ $suggestions = getCalendarSuggestions($project);
                     <div class="nav-category-group mb-2">
                         <div class="px-3 mb-1.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">⚙️ مدیریت و دسترسی‌ها</div>
 
-                        <?php if(isModuleActive('users') && (isSuperAdmin() || isProjectAdmin())): ?>
+                        <?php if(isModuleActive('users') && hasPermission('users')): ?>
                             <?php if(isFeatureAvailable('users')): ?>
                             <a href="?tab=users" class="nav-link <?php echo $tab=='users'?'active':''; ?>"><span>🛡️</span> <span>دسترسی کاربران</span><?php echo getModuleVisibilityBadge('users', $project); ?></a>
                             <?php endif; ?>
@@ -14591,9 +14625,10 @@ $suggestions = getCalendarSuggestions($project);
                             <div class="space-y-3">
                                 <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">نقش سازمانی (Default Role)</label>
                                 <select name="role" class="select !bg-slate-50 !border-transparent">
+                                    <option value="manager">مدیر با دسترسی انتخابی</option>
                                     <option value="editor">ویرایشگر محتوا (Editor)</option>
                                     <option value="viewer">ناظر سیستم (Viewer)</option>
-                                    <option value="project_admin">مدیر فنی پروژه (Lead)</option>
+                                    <option value="project_admin">ادمین پروژه</option>
                                 </select>
                             </div>
                         </div>
@@ -19012,15 +19047,15 @@ export default function CampaignLanding() {
                                                         </div>
                                                         <div class="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200 shrink-0">
                                                             <label class="cursor-pointer text-[10px] font-bold px-2 py-1 rounded-lg transition-all flex items-center gap-1 hover:bg-emerald-50 text-emerald-700 has-[:checked]:bg-emerald-500 has-[:checked]:text-white shadow-xs">
-                                                                <input type="radio" name="module_visibility[<?php echo $mKey; ?>]" value="active" <?php echo $cur_vis === 'active' ? 'checked' : ''; ?> class="hidden edit-mod-radio" data-module="<?php echo $mKey; ?>">
+                                                                <input type="radio" name="module_visibility[<?php echo $mKey; ?>]" value="active" <?php echo $cur_vis === 'active' ? 'checked' : ''; ?> class="hidden edit-mod-radio" <?php echo !isMainAdmin() ? 'disabled' : ''; ?> data-module="<?php echo $mKey; ?>">
                                                                 <span>🟢 فعال</span>
                                                             </label>
                                                             <label class="cursor-pointer text-[10px] font-bold px-2 py-1 rounded-lg transition-all flex items-center gap-1 hover:bg-amber-50 text-amber-700 has-[:checked]:bg-amber-500 has-[:checked]:text-white shadow-xs">
-                                                                <input type="radio" name="module_visibility[<?php echo $mKey; ?>]" value="admin_only" <?php echo $cur_vis === 'admin_only' ? 'checked' : ''; ?> class="hidden edit-mod-radio" data-module="<?php echo $mKey; ?>">
+                                                                <input type="radio" name="module_visibility[<?php echo $mKey; ?>]" value="admin_only" <?php echo $cur_vis === 'admin_only' ? 'checked' : ''; ?> class="hidden edit-mod-radio" <?php echo !isMainAdmin() ? 'disabled' : ''; ?> data-module="<?php echo $mKey; ?>">
                                                                 <span>🟡 فقط ادمین</span>
                                                             </label>
                                                             <label class="cursor-pointer text-[10px] font-bold px-2 py-1 rounded-lg transition-all flex items-center gap-1 hover:bg-rose-50 text-rose-700 has-[:checked]:bg-rose-500 has-[:checked]:text-white shadow-xs">
-                                                                <input type="radio" name="module_visibility[<?php echo $mKey; ?>]" value="disabled" <?php echo $cur_vis === 'disabled' ? 'checked' : ''; ?> class="hidden edit-mod-radio" data-module="<?php echo $mKey; ?>">
+                                                                <input type="radio" name="module_visibility[<?php echo $mKey; ?>]" value="disabled" <?php echo $cur_vis === 'disabled' ? 'checked' : ''; ?> class="hidden edit-mod-radio" <?php echo !isMainAdmin() ? 'disabled' : ''; ?> data-module="<?php echo $mKey; ?>">
                                                                 <span>🔴 غیرفعال</span>
                                                             </label>
                                                         </div>
@@ -21767,9 +21802,10 @@ async function handleRequest(request) {
                     <div>
                         <label class="label text-[10px] font-black text-slate-500 mb-1 block">نقش کاربر</label>
                         <select name="role" id="edit-user-role" class="select text-xs">
-                            <option value="editor">ویرایشگر محتوا (Editor)</option>
+                            <option value="manager">مدیر با دسترسی انتخابی</option>
+                                    <option value="editor">ویرایشگر محتوا (Editor)</option>
                             <option value="viewer">ناظر سیستم (Viewer)</option>
-                            <option value="project_admin">مدیر فنی پروژه (Lead)</option>
+                            <option value="project_admin">ادمین پروژه</option>
                         </select>
                     </div>
                 </div>
