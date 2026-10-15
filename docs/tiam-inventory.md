@@ -68,3 +68,8 @@ TLS در HTTPS و SQL فعال است. گواهی SQL باید مورد اعتم
 کنار خروجی، دکمهٔ «کپی لاگ» متن همان خروجی را در Clipboard قرار می‌دهد. اگر مرورگر اجازهٔ Clipboard ندهد، یک فیلد فقط‌خواندنی با متن انتخاب‌شده برای Ctrl+C یا کپی دستگاه نمایش داده می‌شود. این دکمه فقط لاگ را کپی می‌کند و تنظیمات اتصال و رمزها را به خروجی اضافه نمی‌کند.
 
 اعتبارسنجی این تغییر: ۳۶ بررسی PHP، ۹ تست Python، جریان HTTP قبلی پیش‌نمایش/تأیید/زمان‌بندی، و تست مرورگر برای ذخیرهٔ حالت شبکهٔ فعلی، پنهان‌سازی فیلدهای مدیریت VPN، ارسال‌نشدن مشخصات VPN به ایجنت، کپی دقیق لاگ و مسیر کپی دستی. تست مستقیم Python بررسی می‌کند که مسیر فعلی بدون اجرای هیچ subprocess مربوط به VPN به مرحلهٔ SQL می‌رسد. این‌ها جای اتصال واقعی به سرور SQL پروژه را نمی‌گیرند.
+
+
+## SQL compatibility mode (explicit project setting)
+
+Under «امنیت اتصال SQL», select «بدون الزام رمزگذاری و بدون بررسی گواهی» and save to enable `sql_security=compatibility` for that project. The updated agent uses ODBC `Encrypt=no;TrustServerCertificate=yes` and omits `HostNameInCertificate` in this mode. Verified TLS is still the default for new configurations; invalid mode values are rejected. Changing the mode changes the connection fingerprint and requires a fresh approved preview before daily synchronization. This SQL setting does not change HTTPS authentication with the panel or the selected system-network/VPN mode. Client-side optional encryption does not override encryption enforced by SQL Server. Update the downloaded Python agent before use.

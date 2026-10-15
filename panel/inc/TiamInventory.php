@@ -25,6 +25,8 @@ class TiamInventory {
     }
     public static function config($old, $input) {
         $cfg = $old;
+        $cfg['sql_security'] = $input['sql_security'] ?? ($old['sql_security'] ?? 'verified');
+        if (!in_array($cfg['sql_security'], ['verified','compatibility'], true)) throw new RuntimeException('حالت امنیت اتصال SQL معتبر نیست.');
         foreach (['host', 'database', 'schema', 'view', 'username', 'vpn_server', 'vpn_username', 'vpn_service', 'certificate_hostname'] as $key) $cfg[$key] = trim((string)($input[$key] ?? $old[$key] ?? ''));
         foreach (['password', 'vpn_password', 'vpn_secret'] as $key) if (!empty($input[$key])) $cfg[$key] = (string)$input[$key];
         $cfg['port'] = (int)($input['port'] ?? 1433);

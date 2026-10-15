@@ -90,11 +90,15 @@ try {
 
 def read_view(cfg, sample=False):
     import pyodbc
+    security = cfg.get('sql_security', 'verified')
+    if security not in ('verified', 'compatibility'):
+        raise ValueError('INVALID_SQL_SECURITY_MODE')
+    compatibility = security == 'compatibility'
     target = identifier(cfg.get('schema', 'dbo')) + '.' + identifier(cfg['view'])
     attrs = {'DRIVER': 'ODBC Driver 18 for SQL Server', 'SERVER': str(cfg['host']) + ',' + str(int(cfg.get('port', 1433))),
              'DATABASE': cfg['database'], 'UID': cfg['username'], 'PWD': cfg['password'],
-             'Encrypt': 'yes', 'TrustServerCertificate': 'no', 'APP': 'MaarkshoTiamInventory'}
-    if cfg.get('certificate_hostname'):
+             'Encrypt': 'no' if compatibility else 'yes', 'TrustServerCertificate': 'yes' if compatibility else 'no', 'APP': 'MaarkshoTiamInventory'}
+    if not compatibility and cfg.get('certificate_hostname'):
         attrs['HostNameInCertificate'] = cfg['certificate_hostname']
     dsn = ';'.join(k + '=' + dsn_value(v) for k, v in attrs.items())
     with pyodbc.connect(dsn, timeout=15, autocommit=True) as conn:
@@ -140,7 +144,7 @@ def execute_job(job, project):
         if job['kind'] == 'vpn_test':
             return {'success': True, 'logs': logs, 'rows': [], 'columns': []}
         columns, rows = stage(logs, 'sql_view', lambda: read_view(cfg, job['kind'] == 'view_test'),
-                              'Encrypted SQL authentication and view SELECT completed')
+                              'SQL authentication and view SELECT completed (security mode: ' + cfg.get('sql_security', 'verified') + ')')
         logs.append({'stage': 'schema', 'status': 'success', 'message': str(len(columns)) + ' columns; ' + str(len(rows)) + ' rows received', 'elapsed_ms': 0})
         return {'success': True, 'logs': logs, 'columns': columns, 'rows': rows}
     except Exception:

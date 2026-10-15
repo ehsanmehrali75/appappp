@@ -21,3 +21,8 @@ if($parsed['Data Source'] -ne 'tcp:192.0.2.1,1433') { throw 'SQL data source mus
 if($parsed['Initial Catalog'] -ne 'Example;DB') { throw 'Database values must remain escaped, not interpreted as connection options' }
 if(-not $parsed['Encrypt'] -or $parsed['TrustServerCertificate']) { throw 'TLS certificate verification must remain enabled' }
 Write-Host 'Three real SqlClient connection-string regression checks passed; no SQL server contacted'
+
+$compat=New-DiagnosticConnectionString -Server '192.0.2.1' -Port 1433 -Database 'ExampleDB' -AllowInsecureConnection
+$parsedCompat=[System.Data.SqlClient.SqlConnectionStringBuilder]::new($compat)
+if($parsedCompat['Encrypt'] -or -not $parsedCompat['TrustServerCertificate']) { throw 'Explicit compatibility mode must disable required encryption and certificate verification' }
+Write-Host 'Explicit SQL compatibility mode passed'

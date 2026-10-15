@@ -61,4 +61,8 @@ $next=TiamInventory::createJob($queueProject,'preview','owner-a');check($next['i
 $manual=$input;$manual['vpn_enabled']='0';$manual['vpn_secret']='existing-secret';
 $manualCfg=TiamInventory::config([],$manual);check($manualCfg['vpn_enabled']===false,'existing-network selection is a real boolean false');
 $managed=$manual;$managed['vpn_enabled']='1';check(TiamInventory::config($manualCfg,$managed)['vpn_enabled']===true,'managed VPN remains opt-in');
+$compat=$input;$compat['sql_security']='compatibility';$compatCfg=TiamInventory::config($cfg,$compat);
+check($compatCfg['sql_security']==='compatibility','explicit SQL compatibility mode saved');
+check(TiamInventory::fingerprint($compatCfg)!==TiamInventory::fingerprint($cfg),'security change changes connection fingerprint');
+$compat['sql_security']='invalid';rejects(fn()=>TiamInventory::config($cfg,$compat),'invalid security mode rejected');
 echo "$count Tiam inventory checks passed\n";

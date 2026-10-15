@@ -17,6 +17,13 @@ $inventoryCfg = $project['settings']['tiam_inventory'] ?? [];
         </label>
     <?php endforeach; ?>
     </div>
+    <label class="text-xs font-bold">امنیت اتصال SQL
+        <select data-tiam-field="sql_security" class="input text-xs mt-1">
+            <option value="verified" <?php echo ($inventoryCfg['sql_security']??'verified')==='verified'?'selected':''; ?>>اتصال رمزگذاری‌شده با بررسی گواهی</option>
+            <option value="compatibility" <?php echo ($inventoryCfg['sql_security']??'verified')==='compatibility'?'selected':''; ?>>بدون الزام رمزگذاری و بدون بررسی گواهی — شبکهٔ مورد اعتماد</option>
+        </select>
+    </label>
+    <p class="text-xs">حالت سازگاری، رمزگذاری SQL را الزامی نمی‌کند و گواهی سرور را بررسی نمی‌کند. اگر سرور رمزگذاری را اجباری کند، اتصال رمزگذاری می‌شود.</p>
     <label class="text-xs font-bold">روش دسترسی به SQL Server
         <select data-tiam-field="vpn_enabled" id="tiam-network-mode" class="input text-xs mt-1" onchange="tiamUpdateNetworkMode()">
             <option value="0" <?php echo empty($inventoryCfg['vpn_enabled'])?'selected':''; ?>>استفاده از شبکه / VPN فعلی سیستم — بدون تغییر اتصال</option>

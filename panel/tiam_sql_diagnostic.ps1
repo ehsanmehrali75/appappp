@@ -8,14 +8,16 @@ param(
     [ValidatePattern('^[\p{L}_][\p{L}\p{N}_ ]{0,127}$')][string]$Schema = 'dbo',
     [ValidatePattern('^[\p{L}_][\p{L}\p{N}_ ]{0,127}$')][string]$View = 'Factinventory',
     [switch]$IncludeSample,
+    [switch]$AllowInsecureConnection,
     [string]$OutputPath = (Join-Path (Get-Location) ('tiam-sql-report-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.json'))
 )
 $ErrorActionPreference = 'Stop'
 $report = [ordered]@{
-    diagnostic_version = 2
+    diagnostic_version = 3
     generated_at = [DateTimeOffset]::Now.ToString('o')
     server = $Server; port = $Port; database = $Database; schema = $Schema; object = $View
     network_mode = 'existing_system_network'; vpn_changed = $false
+    sql_security = $(if ($AllowInsecureConnection) { 'compatibility' } else { 'verified' })
     sample_requested = [bool]$IncludeSample
     success = $false; stages = @(); visible_objects = @(); columns = @(); sample = @()
 }
@@ -30,13 +32,13 @@ function Convert-SampleValue($value) {
     return $value
 }
 function New-DiagnosticConnectionString {
-    param([string]$Server,[int]$Port,[string]$Database)
+    param([string]$Server,[int]$Port,[string]$Database,[switch]$AllowInsecureConnection)
     $builder = [System.Data.SqlClient.SqlConnectionStringBuilder]::new()
     # PowerShell adapts this IDictionary: use SQL keywords, not CLR property names.
     $builder['Data Source'] = 'tcp:' + $Server + ',' + $Port
     $builder['Initial Catalog'] = $Database
-    $builder['Encrypt'] = $true
-    $builder['TrustServerCertificate'] = $false
+    $builder['Encrypt'] = -not [bool]$AllowInsecureConnection
+    $builder['TrustServerCertificate'] = [bool]$AllowInsecureConnection
     $builder['Connect Timeout'] = 15
     $builder['Application Name'] = 'MaarkshoReadOnlyDiagnostic'
     return $builder.ConnectionString
@@ -59,13 +61,13 @@ try {
     $password = Read-Host 'SQL password' -AsSecureString
     $password.MakeReadOnly()
     $stage = 'sql_parameters'
-    $connectionString = New-DiagnosticConnectionString -Server $Server -Port $Port -Database $Database
+    $connectionString = New-DiagnosticConnectionString -Server $Server -Port $Port -Database $Database -AllowInsecureConnection:$AllowInsecureConnection
     $stage = 'sql_credentials'
     $connection = [System.Data.SqlClient.SqlConnection]::new($connectionString)
     $connection.Credential = [System.Data.SqlClient.SqlCredential]::new($Username,$password)
     $stage = 'sql_connection'
     $connection.Open()
-    $report.stages += @{stage=$stage;status='success';message='Encrypted SQL connection and login verified'}
+    $report.stages += @{stage=$stage;status='success';message=('SQL login verified; requested security mode: ' + $report.sql_security)}
     $stage = 'object_catalog'
     $command = $connection.CreateCommand(); $command.CommandTimeout = 30
     # SQL Server metadata visibility limits this list to objects visible to this login.

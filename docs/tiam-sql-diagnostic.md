@@ -16,8 +16,17 @@ A timestamped `tiam-sql-report-*.json` file is saved in the current folder even 
 
 If a few actual sample rows are needed and may be shared, explicitly add `-IncludeSample`. This reads at most five rows, omits binary content and truncates long strings to 200 characters. Review that report before sharing it. Each sample property is prefixed with its column ordinal to preserve duplicate names; actual names are also in `columns`.
 
-TLS verification remains enabled. For certificate errors, use a reachable SQL hostname matching the server certificate and the trusted issuing CA on Windows; the tool does not bypass trust verification.
+By default TLS verification remains enabled. For certificate errors in verified mode, use a reachable SQL hostname matching the server certificate and the trusted issuing CA on Windows; the default verified mode does not bypass trust verification.
 
 Validation in this task: PowerShell 7 parser, five value-conversion checks, expected structured rejection on Linux, and PHP syntax for the download link. A Windows PowerShell 5.1/SQL Server connection cannot be exercised from this Linux environment or establish connectivity to a private `192.168.*` server. Run the tool on the user's Windows machine and inspect the actual report before changing production mappings. Tests: `pwsh -NoProfile -File tests/sql_diagnostic.ps1`.
 
 Version 2 fixes a reproduced PowerShell IDictionary adapter issue: `$builder.DataSource = ...` was interpreted as an unsupported connection-string key and threw `ArgumentException` before `Open()`. The builder now uses canonical SQL keywords (`Data Source`, `Initial Catalog`, etc.) through indexers. Real SqlClient regression checks verify the endpoint, escaped database values, encryption and certificate validation without contacting SQL. Failure stages distinguish `sql_parameters`, `sql_credentials` and the actual `sql_connection`. A version 1 report with TCP success and this ArgumentException does not establish a SQL authentication failure; rerun the version 2 script before diagnosing credentials or certificates.
+
+
+Version 3 adds an explicit user-selected SQL compatibility mode:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tiam_sql_diagnostic.ps1 -AllowInsecureConnection
+```
+
+It sets `Encrypt=False;TrustServerCertificate=True` for this SQL connection. Encryption is not required by the client and the server certificate is not verified. If SQL Server forces encryption, traffic may still be encrypted. The JSON identifies the requested mode as `compatibility`; it does not claim to report the negotiated cipher. No Windows CA store or global setting is changed. The application's SQL agent has the matching per-project `sql_security=compatibility` option. Download the new Python agent as well before testing this option in the panel; older agents always request verified TLS.

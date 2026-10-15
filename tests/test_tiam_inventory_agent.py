@@ -90,6 +90,17 @@ class AgentTests(unittest.TestCase):
         self.assertIn('TrustServerCertificate={no}', calls['dsn'])
         self.assertEqual(rows[1]['Qty'], 0)
         self.assertEqual(columns, ['Code', 'Qty'])
+        cfg['sql_security']='compatibility'
+        cfg['certificate_hostname']='unused.example'
+        with patch.dict(sys.modules, {'pyodbc': types.SimpleNamespace(connect=connect)}):
+            agent.read_view(cfg,True)
+        self.assertIn('Encrypt={no}',calls['dsn'])
+        self.assertIn('TrustServerCertificate={yes}',calls['dsn'])
+        self.assertNotIn('HostNameInCertificate',calls['dsn'])
+        cfg['sql_security']='invalid'
+        with patch.dict(sys.modules, {'pyodbc': types.SimpleNamespace(connect=connect)}), self.assertRaises(ValueError):
+            agent.read_view(cfg,True)
+
 
     def test_linux_service_names_are_restricted(self):
         if agent.os.name == 'nt': self.skipTest('Linux only')
