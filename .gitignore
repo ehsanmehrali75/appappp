@@ -4,3 +4,5 @@
 /panel/db/system_admins.php.lock
 __pycache__/
 *.pyc
+
+/panel/db/owner-recovery-key.php
