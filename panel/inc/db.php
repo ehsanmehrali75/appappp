@@ -481,7 +481,8 @@ function db_get_all() {
             'stage1_decision' => 'VARCHAR(50) DEFAULT "pending"',
             'stage2_decision' => 'VARCHAR(50) DEFAULT "pending"',
             'size_chart_uploaded' => 'TINYINT DEFAULT 0',
-            'size_chart_uploaded_at' => 'VARCHAR(50) DEFAULT NULL'
+            'size_chart_uploaded_at' => 'VARCHAR(50) DEFAULT NULL',
+            'website_sync' => 'TEXT'
         ];
         foreach($cols as $col => $type) {
             $check = $conn->query("SHOW COLUMNS FROM products LIKE '$col'");
@@ -632,7 +633,7 @@ function db_save_project($project, $onlyProducts = null, $onlySchedules = null) 
                 $productsToSave = $onlyProducts !== null ? $onlyProducts : ($project['products'] ?? []);
                 
                 if (!empty($productsToSave)) {
-                    $stmt = $conn->prepare("REPLACE INTO products (id, project_id, sku, name, description, image, social_image, gallery, link, price, extracted_at, manual_edit, likes, dislikes, user_votes, user_feedback, platforms_sent, status, color, stock_online, stock_total, sizes, size_chart, size_chart_template_id, priority, utm_source, utm_medium, utm_campaign, variants, uploaded_to_site, uploaded_by, is_manual_image, approvals_stage1, approvals_stage2, rejection_reason, rejection_by, rejection_side, rejections_history, content_gen_requested, publish_priority, reference_gallery, images_list, warehouses_stock, warehouse_details, model_code, stage1_decision, stage2_decision, size_chart_uploaded, size_chart_uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt = $conn->prepare("REPLACE INTO products (id, project_id, sku, name, description, image, social_image, gallery, link, price, extracted_at, manual_edit, likes, dislikes, user_votes, user_feedback, platforms_sent, status, color, stock_online, stock_total, sizes, size_chart, size_chart_template_id, priority, utm_source, utm_medium, utm_campaign, variants, uploaded_to_site, uploaded_by, is_manual_image, approvals_stage1, approvals_stage2, rejection_reason, rejection_by, rejection_side, rejections_history, content_gen_requested, publish_priority, reference_gallery, images_list, warehouses_stock, warehouse_details, model_code, stage1_decision, stage2_decision, size_chart_uploaded, size_chart_uploaded_at, website_sync) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                     if ($stmt) {
                         foreach ($productsToSave as $p) {
                             if (!is_array($p)) continue;
@@ -716,8 +717,9 @@ function db_save_project($project, $onlyProducts = null, $onlySchedules = null) 
                             $p_stage2_decision = (string)($p['stage2_decision'] ?? 'pending');
                             $p_size_chart_uploaded = (int)(!empty($p['size_chart_uploaded']) ? 1 : 0);
                             $p_size_chart_uploaded_at = (string)($p['size_chart_uploaded_at'] ?? '');
+                            $p_website_sync = json_encode($p['website_sync'] ?? (object)[], JSON_UNESCAPED_UNICODE);
                             
-                            $stmt->bind_param("ssssssssssiiiissssssssssissssisissssssiisssssssis", 
+                            $stmt->bind_param("ssssssssssiiiissssssssssissssisissssssiisssssssiss",
                                 $p_id, $p_project_id, $p_sku, $p_name, $p_desc, $p_image, $p_social, $gallery, $p_link, 
                                 $p_price, $extracted, $manual, $likes, $dislikes, 
                                 $votes, $feedback, $sent, $p_status, $p_color, $p_stock, $p_stock_t, $sizes, $p_chart, $p_chart_template_id, $p_priority,
@@ -726,7 +728,7 @@ function db_save_project($project, $onlyProducts = null, $onlySchedules = null) 
                                 $p_content_gen_requested, $p_publish_priority, $p_reference_gallery, $p_images_list,
                                 $p_warehouses_stock, $p_warehouse_details, $p_model_code,
                                 $p_stage1_decision, $p_stage2_decision,
-                                $p_size_chart_uploaded, $p_size_chart_uploaded_at
+                                $p_size_chart_uploaded, $p_size_chart_uploaded_at, $p_website_sync
                             );
                             $stmt->execute();
                         }

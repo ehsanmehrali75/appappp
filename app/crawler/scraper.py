@@ -261,7 +261,7 @@ def product_links(html, base_url):
 def category_urls(url, total):
     parsed = urlparse(url)
     query = parse_qs(parsed.query, keep_blank_values=True)
-    for key, value in (('perpage', '24'), ('sortby', '1'), ('stock', '1')):
+    for key, value in (('perpage', '24'), ('sortby', '1')):
         query.setdefault(key, [value])
     pages = []
     for number in range(1, total + 1):

@@ -499,6 +499,43 @@ if ($project && isset($_POST['ajax_action'])) {
     header('Content-Type: application/json');
     $action = $_POST['ajax_action'];
 
+    if (in_array($action, ['website_catalog_preview','website_catalog_apply','website_catalog_resolve'], true)) {
+        if (!hasPermission('products')) { http_response_code(403); echo json_encode(['status'=>'failed','msg'=>'دسترسی ویرایش محصولات مجاز نیست.']); exit; }
+        if (!isset($_POST['csrf']) || !hash_equals($_SESSION['website_catalog_csrf'] ?? '', (string)$_POST['csrf'])) { http_response_code(403); echo json_encode(['status'=>'failed','msg'=>'نشست معتبر نیست؛ صفحه را تازه کنید.']); exit; }
+        $websiteLock = null;
+        try {
+            $lockDir = sys_get_temp_dir().'/maarksho-website-'.substr(hash('sha256',__DIR__),0,16);
+            if (!is_dir($lockDir) && !mkdir($lockDir,0700,true) && !is_dir($lockDir)) throw new RuntimeException('آماده‌سازی قفل همگام‌سازی ناموفق بود.');
+            $websiteLock = fopen($lockDir.'/'.hash('sha256',(string)$project['id']).'.lock','c');
+            if (!$websiteLock || !flock($websiteLock,LOCK_EX)) throw new RuntimeException('قفل همگام‌سازی پروژه در دسترس نیست.');
+            $freshProject = getCurrentProject($project['id'], true);
+            if (!$freshProject) throw new RuntimeException('پروژه یافت نشد.');
+            if ($action === 'website_catalog_preview') {
+                if (strlen($_POST['data'] ?? '') > 5*1024*1024) throw new RuntimeException('حداکثر اندازهٔ JSON پنج مگابایت است.');
+                $rows = json_decode($_POST['data'] ?? '', true);
+                $options = ['complete'=>($_POST['complete']??'')==='1','update_price'=>($_POST['update_price']??'1')==='1','update_stock'=>($_POST['update_stock']??'1')==='1','price_unit'=>$_POST['price_unit']??'auto'];
+                $result = WebsiteCatalogSync::reconcile($freshProject,$rows,$options);
+                $token = bin2hex(random_bytes(24));
+                $_SESSION['website_catalog_preview'] = ['token'=>$token,'project'=>$project['id'],'expires'=>time()+900,'base'=>WebsiteCatalogSync::fingerprint($freshProject),'rows'=>$rows,'options'=>$options];
+                echo json_encode(['status'=>'preview','token'=>$token,'counts'=>$result['counts'],'changes'=>array_slice($result['changes'],0,100),'warnings'=>$result['warnings']],JSON_UNESCAPED_UNICODE);
+            } elseif ($action === 'website_catalog_apply') {
+                $pending = $_SESSION['website_catalog_preview'] ?? [];
+                if (($pending['project']??'') !== $project['id'] || ($pending['expires']??0)<time() || !hash_equals($pending['token']??'', (string)($_POST['token']??''))) throw new RuntimeException('پیش‌نمایش منقضی یا متعلق به پروژهٔ دیگری است.');
+                if (!hash_equals($pending['base'],WebsiteCatalogSync::fingerprint($freshProject))) throw new RuntimeException('داده‌های پروژه بعد از پیش‌نمایش تغییر کرده؛ دوباره پیش‌نمایش بگیرید.');
+                $result = WebsiteCatalogSync::reconcile($freshProject,$pending['rows'],$pending['options']);
+                if (!saveProject($result['project'])) throw new RuntimeException('ذخیرهٔ پروژه ناموفق بود.');
+                unset($_SESSION['website_catalog_preview']);
+                echo json_encode(['status'=>'success','counts'=>$result['counts'],'msg'=>'اطلاعات محصولات موجود تکمیل شد؛ محصول جدیدی ساخته نشد.'],JSON_UNESCAPED_UNICODE);
+            } else {
+                WebsiteCatalogSync::resolve($freshProject, (string)($_POST['product_id']??''), $_SESSION['user']['username']??'');
+                if (!saveProject($freshProject)) throw new RuntimeException('ذخیرهٔ رفع نقص ناموفق بود.');
+                echo json_encode(['status'=>'success','msg'=>'رفع نقص انتشار با نام شما ثبت شد.'],JSON_UNESCAPED_UNICODE);
+            }
+        } catch (Throwable $error) { http_response_code(400); echo json_encode(['status'=>'failed','msg'=>$error instanceof RuntimeException ? $error->getMessage() : 'ساختار داده معتبر نیست.'],JSON_UNESCAPED_UNICODE); }
+        finally { if (is_resource($websiteLock)) {flock($websiteLock,LOCK_UN);fclose($websiteLock);} }
+        exit;
+    }
+
     // --- LANDING PAGE BUILDER AJAX ACTIONS ---
     if ($action === 'landing_save') {
         $landings_json = $_POST['landings_json'] ?? '[]';
@@ -3719,6 +3756,12 @@ $sections_json
             exit();
         }
 
+        if (WebsiteCatalogSync::looksLikeWebsite($items)) {
+            http_response_code(400);
+            echo json_encode(['status'=>'failed','msg'=>'خروجی سایت فقط از بخش «تکمیل اطلاعات از سایت» با پیش‌نمایش وارد می‌شود؛ محصول جدیدی ایجاد نشد.'],JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         $isBackup = false;
         $productsToImport = [];
         $schedulesToImport = [];
@@ -3844,6 +3887,7 @@ $sections_json
                     'has_image' => isset($imp['has_image']) ? (bool)$imp['has_image'] : (!empty($imp['image']) && strpos($imp['image'], 'placehold') === false),
                     'media_status' => (string)($imp['media_status'] ?? $imp['mediaStatus'] ?? 'missing'),
                     'images_list' => is_array($imp['images_list'] ?? null) ? $imp['images_list'] : (is_array($imp['images'] ?? null) ? $imp['images'] : []),
+                    'website_sync' => is_array($imp['website_sync'] ?? null) ? $imp['website_sync'] : [],
                     'reference_gallery' => is_array($imp['reference_gallery'] ?? null) ? $imp['reference_gallery'] : (json_decode($imp['reference_gallery'] ?? '[]', true) ?: [])
                 ];
 
@@ -9356,6 +9400,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                 </div>
             <?php endif; // closes 1680 ?>
 
+            <?php if ($tab === 'website_export') require __DIR__.'/inc/WebsiteCatalogView.php'; ?>
             <?php if ($tab === 'website_export'): 
                 $rawProds = $project['products'] ?? [];
                 $allProds = [];
@@ -9539,7 +9584,8 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     
                     // Tab 3: Has size chart defect or manual size chart requested
                     $hasSizeChart = !empty($p['size_chart']) && strpos($p['size_chart'], 'placehold') === false;
-                    $isSizeChartIncomplete = !empty($p['size_chart_incomplete']);
+                    $websiteQueue = WebsiteCatalogSync::state($project,$p);
+                    $isSizeChartIncomplete = !empty($p['size_chart_incomplete']) || $websiteQueue['needs_size_chart'] || $websiteQueue['size_chart_upload_pending'];
                     $isManualSizeChartRequested = !empty($p['manual_size_chart_requested']);
                     if ($isSizeChartIncomplete || $isManualSizeChartRequested) {
                         $tab3Prods[] = $p;
@@ -9689,7 +9735,8 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                     $qualifiesForTab2 = $hasManualPhoto && !$isUploaded && $isActive;
                                     
                                     $hasSizeChart = !empty($p['size_chart']) && strpos($p['size_chart'], 'placehold') === false;
-                                    $isSizeChartIncomplete = !empty($p['size_chart_incomplete']);
+                                    $websiteQueue = WebsiteCatalogSync::state($project,$p);
+                    $isSizeChartIncomplete = !empty($p['size_chart_incomplete']) || $websiteQueue['needs_size_chart'] || $websiteQueue['size_chart_upload_pending'];
                                     $isManualSizeChartRequested = !empty($p['manual_size_chart_requested']);
                                     $qualifiesForTab3 = ($isSizeChartIncomplete || $isManualSizeChartRequested);
                                     
@@ -10560,6 +10607,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
             <?php endif; ?>
 
             <?php if ($tab === 'extract'): ?>
+                <?php require __DIR__.'/inc/WebsiteCatalogView.php'; ?>
                 <?php $ext_platform = $project['settings']['platform_type'] ?? 'wordpress'; ?>
                 <div class="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
                     <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -11318,6 +11366,12 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             }
                         }
                         
+                        if (isJsonMode && rows.some(r => r && r.url && r.product_code && !r.ProCode && !r._erp_contract)) {
+                            contractErrorBox.textContent='این JSON خروجی سایت است؛ فقط از بخش «تکمیل اطلاعات و تطبیق با سایت» با پیش‌نمایش ثبت می‌شود. هیچ محصول یا موجودی پیش‌فرضی ساخته نشد.';
+                            contractErrorBox.hidden=false;
+                            if (rows.every(r => r && r.url && r.product_code && !r.ProCode && !r._erp_contract) && typeof window.websiteCatalogLoad === 'function') window.websiteCatalogLoad(rows);
+                            return;
+                        }
                         const parsedData = [];
                         let grandStock = 0;
                         const uniqueProducts = new Set();
@@ -11699,6 +11753,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                     reader.onload = function(e) {
                                         try {
                                             const data = JSON.parse(e.target.result);
+                                            if (Array.isArray(data) && data.length && data.every(row => row.url && row.product_code && !row._erp_contract && !row.ProCode)) { websiteCatalogLoad(data); document.getElementById('website-catalog-panel').scrollIntoView({block:'start'}); return; }
                                             showFullLoader('درحال تحلیل و واردسازی هوشمند محصولات...');
                                             
                                             fetch('admin.php', {

@@ -34,6 +34,7 @@ require_once __DIR__ . '/MarkShowCore.php';
 require_once __DIR__ . '/TiamVpnManager.php';
 require_once __DIR__ . '/TiamConnector.php';
 require_once __DIR__ . '/TiamInventory.php';
+require_once __DIR__ . '/WebsiteCatalogSync.php';
 
 // بررسی پیش‌نیازها و وضعیت اکستنشن‌ها
 define('HAS_CURL_EXTENSION', extension_loaded('curl') && function_exists('curl_init'));
@@ -560,7 +561,7 @@ function getCurrentProject($id = null, $forceReload = false) {
         $cache_enabled = !empty($cache_config['enabled']);
         $cache_ttl = isset($cache_config['ttl']) ? (int)$cache_config['ttl'] : 600;
 
-        if ($cache_enabled) {
+        if ($cache_enabled && !$forceReload) {
             $cached_project = MaarkshoCache::get('project_full_' . $id, $cache_ttl);
             if ($cached_project && is_array($cached_project)) {
                 $GLOBALS['LAST_LOADED_PROJECT'] = $cached_project;
@@ -666,7 +667,8 @@ function getCurrentProject($id = null, $forceReload = false) {
                         'reference_gallery' => json_decode($pRow['reference_gallery'] ?? '[]', true) ?: [],
                         'images_list' => json_decode($pRow['images_list'] ?? '[]', true) ?: [],
                         'size_chart_uploaded' => !empty($pRow['size_chart_uploaded']),
-                        'size_chart_uploaded_at' => $pRow['size_chart_uploaded_at'] ?? null
+                        'size_chart_uploaded_at' => $pRow['size_chart_uploaded_at'] ?? null,
+                        'website_sync' => json_decode($pRow['website_sync'] ?? '{}', true) ?: []
                     ];
                 }
             }
@@ -4840,6 +4842,11 @@ function extractSportlandModelKey($text, $customBrands = []) {
  * پشتیبانی از روش ۱ (استاندارد) و روش ۲ (اسپورت لند با تطابق مدل انگلیسی و تجمیع انبارها)
  */
 function processAndSyncProducts(&$project, $incomingItems, $source = 'json', $erpMode = 'standard') {
+    if ($source === 'json' && WebsiteCatalogSync::looksLikeWebsite($incomingItems)) {
+        $result = WebsiteCatalogSync::reconcile($project, $incomingItems);
+        $project = $result['project'];
+        return ['new'=>0, 'updated'=>$result['counts']['matched'], 'products'=>$project['products']];
+    }
     $contractCount=count(array_filter($incomingItems,static fn($row)=>is_array($row)&&($row['_erp_contract']??'')===ERPInventoryContract::VERSION));
     if($contractCount && $contractCount!==count($incomingItems))throw new RuntimeException('ردیف‌های ERP نسخه‌دار و دادهٔ قدیمی را در یک فایل مخلوط نکنید.');
     if ($incomingItems && $contractCount===count($incomingItems)) {
