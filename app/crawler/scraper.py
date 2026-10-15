@@ -14,7 +14,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse
 
 from bs4 import BeautifulSoup
-from playwright.async_api import async_playwright
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError, async_playwright
 
 OUTPUT = 'output/products.json'
 CHROME_PATHS = [
@@ -27,7 +27,7 @@ SELECTORS = {
     'name': 'h1.product-name', 'price': '#sale-price',
     'sizes': 'a[name="size-variant"]', 'color': '#coloe-des',
     'category': '.breadcrumb a', 'description': '#product-tab-description',
-    'size_guide': '#a-size-guide',
+    'size_guide': '#a-size-guide, .container-sizeguide a[data-link]',
     'gallery': '#dv-product-gallery-main .product-single-carousel img',
 }
 
@@ -325,7 +325,10 @@ def parse_html(html, url, fields):
             data[field] = element.get_text(' ', strip=True) if element else ''
         elif field == 'size_guide':
             element = soup.select_one(selector)
-            data[field] = element.get('data-link') if element else None
+            source = (element.get('data-link') or '').strip() if element else ''
+            resolved = urljoin(url, source) if source and not source.startswith('#') else ''
+            parsed = urlparse(resolved)
+            data[field] = resolved if parsed.scheme in ('http', 'https') and parsed.netloc else None
         elif field == 'gallery':
             gallery = []
             for image in soup.select(selector):
@@ -337,25 +340,45 @@ def parse_html(html, url, fields):
     return data
 
 
-async def parse_product_page(page, url, fields, controller, log, timeout_ms, dynamic_wait_ms):
+async def parse_product_page(page, url, fields, controller, log, timeout_ms, dynamic_wait_ms,
+                             size_guide_wait_ms=5000):
     await navigate(page, url, 'h1.product-name, #product-code', controller, log, timeout_ms)
     await page.wait_for_function(
         "() => ['h1.product-name','#product-code'].some(s => document.querySelector(s)?.textContent.trim())",
         timeout=timeout_ms,
     )
-    # One bounded grace period for optional JS fields, rather than waiting for
-    # every background request or imposing one fixed delay per field/product.
-    if dynamic_wait_ms:
-        selectors = [SELECTORS[field] for field in fields]
+    # Optional fields share bounded waits. Size-guide links are populated by a
+    # later request on this site: wait for their URL, not just an empty anchor.
+    # Both waits start together, so unrelated missing fields do not add delays.
+    async def wait_optional_fields():
+        selectors = [SELECTORS[field] for field in fields if field != 'size_guide']
+        if not dynamic_wait_ms or not selectors:
+            return
         try:
             await page.wait_for_function(
                 'selectors => selectors.every(s => document.querySelector(s))',
                 arg=selectors, timeout=dynamic_wait_ms,
             )
-        except Exception as error:
-            from playwright.async_api import TimeoutError as PlaywrightTimeoutError
-            if not isinstance(error, PlaywrightTimeoutError):
-                raise
+        except PlaywrightTimeoutError:
+            pass
+
+    async def wait_size_guide():
+        if 'size_guide' not in fields or not size_guide_wait_ms:
+            return
+        try:
+            await page.wait_for_function(
+                '''selector => {
+                    const source = document.querySelector(selector)?.getAttribute('data-link')?.trim();
+                    if (!source || source.startsWith('#')) return false;
+                    try { return ['http:', 'https:'].includes(new URL(source, location.href).protocol); }
+                    catch (_) { return false; }
+                }''',
+                arg=SELECTORS['size_guide'], timeout=size_guide_wait_ms,
+            )
+        except PlaywrightTimeoutError:
+            log(f'SIZE GUIDE => no valid link within {size_guide_wait_ms}ms: {url}')
+
+    await asyncio.gather(wait_optional_fields(), wait_size_guide())
     return parse_html(await page.content(), url, fields)
 
 
@@ -381,7 +404,8 @@ async def parse_product(browser, url, fields):
 async def run_scraper(url, mode, fields, log, progress, batch_size=None,
                       controller=None, use_system_proxy=True, *, concurrency=4,
                       output=None, checkpoint_every=10, timeout_ms=20000,
-                      dynamic_wait_ms=800, refresh_existing=False, block_assets=True):
+                      dynamic_wait_ms=800, refresh_existing=False, block_assets=True,
+                      size_guide_wait_ms=5000):
     """Drop-in API. Legacy update/continue both skip already collected URLs.
 
     Set refresh_existing=True with mode='update' to actually refresh old URLs.
@@ -394,7 +418,7 @@ async def run_scraper(url, mode, fields, log, progress, batch_size=None,
         raise ValueError('Select known product fields')
     if urlparse(url).scheme not in ('https', 'http') or not urlparse(url).netloc:
         raise ValueError('Enter a complete HTTP/HTTPS category URL')
-    if not 1 <= concurrency <= 8 or checkpoint_every < 1 or timeout_ms < 1 or dynamic_wait_ms < 0:
+    if not 1 <= concurrency <= 8 or checkpoint_every < 1 or timeout_ms < 1 or dynamic_wait_ms < 0 or size_guide_wait_ms < 0:
         raise ValueError('Use concurrency 1–8 and positive checkpoint/timeout settings')
     if batch_size is not None and batch_size < 0:
         raise ValueError('batch_size must be nonnegative')
@@ -463,7 +487,8 @@ async def run_scraper(url, mode, fields, log, progress, batch_size=None,
                         return
                     item_started = time.monotonic()
                     try:
-                        product = await parse_product_page(worker_page, link, fields, controller, log, timeout_ms, dynamic_wait_ms)
+                        product = await parse_product_page(worker_page, link, fields, controller, log,
+                                                          timeout_ms, dynamic_wait_ms, size_guide_wait_ms)
                     except Exception as error:
                         failures.append(link)
                         log(f'FAILED => {link}: {type(error).__name__}: {str(error)[:250]}')

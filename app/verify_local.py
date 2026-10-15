@@ -45,7 +45,10 @@ async def main():
  original=types.ModuleType('original_scraper');source=(Path(__file__).resolve().parent/'reference'/'original_scraper.py').read_text();exec(compile(source,'original_scraper.py','exec'),original.__dict__)
  original.find_browser=fast.find_browser;original.OUTPUT=str(ROOT/'original.json')
  start=time.monotonic();await original.run_scraper(base+'/search','fresh',fields,lambda s:None,lambda p:None,use_system_proxy=False);old_time=time.monotonic()-start
- before=json.loads((ROOT/'original.json').read_text());assert {r['url']:r for r in before}=={r['url']:r for r in data};checks.append('all 12 fixture rows match original output exactly')
+ before=json.loads((ROOT/'original.json').read_text());
+ for item in before:
+  if item.get('size_guide'):item['size_guide']=base+item['size_guide']
+ assert {r['url']:r for r in before}=={r['url']:r for r in data};checks.append('all 12 fixture rows match original, with intentional absolute size-guide URLs')
  hits.clear();out=ROOT/'batch.json'
  await fast.run_scraper(base+'/search','fresh',['name'],logs.append,lambda p:None,batch_size=3,use_system_proxy=False,output=str(out));assert len(json.loads(out.read_text()))==3;assert sum(h.startswith('/search?') for h in hits)==1;checks.append('batch stops discovery after first sufficient category page')
  await fast.run_scraper(base+'/search','continue',['name'],logs.append,lambda p:None,batch_size=3,use_system_proxy=False,output=str(out));assert len(json.loads(out.read_text()))==6;checks.append('continue appends next unsaved products')

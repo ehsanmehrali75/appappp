@@ -12,6 +12,8 @@
         const values = Array.isArray(data) ? data : data?.products;
         if (!Array.isArray(values) || !values.length || !values.every(row => row && row.url && row.product_code && !row._erp_contract && !row.ProCode)) throw new Error('این فایل خروجی سایت با کد کالا نیست.');
         rows = values;
+        panel.querySelector('.wc-import').open = true;
+        window.extractWorkspaceShow?.('work');
         byId('complete').checked = false;
         show(`${rows.length} ردیف آمادهٔ پیش‌نمایش است. هیچ تغییری ثبت نشده است.`);
     };
@@ -51,14 +53,5 @@
         try {const result=await request('website_catalog_resolve',{product_id:button.dataset.id});show(result.msg);location.reload();}
         catch(error){show(error.message);button.disabled=false;}
     }));
-    function filter() {
-        const query=byId('search').value.trim().toLocaleLowerCase();const queue=byId('queue').value;let count=0;
-        panel.querySelectorAll('.website-catalog-row').forEach(row=>{
-            const keys=row.dataset.queues.split(' ');const pending=keys.some(key=>key && key!=='resolved');
-            const matches=(queue==='all'||(queue==='work'?pending:keys.includes(queue)))&&row.dataset.search.toLocaleLowerCase().includes(query);
-            row.hidden=!matches;if(matches)count++;
-        });
-        byId('queue-count').textContent=`${count} محصول در این صف`;
-    }
-    byId('queue').addEventListener('change',filter);byId('search').addEventListener('input',filter);filter();
+    byId('queue').addEventListener('change',()=>byId('queue').form.requestSubmit());
 })();

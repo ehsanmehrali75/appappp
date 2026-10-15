@@ -1,5 +1,6 @@
 <?php
 /** Website data enriches existing products; ERP remains the product/variant authority. */
+require_once __DIR__.'/ProductSizeChartCatalog.php';
 class WebsiteCatalogSync {
     public static function code($value) {
         return trim(strtr((string)$value, array_combine(preg_split('//u','۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩',-1,PREG_SPLIT_NO_EMPTY),str_split('01234567890123456789'))));
@@ -49,24 +50,83 @@ class WebsiteCatalogSync {
         $number=self::number(trim(preg_replace('/(?:ریال|تومان|rial|toman|irr|irt)/iu','',$text)));
         return $unit==='rial'?$number/10:$number;
     }
+    /** Website photos exclude references and social-only assets; portal rules remain untouched. */
+    public static function photos($product,$localOnly=false) {
+        $out=[];$site=$product['website_sync']['image_urls']??[];
+        $social=ProductSizeChartCatalog::mediaUrl($product['social_image']??$product['socialImage']??'');
+        $add=function($item) use (&$out,$localOnly,$site,$social) {
+            $url=ProductSizeChartCatalog::mediaUrl(is_array($item)?($item['url']??$item['src']??$item['image']??''):$item);
+            $kind=is_array($item)?strtolower((string)($item['type']??$item['image_type']??$item['category']??'')):'';
+            if (function_exists('isValidProductImage') && !isValidProductImage($url)) return;
+            if (!$url || $url===$social || in_array($kind,['social','social_image','reference','ref'],true)) return;
+            if ($localOnly && ((is_array($item)&&($item['source']??'')==='site') || in_array($url,$site,true))) return;
+            $out[$url]=true;
+        };
+        if (!empty($product['image'])) $add($product['image']);
+        foreach (['gallery','images_list','images'] as $field) {
+            $items=$product[$field]??[];if(is_string($items))$items=json_decode($items,true);
+            if(is_array($items))foreach($items as $item)$add($item);
+        }
+        return array_keys($out);
+    }
+    public static function chartFingerprint($chart) {
+        return hash('sha256',json_encode([$chart['image_url'],$chart['columns'],$chart['rows']],JSON_UNESCAPED_UNICODE));
+    }
+    public static function photoFingerprint($product) {
+        return hash('sha256',json_encode(self::photos($product,true),JSON_UNESCAPED_UNICODE));
+    }
+    public static function inventory($product) {
+        $known=false;$positive=false;
+        foreach(['stock_total','stock_online','stock'] as $key) {
+            $value=$product[$key]??null;if(!is_scalar($value)||trim((string)$value)==='')continue;
+            $value=str_replace([',','٬',' '],'',self::code($value));
+            if(is_numeric($value)){$known=true;if((float)$value>0)$positive=true;}
+        }
+        return $positive?'in_stock':($known?'out_of_stock':'unknown');
+    }
     public static function state($project,$product) {
-        $meta=$product['website_sync']??[];
+        $meta=is_array($product['website_sync']??null)?$product['website_sync']:[];
         $hasDescription=trim((string)($product['description']??''))!=='';
-        $hasChart=function_exists('hasProductSizeChart')?hasProductSizeChart($product):(!empty($product['size_chart'])||!empty($product['size_chart_template_id']));
-        $hasImage=function_exists('hasProductFinalImages')?hasProductFinalImages($product):!empty($product['image']);
-        if (($meta['presence']??'')==='missing' && !in_array($meta['publication']??'', ['technical_pending','resolved'], true)) $meta['publication']=$hasImage?'pending_upload':'pending_image';
-        if (($meta['publication']??'')==='resolved' && empty($product['uploaded_to_site'])) $meta['publication']=$hasImage?'pending_upload':'pending_image';
-        if (($meta['presence']??'')==='seen' && empty($product['uploaded_to_site']) && $hasImage) $meta['publication']='pending_upload';
+        $chart=ProductSizeChartCatalog::forProduct($project,$product);
+        $siteChart=($meta['has_size_chart']??null)===true;
+        $hasChart=$chart['exists']||$siteChart;
+        $localPhotos=self::photos($product,true);$allPhotos=self::photos($product);
+        $sitePhotos=($meta['presence']??'')==='missing'?[]:array_values(array_filter($meta['image_urls']??[],fn($url)=>self::url($url)!==''));
+        $hasImage=(bool)$allPhotos;
+        $approved=!in_array($product['status']??'active',['pending','waiting_approval','rejected'],true)&&empty($product['portal_pending']);
+        $newManual=!empty($product['has_new_manual_image'])||($localPhotos&&isset($meta['local_image_fingerprint'])&&!hash_equals($meta['local_image_fingerprint'],self::photoFingerprint($product)));
+        $pub=$meta['publication']??'';
+        if (($meta['presence']??'')==='missing') {
+            if (!in_array($pub,['technical_pending','resolved'],true)) $pub=$hasImage?'pending_upload':'pending_image';
+            if ($pub==='resolved' && (empty($product['uploaded_to_site'])||$newManual)) $pub=$hasImage?'pending_upload':'pending_image';
+        } elseif (($meta['presence']??'')==='seen') {
+            $pub=$sitePhotos?'uploaded':($hasImage?'pending_upload':'pending_image');
+            if ($newManual||empty($product['uploaded_to_site'])) $pub=$hasImage?'pending_upload':'pending_image';
+        } elseif (empty($product['uploaded_to_site'])) $pub=$hasImage?'pending_upload':'pending_image';
+        elseif($pub==='')$pub='resolved';
+        if(($meta['publication']??'')==='resolved'&&!empty($product['uploaded_to_site'])&&!$newManual)$pub='resolved';
+        if($newManual&&$hasImage)$pub='pending_upload';
+        if(!$hasImage)$pub='pending_image';
+        if ($pub==='pending_upload' && !$approved) $pub='pending_approval';
+        $websiteKnown=in_array($meta['presence']??'',['seen','missing'],true);
+        $sizePending=$chart['exists']&&(($meta['presence']??'')==='missing'||(array_key_exists('has_size_chart',$meta)&&!$meta['has_size_chart'])||(!$websiteKnown&&empty($product['size_chart_uploaded'])));
+        if($chart['exists']&&isset($meta['local_chart_fingerprint'])&&!hash_equals($meta['local_chart_fingerprint'],self::chartFingerprint($chart)))$sizePending=true;
         return array_replace($meta,[
+            'publication'=>$pub,'inventory'=>self::inventory($product),
+            'low_priority'=>self::inventory($product)==='out_of_stock',
             'needs_description'=>!$hasDescription,
             'needs_size_chart'=>!$hasChart,
-            'description_upload_pending'=>$hasDescription&&array_key_exists('has_description',$meta)&&!$meta['has_description'],
-            'size_chart_upload_pending'=>$hasChart&&array_key_exists('has_size_chart',$meta)&&!$meta['has_size_chart'],
-            'needs_image'=>!$hasImage,
+            'description_upload_pending'=>$hasDescription&&(($meta['presence']??'')==='missing'||(array_key_exists('has_description',$meta)&&!$meta['has_description'])),
+            'size_chart_upload_pending'=>$sizePending,
+            'needs_image'=>!$hasImage,'has_local_image'=>(bool)$localPhotos,'local_image_urls'=>$localPhotos,'site_image_urls'=>$sitePhotos,
+            'chart'=>$chart,'site_chart_urls'=>($meta['presence']??'')==='missing'?[]:($meta['size_guide_urls']??[]),
+            'comparison_available'=>(bool)($localPhotos&&$sitePhotos)||($chart['has_local']&&$siteChart),
+            'image_upload_pending'=>$pub==='pending_upload','approval_pending'=>!$approved&&$hasImage,
+            'size_chart_export_needed'=>$sizePending&&!$chart['export_ready'],
         ]);
     }
     public static function fingerprint($project) {
-        return hash('sha256',json_encode([$project['id'],$project['products']??[],$project['settings']['website_catalog']??[]],JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION));
+        return hash('sha256',json_encode([$project['id'],$project['products']??[],$project['settings']['website_catalog']??[],$project['settings']['size_charts']??[]],JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION));
     }
     public static function reconcile($project,$rows,$options=[]) {
         if(!self::isWebsiteRows($rows)||count($rows)>50000)throw new RuntimeException('فایل باید آرایهٔ خروجی سایت با url و product_code باشد (حداکثر ۵۰۰۰۰ ردیف).');
@@ -131,18 +191,22 @@ class WebsiteCatalogSync {
             }
             // Local content is never erased by an empty or missing website field.
             if($descriptionObserved)$meta['has_description']=(bool)$descriptions;
-            if($chartObserved)$meta['has_size_chart']=(bool)$charts;
+            if($chartObserved){$meta['has_size_chart']=(bool)$charts;$meta['size_guide_urls']=array_values(array_unique($charts));$product['size_chart_uploaded']=(int)(bool)$charts;$product['size_chart_uploaded_at']=$charts?date('Y-m-d H:i:s',$now):null;}
             if($descriptions){$meta['has_description']=true;if(empty($product['description']))$product['description']=$descriptions[0];}
-            if($charts){$meta['has_size_chart']=true;$meta['size_guide_urls']=array_values(array_unique($charts));if(empty($product['size_chart'])&&empty($product['size_chart_template_id'])&&preg_match('/\.(?:png|jpe?g|webp|gif)(?:[?#]|$)/i',$charts[0]))$product['size_chart']=$charts[0];}
+            if($charts){$meta['has_size_chart']=true;$meta['size_guide_urls']=array_values(array_unique($charts));if(!ProductSizeChartCatalog::forProduct($project,$product)['exists']&&preg_match('/\.(?:png|jpe?g|webp|gif)(?:[?#]|$)/i',$charts[0]))$product['size_chart']=$charts[0];}
             $meta['image_urls']=array_keys($siteImages);
             $oldImages=$product['images_list']??[];if(is_string($oldImages))$oldImages=json_decode($oldImages,true);
             if(!is_array($oldImages))throw new RuntimeException('ساختار تصاویر قبلی محصول نامعتبر است؛ برای حفظ تصاویر، ثبت متوقف شد.');
             $product['images_list']=$oldImages;
             $existing=[];foreach($product['images_list'] as $image){$u=is_array($image)?($image['url']??''):$image;if(is_string($u))$existing[$u]=true;}
             foreach(array_keys($siteImages) as $image)if(!isset($existing[$image])){$product['images_list'][]=['url'=>$image,'source'=>'site','approved'=>true,'uploaded_to_site'=>true,'created_at'=>$now];$counts['images']++;}
-            $product['uploaded_to_site']=1;
+            $product['uploaded_to_site']=$siteImages&&!empty($product['has_new_manual_image'])?0:(int)(bool)$siteImages;
+            if(!$siteImages)$meta['publication']=self::photos($product)?'pending_upload':'pending_image';
             // Keep the original primary image, gallery, social image and reference gallery.
             if(empty($product['link']))$product['link']=$group[0]['url'];
+            $product['website_sync']=$meta;
+            $meta['local_chart_fingerprint']=self::chartFingerprint(ProductSizeChartCatalog::forProduct($project,$product));
+            $meta['local_image_fingerprint']=self::photoFingerprint($product);
             $product['website_sync']=$meta;
             $changes[]=['id'=>$id,'name'=>$product['name']??$id,'action'=>'تکمیل اطلاعات سایت'];unset($product);
         }
@@ -150,12 +214,12 @@ class WebsiteCatalogSync {
             if(isset($covered[$index]))continue;
             $linkedOrigin=self::origin($product['link']??$product['url']??'');if($linkedOrigin!==''&&$linkedOrigin!==$origin)continue;
             $id=(string)$product['id'];$meta=$product['website_sync']??[];
-            $hasImage=function_exists('hasProductFinalImages')?hasProductFinalImages($product):!empty($product['image']);
-            $publication=!empty($product['uploaded_to_site'])&&$hasImage?'technical_pending':($hasImage?'pending_upload':'pending_image');
-            $meta=array_replace($meta,['presence'=>'missing','origin'=>$origin,'checked_at'=>$now,'publication'=>$publication]);
+            $hasImage=(bool)self::photos($product);
+            $publication=$hasImage&&(!empty($product['uploaded_to_site'])||($meta['publication']??'')==='technical_pending')?'technical_pending':($hasImage?'pending_upload':'pending_image');
+            $meta=array_replace($meta,['presence'=>'missing','origin'=>$origin,'checked_at'=>$now,'publication'=>$publication,'has_description'=>false,'has_size_chart'=>false]);
             unset($meta['resolved_at'],$meta['resolved_by']);
             $product['website_sync']=$meta;
-            $product['uploaded_to_site']=0;$counts['missing']++;if($publication==='technical_pending')$counts['technical']++;
+            $product['uploaded_to_site']=0;$product['size_chart_uploaded']=0;$product['size_chart_uploaded_at']=null;$counts['missing']++;if($publication==='technical_pending')$counts['technical']++;
             $changes[]=['id'=>$id,'name'=>$product['name']??$id,'action'=>['technical_pending'=>'باگ فنی / منتظر آپلود','pending_upload'=>'منتظر آپلود','pending_image'=>'منتظر تولید عکس'][$publication]];
         }unset($product);
         $project['settings']['website_catalog']['origin']=$origin;
@@ -166,9 +230,11 @@ class WebsiteCatalogSync {
         foreach($project['products'] as &$product)if((string)$product['id']===(string)$id) {
             $meta=$product['website_sync']??[];
             $derived=self::state($project,$product);
+            if(empty(self::photos($product)))throw new RuntimeException('ابتدا عکس نهایی غیرسوشیال محصول را آماده کنید.');
+            if(!empty($derived['approval_pending']))throw new RuntimeException('ابتدا تأیید تصویر در پورتال انجام شود.');
             if(!in_array($derived['publication']??'',['technical_pending','pending_upload'],true))throw new RuntimeException('این محصول در صف رفع نقص انتشار نیست.');
-            $meta['publication']='resolved';$meta['resolved_at']=time();$meta['resolved_by']=$user;
-            $product['website_sync']=$meta;$product['uploaded_to_site']=1;return;
+            $meta['publication']='resolved';$meta['resolved_at']=time();$meta['resolved_by']=$user;$meta['local_image_fingerprint']=self::photoFingerprint($product);
+            $product['website_sync']=$meta;$product['uploaded_to_site']=1;$product['has_new_manual_image']=0;return;
         }
         throw new RuntimeException('محصول یافت نشد.');
     }

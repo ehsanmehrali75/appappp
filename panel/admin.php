@@ -2531,11 +2531,20 @@ $sections_json
         }
 
         $updatedCount = 0;
-        foreach ($project['products'] as &$p) {
-            if (in_array($p['id'], $pids)) {
-                $p['uploaded_to_site'] = 1;
-                $updatedCount++;
+        $completedProject = $project;
+        try {
+            foreach ($project['products'] as $p) {
+                if (!in_array($p['id'], $pids, true)) continue;
+                $workflow = WebsiteCatalogSync::state($project,$p);
+                if (in_array($workflow['publication']??'', ['technical_pending','pending_upload'], true)) {
+                    WebsiteCatalogSync::resolve($completedProject, $p['id'], $_SESSION['user']['username']??'');
+                    $updatedCount++;
+                }
             }
+            $project = $completedProject;
+        } catch (RuntimeException $error) {
+            echo json_encode(['status'=>'failed','msg'=>$error->getMessage()],JSON_UNESCAPED_UNICODE);
+            exit;
         }
         if ($updatedCount > 0) {
             saveProject($project);
@@ -9413,7 +9422,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         ( (int)($p['stock_online'] ?? 0) > 0 || (int)($p['stock_total'] ?? 0) > 0 ) &&
                         empty($p['uploaded_to_site'])
                     );
-                    $originallyNoImage = isProductNoImage($p);
+                    $originallyNoImage = empty(WebsiteCatalogSync::photos($p));
                     
                     if ($hasImage || $isERPWithStock || $originallyNoImage) {
                         $allProds[] = $p;
@@ -9504,27 +9513,12 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         }
                     }
 
+                    $websiteWorkflow = WebsiteCatalogSync::state($project,$p);
                     $hasNewManualUpload = !empty($p['has_new_manual_image']);
-                    $isAlreadyOnSite = !empty($p['uploaded_to_site']) && !$hasNewManualUpload;
+                    $isUploaded = in_array($websiteWorkflow['publication'], ['uploaded','resolved'], true);
+                    $hasManualPhoto = !empty(WebsiteCatalogSync::photos($p)) && !$isUploaded;
 
-                    if ($isAlreadyOnSite) {
-                        $isUploaded = true;
-                        $hasManualPhoto = false;
-                    } elseif ($hasNewManualUpload) {
-                        $isUploaded = false;
-                        $hasManualPhoto = true;
-                    } else if ($hasExternalUrlImg) {
-                        $isUploaded = true;
-                        $hasManualPhoto = false;
-                    } else if ($hasLocalManualPhoto || !empty($p['is_manual_image'])) {
-                        $isUploaded = false;
-                        $hasManualPhoto = true;
-                    } else {
-                        $isUploaded = !empty($p['uploaded_to_site']);
-                        $hasManualPhoto = false;
-                    }
-
-                    $originallyNoImage = isProductNoImage($p);
+                    $originallyNoImage = empty(WebsiteCatalogSync::photos($p));
                     $p_status = $p['status'] ?? 'active';
                     
                     $score = 0;
@@ -9583,7 +9577,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     }
                     
                     // Tab 3: Has size chart defect or manual size chart requested
-                    $hasSizeChart = !empty($p['size_chart']) && strpos($p['size_chart'], 'placehold') === false;
+                    $hasSizeChart = ProductSizeChartCatalog::forProduct($project,$p)['exists'];
                     $websiteQueue = WebsiteCatalogSync::state($project,$p);
                     $isSizeChartIncomplete = !empty($p['size_chart_incomplete']) || $websiteQueue['needs_size_chart'] || $websiteQueue['size_chart_upload_pending'];
                     $isManualSizeChartRequested = !empty($p['manual_size_chart_requested']);
@@ -9634,7 +9628,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             <span class="bg-primary/10 text-primary text-xs rounded-full px-2 py-0.5"><?php echo count($allProds); ?></span>
                         </button>
                         <button onclick="switchExportSubTab('tab2')" id="subtab-btn-tab2" class="text-sm font-black pb-2 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-600 transition-all flex items-center gap-1">
-                            ⭐️ <span>عکس دستی (منتظر آپلود)</span>
+                            ⭐️ <span>آپلود محتوا (عکس آماده)</span>
                             <span id="badge-tab2-count" class="bg-amber-50 text-amber-700 text-xs rounded-full px-2 py-0.5 font-bold"><?php echo count($tab2Prods); ?></span>
                         </button>
                         <button onclick="switchExportSubTab('tab3')" id="subtab-btn-tab3" class="text-sm font-black pb-2 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-600 transition-all flex items-center gap-1">
@@ -9714,7 +9708,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                     
                                     $isManual = $hasManualPhoto;
                                     $isActive = ($p['status'] ?? 'active') === 'active';
-                                    $originallyNoImage = isProductNoImage($p);
+                                    $originallyNoImage = empty(WebsiteCatalogSync::photos($p));
                                     
                                     $statusKey = 'pending_upload';
                                     if ($originallyNoImage) {
@@ -9734,7 +9728,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                     // If subtab is tab2, but this product does not qualify, we hide it under tab2 active
                                     $qualifiesForTab2 = $hasManualPhoto && !$isUploaded && $isActive;
                                     
-                                    $hasSizeChart = !empty($p['size_chart']) && strpos($p['size_chart'], 'placehold') === false;
+                                    $hasSizeChart = ProductSizeChartCatalog::forProduct($project,$p)['exists'];
                                     $websiteQueue = WebsiteCatalogSync::state($project,$p);
                     $isSizeChartIncomplete = !empty($p['size_chart_incomplete']) || $websiteQueue['needs_size_chart'] || $websiteQueue['size_chart_upload_pending'];
                                     $isManualSizeChartRequested = !empty($p['manual_size_chart_requested']);
@@ -9780,7 +9774,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                             <div class="flex items-center gap-1.5 flex-wrap">
                                                 <h4 class="font-bold text-slate-800 text-sm sm:text-base truncate"><?php echo htmlspecialchars($p['name'] ?? 'بدون نام'); ?></h4>
                                                 <?php if ($isSizeChartIncomplete): ?>
-                                                    <span class="inline-flex items-center bg-rose-50 border border-rose-100 text-rose-700 font-extrabold text-[9px] px-1.5 py-0.5 rounded">📐 نقص جدول سایز</span>
+                                                    <span class="inline-flex items-center bg-rose-50 border border-rose-100 text-rose-700 font-extrabold text-[9px] px-1.5 py-0.5 rounded">📐 <?php echo $websiteQueue['needs_size_chart']?'منتظر تولید جدول سایز':($websiteQueue['size_chart_upload_pending']?'منتظر آپلود جدول سایز':'نقص جدول سایز'); ?></span>
                                                 <?php elseif ($isManualSizeChartRequested): ?>
                                                     <span class="inline-flex items-center bg-amber-50 border border-amber-100 text-amber-700 font-extrabold text-[9px] px-1.5 py-0.5 rounded">📐 در انتظار جدول سایز</span>
                                                 <?php elseif ($hasSizeChart): ?>
@@ -9838,7 +9832,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                         <div class="w-24 sm:w-40 flex-shrink-0 block-status">
                                             <?php 
                                             $p_status = $p['status'] ?? 'active';
-                                            $originallyNoImage = isProductNoImage($p);
+                                            $originallyNoImage = empty(WebsiteCatalogSync::photos($p));
                                             
                                             if ($originallyNoImage): ?>
                                                 <!-- If it has no image, it must always display "منتظر آپلود تصویر" -->
@@ -10607,9 +10601,11 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
             <?php endif; ?>
 
             <?php if ($tab === 'extract'): ?>
+                <link rel="stylesheet" href="/panel/assets/extract-workspace.css?v=<?php echo filemtime(__DIR__.'/assets/extract-workspace.css'); ?>">
+                <script src="/panel/assets/extract-workspace.js?v=<?php echo filemtime(__DIR__.'/assets/extract-workspace.js'); ?>" defer></script>
                 <?php require __DIR__.'/inc/WebsiteCatalogView.php'; ?>
                 <?php $ext_platform = $project['settings']['platform_type'] ?? 'wordpress'; ?>
-                <div class="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div id="extract-tools-workspace" class="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
                     <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
                         <div class="flex-1">
                             <div class="text-[10px] font-black text-primary uppercase tracking-[0.3em] mb-2 leading-none">Automation Engine</div>
@@ -10618,7 +10614,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         </div>
                         <div id="worker-status-badge" class="flex items-center gap-4 px-6 py-4 bg-white border border-slate-100 rounded-3xl premium-card shadow-sm">
                             <div class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-lg shadow-emerald-200"></div>
-                            <span class="text-[11px] font-black text-slate-700 tracking-widest uppercase">System Active</span>
+                            <span class="text-[11px] font-black text-slate-700">ابزارهای استخراج و همگام‌سازی</span>
                         </div>
                     </div>
 
@@ -10888,7 +10884,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     </div>
 
                     <!-- Real-Time Shop Scraper & Crawler Panel -->
-                    <div class="premium-card p-10 bg-white border border-slate-100 shadow-xl shadow-slate-200/50 rounded-[2.5rem]">
+                    <div id="extract-live-crawler" class="premium-card p-10 bg-white border border-slate-100 shadow-xl shadow-slate-200/50 rounded-[2.5rem]">
                         <div class="flex items-start gap-4 mb-6 text-right">
                             <span class="text-4xl text-indigo-600">🕷️</span>
                             <div class="space-y-1">
@@ -11044,7 +11040,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     </div>
 
                     <!-- CENTRAL ERP SYSTEM INTEGRATOR / IMPORTER PANEL -->
-                    <div class="premium-card p-10 border-amber-200 bg-amber-50/10">
+                    <div id="extract-central-erp" class="premium-card p-10 border-amber-200 bg-amber-50/10">
                         <div class="flex flex-col gap-6">
                             <div class="flex items-start gap-4">
                                 <span class="text-4xl">📥</span>
@@ -11702,7 +11698,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     }
                     </script>
 
-                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    <div id="extract-legacy-tools" class="grid grid-cols-1 lg:grid-cols-12 gap-8">
                         <div class="lg:col-span-4 lg:sticky lg:top-8 h-fit">
                             <div class="bg-white rounded-[2.5rem] p-8 shadow-2xl shadow-slate-200/50 border border-slate-100">
                                 <h3 class="text-xl font-black text-slate-800 mb-6 flex items-center gap-3">

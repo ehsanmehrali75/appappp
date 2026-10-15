@@ -1,12 +1,12 @@
 {
-  "original_seconds": 12.775,
-  "optimized_seconds": 2.051,
-  "ratio_local_only": 6.23,
+  "original_seconds": 13.864,
+  "optimized_seconds": 3.1,
+  "ratio_local_only": 4.47,
   "products": 12,
   "peak_requests": 4,
   "checks": [
     "bounded real browser concurrency, deterministic rows, monotonic progress",
-    "all 12 fixture rows match original output exactly",
+    "all 12 fixture rows match original, with intentional absolute size-guide URLs",
     "batch stops discovery after first sufficient category page",
     "continue appends next unsaved products",
     "explicit refresh preserves unselected fields",
