@@ -93,14 +93,21 @@ class WebsiteCatalogSync {
     public static function photoFingerprint($product) {
         return hash('sha256',json_encode(self::photos($product,true),JSON_UNESCAPED_UNICODE));
     }
+    /** Online stock is a subset, not an amount to add to total stock. Unknown totals stay unknown. */
+    public static function totalStock($product) {
+        try {return self::number($product['stock_total']??null);}
+        catch (RuntimeException $e) {return null;}
+    }
     public static function inventory($product) {
         if(($product['status']??'')==='out_of_stock')return 'out_of_stock';
         $known=false;$positive=false;
         foreach(['stock_total','stock_online','stock'] as $key) {
             $value=$product[$key]??null;if(!is_scalar($value)||trim((string)$value)==='')continue;
-            $value=str_replace([',','٬',' '],'',self::code($value));
+            $value=self::code($value);
             if(mb_strpos($value,'ناموجود')!==false)return 'out_of_stock';
-            if(is_numeric($value)){$known=true;if((float)$value>0)$positive=true;}
+            try {$quantity=self::number($value,true);}
+            catch (RuntimeException $e) {continue;}
+            $known=true;if($quantity>0)$positive=true;
         }
         return $positive?'in_stock':($known?'out_of_stock':'unknown');
     }

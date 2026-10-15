@@ -7,12 +7,21 @@ $wcFilters=['archive'=>'آرشیو ناموجودها','work'=>'همهٔ کار�
 $wcQueueInput=$_GET['wc_queue']??'';
 $wcQueue=is_string($wcQueueInput)&&isset($wcFilters[$wcQueueInput])?$wcQueueInput:'work';
 $wcSearch=trim(mb_substr(is_string($_GET['wc_q']??null)?$_GET['wc_q']:'',0,120));
-$wcStock=in_array($_GET['wc_stock']??'',['in_stock','out_of_stock','unknown'],true)?$_GET['wc_stock']:'';
+$wcStockStatuses=['in_stock'=>'موجود','out_of_stock'=>'ناموجود / آرشیو','unknown'=>'موجودی نامشخص'];
+$wcStockThresholds=['gt_5'=>5,'gt_10'=>10,'gt_15'=>15,'gt_20'=>20];
+$wcStockInput=$_GET['wc_stock']??'';
+$wcStock=is_string($wcStockInput)&&(isset($wcStockStatuses[$wcStockInput])||isset($wcStockThresholds[$wcStockInput]))?$wcStockInput:'';
 $wcLimit=in_array((int)($_GET['wc_size']??20),[10,20,50],true)?(int)($_GET['wc_size']??20):20;
 $wcNormalize=static fn($value)=>mb_strtolower(str_replace(['ي','ك',"\u{200c}"],['ی','ک',''],(string)$value));
 $websiteQueues=[];$wcCounts=array_fill_keys(array_keys($wcFilters),0);
 foreach(($project['products']??[]) as $websiteProduct) {
+    if($wcSearch!==''&&mb_strpos($wcNormalize(($websiteProduct['name']??'').' '.($websiteProduct['sku']??'')),$wcNormalize($wcSearch))===false)continue;
     $ws=WebsiteCatalogSync::state($project,$websiteProduct);$pub=$ws['publication']??'';$tasks=[];
+    if(isset($wcStockStatuses[$wcStock])&&$ws['inventory']!==$wcStock)continue;
+    if(isset($wcStockThresholds[$wcStock])) {
+        $wcQuantity=WebsiteCatalogSync::totalStock($websiteProduct);
+        if($ws['archived']||$wcQuantity===null||$wcQuantity<=$wcStockThresholds[$wcStock])continue;
+    }
     foreach(['needs_size_chart','needs_description'] as $key)if($ws[$key])$tasks[]=$key;
     if($ws['size_chart_upload_pending'])$tasks[]='size_chart_upload';
     if($ws['description_upload_pending']||$ws['size_chart_upload_pending'])$tasks[]='content_upload';
@@ -24,8 +33,6 @@ foreach(($project['products']??[]) as $websiteProduct) {
     $wcCounts['all']++;if($work)$wcCounts['work']++;foreach(array_unique($tasks) as $key)if(isset($wcCounts[$key]))$wcCounts[$key]++;
     if($ws['archived']&&!in_array($wcQueue,['all','archive'],true))continue;
     if($wcQueue!=='all'&&!($wcQueue==='work'?$work:in_array($wcQueue,$tasks,true)))continue;
-    if($wcStock!==''&&$ws['inventory']!==$wcStock)continue;
-    if($wcSearch!==''&&mb_strpos($wcNormalize(($websiteProduct['name']??'').' '.($websiteProduct['sku']??'')),$wcNormalize($wcSearch))===false)continue;
     $websiteQueues[]=['product'=>$websiteProduct,'state'=>$ws,'tasks'=>$tasks];
 }
 usort($websiteQueues,static function($a,$b){
@@ -53,14 +60,15 @@ $wcPhotos=static function($urls,$label)use($wcEscape){
         <div class="wc-actions"><button type="button" id="website-catalog-preview" class="btn btn-outline">پیش‌نمایش تغییرات</button><button type="button" id="website-catalog-apply" class="btn btn-primary" hidden>تأیید و ثبت تغییرات</button></div>
     </div></details>
     <div id="website-catalog-result" role="status" aria-live="polite" tabindex="0" aria-label="گزارش پیش‌نمایش و ثبت"></div>
-    <div class="wc-summary" aria-label="خلاصهٔ کارهای پروژه"><?php foreach(['pending_image'=>'تولید عکس','pending_upload'=>'آپلود عکس','needs_size_chart'=>'تولید جدول سایز','size_chart_upload'=>'آپلود جدول سایز','technical_pending'=>'بررسی فنی'] as $key=>$label): ?><a href="<?php echo $wcEscape('admin.php?'.http_build_query(['tab'=>$tab,'we_view'=>'work','wc_queue'=>$key]).'#website-catalog-list'); ?>"><strong><?php echo number_format($wcCounts[$key]); ?></strong><span><?php echo $label; ?></span></a><?php endforeach; ?></div>
+    <div class="wc-summary" aria-label="خلاصهٔ کارها با فیلترهای فعلی"><?php foreach(['pending_image'=>'تولید عکس','pending_upload'=>'آپلود عکس','needs_size_chart'=>'تولید جدول سایز','size_chart_upload'=>'آپلود جدول سایز','technical_pending'=>'بررسی فنی'] as $key=>$label): ?><a href="<?php echo $wcEscape('admin.php?'.http_build_query(['tab'=>$tab,'we_view'=>'work','wc_queue'=>$key,'wc_q'=>$wcSearch,'wc_stock'=>$wcStock,'wc_size'=>$wcLimit]).'#website-catalog-list'); ?>"><strong><?php echo number_format($wcCounts[$key]); ?></strong><span><?php echo $label; ?></span></a><?php endforeach; ?></div>
     <div id="website-catalog-list">
     <form method="get" action="admin.php#website-catalog-list" class="wc-filters"><input type="hidden" name="tab" value="<?php echo $wcEscape($tab); ?>"><?php if($tab==='website_export'): ?><input type="hidden" name="we_view" value="work"><?php endif; ?>
         <label>صف کار<select id="website-catalog-queue" name="wc_queue" class="select"><?php foreach($wcFilters as $key=>$label): ?><option value="<?php echo $key; ?>" <?php echo $wcQueue===$key?'selected':''; ?>><?php echo $wcEscape($label).' ('.$wcCounts[$key].')'; ?></option><?php endforeach; ?></select></label>
         <label>جست‌وجوی محصول<input id="website-catalog-search" name="wc_q" type="search" class="input" placeholder="نام یا کد کالا" value="<?php echo $wcEscape($wcSearch); ?>"></label>
-        <label>موجودی<select name="wc_stock" class="select"><option value="">همهٔ وضعیت‌های موجودی</option><?php foreach(['in_stock'=>'موجود','out_of_stock'=>'ناموجود / آرشیو','unknown'=>'موجودی نامشخص'] as $key=>$label): ?><option value="<?php echo $key; ?>" <?php echo $wcStock===$key?'selected':''; ?>><?php echo $label; ?></option><?php endforeach; ?></select></label>
+        <label>موجودی<select id="website-catalog-stock-filter" name="wc_stock" class="select" aria-describedby="website-catalog-filter-hint"><option value="">همهٔ وضعیت‌های موجودی</option><optgroup label="وضعیت موجودی"><?php foreach($wcStockStatuses as $key=>$label): ?><option value="<?php echo $key; ?>" <?php echo $wcStock===$key?'selected':''; ?>><?php echo $label; ?></option><?php endforeach; ?></optgroup><optgroup label="موجودی کل"><?php foreach($wcStockThresholds as $key=>$threshold): ?><option value="<?php echo $key; ?>" <?php echo $wcStock===$key?'selected':''; ?>>بیشتر از <?php echo strtr((string)$threshold,array_combine(str_split('0123456789'),preg_split('//u','۰۱۲۳۴۵۶۷۸۹',-1,PREG_SPLIT_NO_EMPTY))); ?> عدد</option><?php endforeach; ?></optgroup></select></label>
         <label>در هر صفحه<select name="wc_size" class="select"><?php foreach([10,20,50] as $limit): ?><option <?php echo $wcLimit===$limit?'selected':''; ?>><?php echo $limit; ?></option><?php endforeach; ?></select></label><button class="btn btn-outline">اعمال فیلتر</button>
     </form>
+    <p id="website-catalog-filter-hint" class="wc-hint">بازه‌های عددی بر اساس موجودی کل هستند؛ مقدار نامشخص در آن‌ها نمایش داده نمی‌شود. شمارندهٔ صف‌ها با فیلتر موجودی و جست‌وجو به‌روز می‌شود.</p>
     <p id="website-catalog-queue-count" class="wc-hint"><?php echo $wcTotal?'نمایش '.((($wcPage-1)*$wcLimit)+1).' تا '.min($wcPage*$wcLimit,$wcTotal).' از '.$wcTotal.' محصول':'محصولی با این فیلتر پیدا نشد.'; ?> — صفحهٔ <?php echo $wcPage.' از '.$wcPages; ?></p>
     <div class="wc-products">
     <?php foreach($websiteQueues as $websiteEntry):$wp=$websiteEntry['product'];$ws=$websiteEntry['state'];$pub=$ws['publication']??'';$labels=[];
