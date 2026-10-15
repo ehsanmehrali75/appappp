@@ -10985,12 +10985,15 @@ $suggestions = getCalendarSuggestions($project);
                             
                             <!-- ERP Method Selector -->
                             <div class="flex gap-2 bg-slate-100 p-1.5 rounded-2xl w-fit">
-                                <button type="button" onclick="toggleERPMethod('tiam')" id="erp_btn_tiam" class="px-5 py-2.5 rounded-xl text-xs font-black transition-all">🔌 اتصال مستقیم به تیام (API)</button>
+                                <button type="button" onclick="toggleERPMethod('tiam')" id="erp_btn_tiam" class="px-5 py-2.5 rounded-xl text-xs font-black transition-all">🔌 اتصال تیام (SQL / API)</button>
                                 <button type="button" onclick="toggleERPMethod('manual')" id="erp_btn_manual" class="px-5 py-2.5 rounded-xl text-xs font-black transition-all">📋 همگام‌سازی و کپی ستون‌ها دستی</button>
                             </div>
 
                             <!-- Tiam Active Connection Card Block -->
                             <div id="erp_tiam_panel" class="hidden animate-in fade-in slide-in-from-top-2 duration-300">
+                                <?php if(hasPermission('settings') && !empty($project['settings']['tiam_inventory']['host'])): ?>
+                                    <?php $tiamEnabled=true; require __DIR__.'/inc/TiamInventoryView.php'; ?>
+                                <?php else: ?>
                                 <?php 
                                 $tconfig = $project['settings']['tiam'] ?? [];
                                 $tiamEnabled = !empty($tconfig['enabled']) && (!empty($tconfig['endpoint']) || !empty($tconfig['erp_server_ip']));
@@ -11065,6 +11068,7 @@ $suggestions = getCalendarSuggestions($project);
                                         </div>
                                     </div>
                                 <?php endif; ?>
+                                <?php endif; ?>
                             </div>
 
                             <!-- Manual paste panel -->
@@ -11095,6 +11099,7 @@ $suggestions = getCalendarSuggestions($project);
                                                 </select>
                                             </div>
                                         </div>
+                                        <p id="erp-contract-error" hidden role="alert" class="text-xs text-red-800"></p>
                                         <textarea id="erp_raw_pasted" oninput="runERPLiveParser(this.value)" rows="9" class="w-full p-5 bg-white border border-slate-200 rounded-[2rem] font-mono text-xs focus:ring-2 focus:ring-amber-500 outline-none transition-all" placeholder="ستون‌های جدول اکسل خود (شامل AnbarName, ProDes, ProCode, StockTedad و ...) را اینجا پیست کنید..."></textarea>
                                     </div>
                                     <div class="md:col-span-4 space-y-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm h-full flex flex-col justify-between">
@@ -11263,6 +11268,11 @@ $suggestions = getCalendarSuggestions($project);
                     }
 
                     function runERPLiveParser(text) {
+                        window.erpParsedPayload=null;
+                        document.getElementById('erp_live_preview').classList.add('hidden');
+                        const contractErrorBox=document.getElementById('erp-contract-error');
+                        contractErrorBox.hidden=true;
+                        let contractError=false;
                         text = text.trim();
                         if (!text) {
                             document.getElementById('erp_live_preview').classList.add('hidden');
@@ -11292,6 +11302,13 @@ $suggestions = getCalendarSuggestions($project);
 
                         if (isJsonMode) {
                             rows.forEach(r => {
+                                if(r._erp_contract==='maarksho.erp.inventory.v1') {
+                                    const stock=Number(r.StockTedad);
+                                    if(r.StockTedad===null || r.StockTedad==='' || !Number.isFinite(stock) || !r.ProCode || !r.ProDes) {contractError=true;return;}
+                                    const sizes=Array.isArray(r.sizes)?r.sizes:[];
+                                    parsedData.push({name:r.ProDes,sku:r.ProCode,anbar_name:r.AnbarName||'',anbar_code:r.AnbarCode||'',size:r.size||'',sizes,color:r.Color||'',stock,price:Number(r.NetItem||0),price_known:Object.prototype.hasOwnProperty.call(r,'NetItem'),erp_row:r});
+                                    grandStock+=stock;uniqueProducts.add((r.ModelCode||r.ProDes)+'|'+(r.ColorCode||r.Color||''));return;
+                                }
                                 let sizesArr = [];
                                 if (Array.isArray(r.sizes)) {
                                     sizesArr = r.sizes.map(s => String(s).trim()).filter(s => s !== '');
@@ -11511,6 +11528,7 @@ $suggestions = getCalendarSuggestions($project);
                             });
                         }
                         
+                        if(contractError){contractErrorBox.textContent='ردیف ERP استاندارد نامعتبر است؛ فایل کامل را از پیش‌نمایش جدید دریافت کنید.';contractErrorBox.hidden=false;return;}
                         if (parsedData.length === 0) {
                             document.getElementById('erp_live_preview').classList.add('hidden');
                             return;
@@ -11522,16 +11540,17 @@ $suggestions = getCalendarSuggestions($project);
                         document.getElementById('erp_count_products').innerText = uniqueProducts.size;
                         document.getElementById('erp_count_stock').innerText = grandStock.toLocaleString('fa-IR') + ' ' + 'عدد';
                         
+                        const erpEscape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
                         let tableHtml = '';
                         parsedData.slice(0, 6).forEach(item => {
                             tableHtml += `
                                 <tr class="border-b border-slate-100 last:border-none">
-                                    <td class="px-3 py-2.5 font-bold text-slate-800">${item.name}</td>
-                                    <td class="px-3 py-2.5 text-slate-500 font-mono">${item.sku || '—'}</td>
-                                    <td class="px-3 py-2.5 text-slate-600 font-bold">${item.anbar_name ? '<span class="px-2 py-0.5 bg-slate-100 rounded-md text-[10px]">' + item.anbar_name + '</span>' : '—'}</td>
-                                    <td class="px-3 py-2.5 text-slate-600 font-bold">${item.size}</td>
-                                    <td class="px-3 py-2.5 text-indigo-600 font-bold">${item.color}</td>
-                                    <td class="px-3 py-2.5 text-emerald-600 font-black">${item.price.toLocaleString('fa-IR')} تومان</td>
+                                    <td class="px-3 py-2.5 font-bold text-slate-800">${erpEscape(item.name)}</td>
+                                    <td class="px-3 py-2.5 text-slate-500 font-mono">${erpEscape(item.sku || '—')}</td>
+                                    <td class="px-3 py-2.5 text-slate-600 font-bold">${item.anbar_name ? '<span class="px-2 py-0.5 bg-slate-100 rounded-md text-[10px]">' + erpEscape(item.anbar_name) + '</span>' : '—'}</td>
+                                    <td class="px-3 py-2.5 text-slate-600 font-bold">${erpEscape(item.size)}</td>
+                                    <td class="px-3 py-2.5 text-indigo-600 font-bold">${erpEscape(item.color)}</td>
+                                    <td class="px-3 py-2.5 text-emerald-600 font-black">${item.price_known===false?'—':item.price.toLocaleString('fa-IR')+' تومان'}</td>
                                     <td class="px-3 py-2.5 text-slate-700 font-black">${item.stock} عدد</td>
                                 </tr>
                             `;
@@ -11553,6 +11572,7 @@ $suggestions = getCalendarSuggestions($project);
                         
                         // Map structure to what processAndSyncProducts expects in JSON importer
                         const items = window.erpParsedPayload.map(x => {
+                            if(x.erp_row) return x.erp_row;
                             return {
                                 name: x.name,
                                 ProDes: x.name,

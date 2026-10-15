@@ -1,5 +1,6 @@
 <?php
 /** Outbound SQL Server bridge for shared hosting. No VPN commands run in PHP. */
+require_once __DIR__.'/ERPInventoryContract.php';
 class TiamJobBusy extends RuntimeException {}
 class TiamInventory {
     public static function directory() {
@@ -41,7 +42,7 @@ class TiamInventory {
         $cfg['price_unit'] = $input['price_unit'] ?? 'toman';
         if (!in_array($cfg['price_unit'], ['toman', 'rial'], true)) throw new RuntimeException('واحد قیمت معتبر نیست.');
         $cfg['mapping'] = [];
-        foreach (['sku', 'name', 'stock', 'size', 'color', 'warehouse', 'price', 'model', 'category', 'subcategory', 'product_type', 'grade', 'warehouse_name', 'source_updated_at'] as $field) {
+        foreach (['sku', 'name', 'stock', 'size', 'color', 'warehouse', 'price', 'model', 'category', 'subcategory', 'product_type', 'grade', 'warehouse_name', 'source_updated_at', 'color_code', 'category_path'] as $field) {
             $column = trim((string)($input['mapping'][$field] ?? ''));
             if ($column !== '' && !preg_match('/^[\p{L}_][\p{L}\p{N}_ ]{0,127}$/uD', $column)) throw new RuntimeException('نام ستون معتبر نیست.');
             $cfg['mapping'][$field] = $column;
@@ -54,14 +55,16 @@ class TiamInventory {
         return $cfg;
     }
     /** Opt-in mapping from the supplied FactInventory schema; Grade semantics are unconfirmed. */
-    public static function factInventoryMapping() {
-        return ['sku'=>'ProCode','name'=>'ProDes','stock'=>'StockTedad','warehouse'=>'ShopCode','model'=>'ProCode',
+    public static function factInventoryMapping($complete = false) {
+        $mapping = ['sku'=>'ProCode','name'=>'ProDes','stock'=>'StockTedad','warehouse'=>'ShopCode','model'=>'ProCode',
             'category'=>'Category','subcategory'=>'SubCategory','product_type'=>'ProductType','grade'=>'Grade',
             'warehouse_name'=>'ShopName','source_updated_at'=>'LastUpdateDateTime', 'size'=>'','color'=>'','price'=>''];
+        if($complete)$mapping=array_replace($mapping,['model'=>'ModelCode','size'=>'Size','color'=>'Color','color_code'=>'ColorCode','price'=>'NetItem','warehouse'=>'AnbarCode','warehouse_name'=>'AnbarName','category_path'=>'CategoryPath']);
+        return $mapping;
     }
     public static function normalize($rows, $cfg) {
         if (!is_array($rows) || !$rows || count($rows) > 50000) throw new RuntimeException('دریافت خالی یا بیش از ۵۰۰۰۰ ردیف؛ هیچ داده‌ای اعمال نشد.');
-        $map = $cfg['mapping'] ?? []; $out = []; $seen = [];
+        $map = $cfg['mapping'] ?? []; $out = []; $seen = []; $skuIdentity = [];
         foreach (['sku', 'name', 'stock'] as $f) if (empty($map[$f])) throw new RuntimeException('نگاشت کد کالا، نام و موجودی الزامی است.');
         foreach ($rows as $i => $row) {
             if (!is_array($row)) throw new RuntimeException('ساختار ردیف دریافتی معتبر نیست.');
@@ -73,10 +76,15 @@ class TiamInventory {
                 $item[$field] = trim((string)$row[$column]);
             }
             if ($item['sku'] === '' || $item['name'] === '' || !is_numeric($item['stock']) || !is_finite((float)$item['stock'])) throw new RuntimeException('کد، نام یا موجودی نامعتبر در ردیف ' . ($i + 1));
+            if(isset($item['model']) && $item['model']==='')throw new RuntimeException('شناسهٔ مدل مادر در ستون نگاشت‌شده خالی است.');
             $item['stock'] = (float)$item['stock'];
             if (isset($item['price']) && (!is_numeric($item['price']) || !is_finite((float)$item['price']) || (float)$item['price'] < 0)) throw new RuntimeException('قیمت نامعتبر در ردیف ' . ($i + 1));
             if (isset($item['price']) && ($cfg['price_unit'] ?? 'toman') === 'rial') $item['price'] = (float)$item['price'] / 10;
-            $key = json_encode([$item['sku'], $item['color'] ?? '', $item['size'] ?? '', $item['warehouse'] ?? '']);
+            $identityColor=(string)($item['color_code']??'')!==''?$item['color_code']:($item['color']??'');
+            $identity=json_encode([$item['model']??'', $identityColor,$item['size']??'']);
+            if(isset($skuIdentity[$item['sku']]) && $skuIdentity[$item['sku']]!==$identity)throw new RuntimeException('یک کد کالا با مدل، رنگ یا سایز متفاوت گزارش شده است.');
+            $skuIdentity[$item['sku']]=$identity;
+            $key = json_encode([$item['sku'], $identityColor, $item['size'] ?? '', $item['warehouse'] ?? '']);
             if (isset($seen[$key])) throw new RuntimeException('ردیف تکراری برای ترکیب کالا/رنگ/سایز/انبار؛ ابتدا سطح دادهٔ ویو را اصلاح کنید.');
             $seen[$key] = true; $out[] = $item;
         }
@@ -91,8 +99,14 @@ class TiamInventory {
                 foreach (($variant['tiam_warehouses']??[]) as $warehouse) if (is_array($warehouse)) $warehouses[]=$warehouse;
             }
         }
-        if ($key!==null) { $product['tiam_key']=$key; $product['tiam_warehouses']=$warehouses; }
+        if ($key!==null) { $product['tiam_key']=$key; $product['tiam_warehouses']=$warehouses; $product=ERPInventoryContract::product($product); }
         return $product;
+    }
+    private static function canonical($value) {
+        if(!is_array($value))return $value;
+        foreach($value as &$item)$item=self::canonical($item);unset($item);
+        if($value && array_keys($value)!==range(0,count($value)-1))ksort($value,SORT_STRING);
+        return $value;
     }
     private static function syncValue($product) {
         $value=[];
@@ -101,19 +115,26 @@ class TiamInventory {
             if (in_array($field,['stock_total','stock_online'],true)) $item=is_numeric($item)?(float)$item:null;
             $value[$field]=$item;
         }
-        return json_encode($value);
+        return json_encode(self::canonical($value));
     }
     public static function merge($project, $items, $cfg) {
         $products = $project['products'] ?? []; $groups = []; $changes = []; $counts = ['new' => 0, 'updated' => 0, 'unchanged' => 0, 'missing' => 0];
         foreach ($items as $item) {
-            $key = self::productKey($item['model'] ?? $item['name'], $item['color'] ?? '');
+            $key = self::productKey($item['model'] ?? $item['name'], (string)($item['color_code']??'')!==''?'code:'.$item['color_code']:($item['color'] ?? ''));
             $groups[$key][] = $item;
         }
-        $indices = [];
+        $indices = []; $skuIndices=[];
+        foreach($products as $i=>$product){
+            foreach(array_merge([['sku'=>$product['sku']??'']],$product['variants']??[]) as $variant)if((string)($variant['sku']??'')!=='')$skuIndices[(string)$variant['sku']][$i]=true;
+        }
         foreach ($products as $i => $p) $indices[$p['tiam_key'] ?? self::productKey($p['name'] ?? '', $p['color'] ?? '')] = $i;
         $touched = []; $matchedIndices = [];
         foreach ($groups as $key => $rows) {
-            $index = $indices[$key] ?? ($indices[self::productKey($rows[0]['name'], $rows[0]['color'] ?? '')] ?? null); $old = $index !== null ? $products[$index] : [];
+            $skuMatches=[];
+            foreach($rows as $record)foreach(($skuIndices[$record['sku']]??[]) as $candidate=>$yes)$skuMatches[$candidate]=true;
+            if(count($skuMatches)>1)throw new RuntimeException('کدهای این مدل به چند محصول قدیمی تعلق دارند؛ ادغام نیاز به بررسی دستی دارد.');
+            $index=$indices[$key]??($skuMatches?array_key_first($skuMatches):($indices[self::productKey($rows[0]['name'],$rows[0]['color']??'')]??null));
+            $old=$index!==null?$products[$index]:[];
             if ($index !== null) {
                 if (isset($matchedIndices[$index])) throw new RuntimeException('چند کد مستقل به یک محصول قدیمی با نام یکسان می‌رسند؛ قبل از اعمال، هویت کالاها را اصلاح کنید.');
                 $matchedIndices[$index] = true;
@@ -127,14 +148,14 @@ class TiamInventory {
                     if (isset($row['price'])) $variants[$vk]['price'] = (float)$row['price'];
                 }
                 $variants[$vk]['inventory'] += $row['stock'];
-                $sourceAttributes = array_intersect_key($row, array_flip(['category','subcategory','product_type','grade','warehouse_name','source_updated_at']));
+                $sourceAttributes = array_intersect_key($row, array_flip(['category','subcategory','product_type','grade','warehouse_name','source_updated_at','color_code','category_path']));
                 $warehouseRecord = ['sku' => $row['sku'], 'size' => $row['size'] ?? '', 'warehouse' => $row['warehouse'] ?? '', 'inventory' => $row['stock']] + ($sourceAttributes ? ['tiam_attributes'=>$sourceAttributes] : []);
                 $warehouses[]=$warehouseRecord; $variants[$vk]['tiam_warehouses'][]=$warehouseRecord;
             }
             foreach (($old['variants'] ?? []) as $oldVariant) {
                 $vk = json_encode([(string)($oldVariant['sku'] ?? ''), (string)($oldVariant['size'] ?? '')]);
                 if (isset($variants[$vk])) $variants[$vk] = array_replace($oldVariant, $variants[$vk]);
-                else { $variants[$vk] = $oldVariant; if (!empty($cfg['zero_missing'])) { $variants[$vk]['inventory'] = 0; foreach (($variants[$vk]['tiam_warehouses']??[]) as $wi=>$record) $variants[$vk]['tiam_warehouses'][$wi]['inventory']=0; } }
+                else { if(in_array((string)($oldVariant['sku']??''),array_column($rows,'sku'),true))continue; $variants[$vk] = $oldVariant; if (!empty($cfg['zero_missing'])) { $variants[$vk]['inventory'] = 0; foreach (($variants[$vk]['tiam_warehouses']??[]) as $wi=>$record) $variants[$vk]['tiam_warehouses'][$wi]['inventory']=0; } }
             }
             $stock = array_sum(array_column($variants, 'inventory'));
             $new = array_replace($old, ['id' => $old['id'] ?? ('tiam_' . substr(hash('sha256', $project['id'] . $key), 0, 24)),
@@ -143,7 +164,14 @@ class TiamInventory {
                 'stock_total' => $stock, 'stock_online' => $stock, 'inventory' => $stock, 'quantity' => $stock,
                 'tiam_key' => $key, 'tiam_warehouses' => $warehouses]);
             if (isset($rows[0]['price'])) $new['price'] = (string)$rows[0]['price'];
-            if (!$old) { $new['status'] = 'draft'; $new['extracted_at'] = date('Y-m-d H:i:s'); }
+            if (!$old) { $new=array_replace(['image'=>'','gallery'=>[],'description'=>'','manualEdit'=>false,'priority'=>5],$new); $new['status'] = 'pending'; $new['extracted_at'] = date('Y-m-d H:i:s'); }
+            $new['model_code']=$rows[0]['model']??$rows[0]['sku'];
+            $new=ERPInventoryContract::product($new);
+            if(!empty($rows[0]['category_path'])) {
+                $new['category_path']=$rows[0]['category_path'];
+                $segments=array_map('trim',explode('/',$new['category_path']));
+                $new['categories']=['gender'=>$segments[0]??'','group'=>$segments[1]??'','type'=>$segments[2]??''];
+            }
             $changed = !$old || self::syncValue($old) !== self::syncValue($new); $type = !$old ? 'new' : ($changed ? 'updated' : 'unchanged'); $counts[$type]++;
             if ($changed) $changes[] = ['type' => $type, 'name' => $new['name'], 'color' => $new['color'], 'before' => $old['stock_total'] ?? null, 'after' => $stock, 'sizes' => $new['sizes'], 'variants' => $new['variants']];
             if ($index === null) $products[] = $new; else $products[$index] = $new;
@@ -159,6 +187,7 @@ class TiamInventory {
                 foreach (($p['tiam_warehouses'] ?? []) as $i => $w) $p['tiam_warehouses'][$i]['inventory'] = 0;
             }
         } unset($p);
+        foreach($products as &$product)if(isset($product['tiam_key']))$product=ERPInventoryContract::product($product);unset($product);
         return ['products' => array_values($products), 'counts' => $counts, 'changes' => $changes];
     }
     public static function owner() { return hash('sha256', session_id() . '|' . ($_SESSION['user']['username'] ?? '')); }
@@ -187,14 +216,16 @@ class TiamInventory {
         if (!in_array($job['state']??'', ['queued','running','preview'], true)) throw new RuntimeException('این درخواست دیگر فعال نیست.');
         $job['state']='cancelled'; $job['cancelled_at']=time();
         $job['logs'][]=['stage'=>'queue','status'=>'cancelled','message'=>'درخواست لغو شد؛ نتیجهٔ دیررس ایجنت پذیرفته نمی‌شود.','elapsed_ms'=>0];
-        unset($job['products']);
+        unset($job['products'], $job['erp_items']);
         self::write($projectId,$job);
         return $job;
     }
     public static function preview($project, $job, $rows) {
         $cfg = $project['settings']['tiam_inventory'];
         if (!hash_equals($job['config_hash'], self::fingerprint($cfg))) throw new RuntimeException('تنظیمات تغییر کرده؛ درخواست جدید بسازید.');
-        $result = self::merge($project, self::normalize($rows, $cfg), $cfg);
+        $normalized = self::normalize($rows,$cfg);
+        $result = self::merge($project, $normalized, $cfg);
+        $job['erp_items']=$normalized;
         $job['base'] = self::base($project); $job['state'] = 'preview';
         $job['products'] = $result['products']; $job['counts'] = $result['counts']; $job['changes'] = array_slice($result['changes'], 0, 100);
         $job['change_count'] = count($result['changes']); $job['sample'] = array_slice($rows, 0, 5);
@@ -208,7 +239,7 @@ class TiamInventory {
         $project['settings']['tiam_inventory']['last_success'] = (new DateTimeImmutable('now', new DateTimeZone('Asia/Tehran')))->format('Y-m-d');
         $project['settings']['tiam_inventory']['last_error'] = '';
         if (!saveProject($project)) throw new RuntimeException('ذخیرهٔ محصولات ناموفق بود.');
-        unset($job['products']); $job['state'] = 'applied'; self::write($project['id'], $job);
+        unset($job['products'], $job['erp_items']); $job['state'] = 'applied'; self::write($project['id'], $job);
         return $job;
     }
 }

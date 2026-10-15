@@ -4840,6 +4840,18 @@ function extractSportlandModelKey($text, $customBrands = []) {
  * پشتیبانی از روش ۱ (استاندارد) و روش ۲ (اسپورت لند با تطابق مدل انگلیسی و تجمیع انبارها)
  */
 function processAndSyncProducts(&$project, $incomingItems, $source = 'json', $erpMode = 'standard') {
+    $contractCount=count(array_filter($incomingItems,static fn($row)=>is_array($row)&&($row['_erp_contract']??'')===ERPInventoryContract::VERSION));
+    if($contractCount && $contractCount!==count($incomingItems))throw new RuntimeException('ردیف‌های ERP نسخه‌دار و دادهٔ قدیمی را در یک فایل مخلوط نکنید.');
+    if ($incomingItems && $contractCount===count($incomingItems)) {
+        $cfg=$project['settings']['tiam_inventory']??[];
+        $cfg['mapping']=ERPInventoryContract::mapping($incomingItems);
+        $cfg['price_unit']='toman'; // Export contract has already converted source currency.
+        $normalized=TiamInventory::normalize($incomingItems,$cfg);
+        $result=TiamInventory::merge($project,$normalized,$cfg);
+        $project['products']=$result['products'];
+        return ['new'=>$result['counts']['new'],'updated'=>$result['counts']['updated'],'products'=>$project['products']];
+    }
+
     $sportlandBrands = $project['settings']['sportland_brands'] ?? [];
     $isSportland = ($erpMode === 'sportland' || $source === 'sportland');
 

@@ -34,7 +34,7 @@ try {
         $_SESSION['project_id'] = $id;
         if (!hasPermission('settings') || !isModuleActive('settings') || !AccessControl::allowed('settings', 'use')) AccessControl::deny();
         if (empty($body['csrf']) || !hash_equals($_SESSION['tiam_csrf'] ?? '', $body['csrf'])) tiamReply(['error' => 'Invalid CSRF token'], 403);
-        if (in_array($action, ['preview', 'apply'], true) && (!hasPermission('products') || !isModuleActive('products') || !AccessControl::allowed('products', 'use'))) AccessControl::deny();
+        if (in_array($action, ['preview', 'apply', 'export_manual'], true) && (!hasPermission('products') || !isModuleActive('products') || !AccessControl::allowed('products', 'use'))) AccessControl::deny();
     }
     $response = TiamInventory::locked($id, function() use ($id, $action, $body, $agent) {
         $project = getCurrentProject($id, true); $cfg = $project['settings']['tiam_inventory'] ?? [];
@@ -48,6 +48,9 @@ try {
         if (in_array($action, ['vpn_test', 'view_test', 'preview'], true)) {
             if (empty($cfg['agent_token_hash'])) throw new RuntimeException('ابتدا تنظیمات و کلید ایجنت را ذخیره کنید.');
             $job = TiamInventory::createJob($project, $action, TiamInventory::owner());
+        } elseif ($action === 'export_manual') {
+            if (empty($job['erp_items']) || !is_string($body['job']??null) || !hash_equals($job['id']??'',$body['job']) || ($job['state']??'')!=='preview' || ($job['expires']??0)<=time() || !hash_equals($job['owner']??'',TiamInventory::owner()) || !hash_equals($job['base']??'',TiamInventory::base($project)) || !hash_equals($job['config_hash']??'',TiamInventory::fingerprint($cfg))) throw new RuntimeException('برای خروجی دستی، پیش‌نمایش معتبر متعلق به همین نشست لازم است.');
+            return ['format'=>ERPInventoryContract::VERSION,'rows'=>array_map([ERPInventoryContract::class,'row'],$job['erp_items']??[])];
         } elseif ($action === 'cancel') {
             $job = TiamInventory::cancelJob($id,$body['job']??'',TiamInventory::owner(),isMainAdmin() || isProjectAdmin());
         } elseif ($action === 'latest') {
@@ -109,7 +112,7 @@ try {
         $job['can_cancel'] = in_array($job['state']??'', ['queued','running','preview'],true) && (isMainAdmin() || isProjectAdmin() || hash_equals($job['owner']??'', TiamInventory::owner()));
         $job['agent_connected'] = !empty($job['agent_last_seen']) && $job['agent_last_seen'] >= time()-90;
         $job['can_apply'] = ($job['state'] ?? '') === 'preview' && hash_equals($job['owner'] ?? '', TiamInventory::owner());
-        unset($job['products'], $job['owner'], $job['config_hash'], $job['base']);
+        unset($job['products'], $job['erp_items'], $job['owner'], $job['config_hash'], $job['base']);
         return $job;
     });
     tiamReply($response);

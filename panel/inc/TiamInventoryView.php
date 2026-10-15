@@ -46,9 +46,11 @@ $inventoryCfg = $project['settings']['tiam_inventory'] ?? [];
     </label>
     <h4 class="font-bold text-sm">نگاشت ستون‌های ویو به ساختار محصولات</h4>
     <button type="button" id="tiam-factinventory-preset" onclick="tiamFactInventoryPreset()" class="bg-slate-700 text-white px-4 py-2 rounded-lg text-xs">جایگزینی نگاشت با الگوی FactInventory</button>
+    <button type="button" onclick="tiamFactInventoryPreset(true)" class="bg-slate-700 text-white px-4 py-2 rounded-lg text-xs">الگوی کامل ERP پس از تکمیل گزارش سایز و رنگ</button>
+    <p class="text-xs">الگوی کامل شامل ModelCode، Size، Color، ColorCode، NetItem، AnbarCode، AnbarName و CategoryPath است. تا اضافه‌شدن این ستون‌ها، از الگوی فعلی استفاده کنید.</p>
     <p class="text-xs">الگو بر اساس ساختار بررسی‌شده: کد ProCode، نام ProDes، موجودی StockTedad و شعبه ShopCode. هویت محصول بر اساس ProCode است. سایز، رنگ و قیمت خالی می‌مانند؛ Grade با نام خودش در اطلاعات منبع حفظ می‌شود. الگو فقط این فرم را تغییر می‌دهد؛ سپس ذخیره کنید و پیش‌نمایش بگیرید.</p>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-    <?php foreach (['sku'=>'کد / بارکد کالا *', 'name'=>'نام کالا *', 'stock'=>'موجودی *', 'size'=>'سایز', 'color'=>'رنگ', 'warehouse'=>'انبار / شعبه', 'price'=>'قیمت (واحد فعلی سیستم)', 'model'=>'شناسهٔ پایدار محصول / مدل مادر', 'category'=>'دسته‌بندی منبع', 'subcategory'=>'زیردسته‌بندی منبع', 'product_type'=>'نوع محصول منبع', 'grade'=>'Grade (بدون فرض سایز)', 'warehouse_name'=>'نام شعبه', 'source_updated_at'=>'زمان به‌روزرسانی منبع'] as $field=>$label): ?>
+    <?php foreach (['sku'=>'کد / بارکد کالا *', 'name'=>'نام کالا *', 'stock'=>'موجودی *', 'size'=>'سایز', 'color'=>'رنگ', 'warehouse'=>'انبار / شعبه', 'price'=>'قیمت (واحد فعلی سیستم)', 'model'=>'شناسهٔ پایدار محصول / مدل مادر', 'category'=>'دسته‌بندی منبع', 'subcategory'=>'زیردسته‌بندی منبع', 'product_type'=>'نوع محصول منبع', 'grade'=>'Grade (بدون فرض سایز)', 'warehouse_name'=>'نام شعبه', 'source_updated_at'=>'زمان به‌روزرسانی منبع', 'color_code'=>'کد رنگ', 'category_path'=>'مسیر دسته‌بندی سازگار با ERP'] as $field=>$label): ?>
         <label class="text-xs"><?php echo $label; ?><input data-tiam-map="<?php echo $field; ?>" value="<?php echo htmlspecialchars($inventoryCfg['mapping'][$field] ?? ''); ?>" class="input text-xs mt-1" dir="ltr"></label>
     <?php endforeach; ?>
     </div>
@@ -67,6 +69,7 @@ $inventoryCfg = $project['settings']['tiam_inventory'] ?? [];
     <pre id="tiam-inventory-log" class="text-xs bg-slate-900 text-slate-100 p-4 rounded-lg whitespace-pre-wrap max-h-96 overflow-auto" dir="rtl" aria-live="polite"></pre>
     <p class="text-xs">لغو درخواست، نتیجهٔ آن را بی‌اعتبار می‌کند؛ اتصال VPN یا پردازش محلی در حال اجرا را فوراً متوقف نمی‌کند.</p>
     <button type="button" id="tiam-inventory-cancel" hidden onclick="tiamInventoryAction('cancel')" class="bg-rose-700 text-white px-4 py-2 rounded-lg text-xs">لغو درخواست معطل / جاری</button>
+    <button type="button" id="tiam-inventory-export" hidden onclick="tiamInventoryAction('export_manual')" class="bg-slate-700 text-white px-4 py-2 rounded-lg text-xs">دانلود JSON سازگار با بخش همگام‌سازی دستی</button>
     <button type="button" id="tiam-inventory-confirm" hidden onclick="tiamInventoryAction('apply')" class="bg-emerald-600 text-white px-5 py-3 rounded-lg font-bold">تأیید پیش‌نمایش و اعمال تغییرات</button>
 </section>
 <script>
@@ -74,11 +77,12 @@ window.tiamInventoryConfigured = <?php echo !empty($inventoryCfg['host'])?'true'
 let tiamInventoryJob = null, tiamInventoryTimer = null, tiamInventoryRequest = 0;
 const tiamInventoryProject = <?php echo json_encode($project['id']); ?>;
 const tiamInventoryCsrf = <?php echo json_encode($_SESSION['tiam_csrf']); ?>;
-function tiamFactInventoryPreset() {
-    const mapping=<?php echo json_encode(TiamInventory::factInventoryMapping(), JSON_UNESCAPED_UNICODE); ?>;
+function tiamFactInventoryPreset(complete=false) {
+    const baseMapping=<?php echo json_encode(TiamInventory::factInventoryMapping(), JSON_UNESCAPED_UNICODE); ?>;
+    const mapping=complete?<?php echo json_encode(TiamInventory::factInventoryMapping(true), JSON_UNESCAPED_UNICODE); ?>:baseMapping;
     document.querySelectorAll('[data-tiam-map]').forEach(el=>el.value=mapping[el.dataset.tiamMap]||'');
-    document.querySelector('[data-tiam-field="view"]').value='FactInventory';
-    document.getElementById('tiam-inventory-log').textContent='نگاشت FactInventory در فرم وارد شد؛ سایز، رنگ و قیمت تعیین نشده‌اند. تنظیمات را ذخیره کنید، سپس پیش‌نمایش را بررسی کنید.';
+    if(!complete)document.querySelector('[data-tiam-field="view"]').value='FactInventory';
+    document.getElementById('tiam-inventory-log').textContent=complete?'الگوی کامل ERP وارد شد؛ نام گزارش را مطابق خروجی تیم فنی تنظیم کنید. فقط پس از اضافه‌شدن ستون‌ها ذخیره و تست کنید.':'نگاشت FactInventory فعلی وارد شد؛ سایز، رنگ و قیمت تعیین نشده‌اند. تنظیمات را ذخیره کنید، سپس پیش‌نمایش را بررسی کنید.';
 }
 function tiamUpdateNetworkMode() {
     const managed=document.getElementById('tiam-network-mode').value==='1';
@@ -111,7 +115,7 @@ async function tiamInventoryAction(action) {
     const requestVersion = ++tiamInventoryRequest;
     clearTimeout(tiamInventoryTimer);
     const log = document.getElementById('tiam-inventory-log');
-    document.getElementById('tiam-inventory-confirm').hidden = true;
+    if(action!=='export_manual')document.getElementById('tiam-inventory-confirm').hidden = true;
     const payload = {action, project:tiamInventoryProject, csrf:tiamInventoryCsrf, job:tiamInventoryJob};
     if (action==='save') {
         const cfg={mapping:{}};
@@ -125,6 +129,10 @@ async function tiamInventoryAction(action) {
         if(requestVersion!==tiamInventoryRequest) return;
         if(data.code==='TIAM_JOB_BUSY') { await tiamInventoryAction('latest'); if(tiamInventoryRequest===requestVersion+1) log.textContent='درخواست جدید ساخته نشد؛ وضعیت درخواست قبلی:\n'+log.textContent; return; }
         if(!response.ok || data.error) throw new Error(data.error || 'خطای سرور');
+        if(data.format==='maarksho.erp.inventory.v1') {
+            const url=URL.createObjectURL(new Blob([JSON.stringify(data.rows,null,2)],{type:'application/json'}));
+            const link=document.createElement('a');link.href=url;link.download='tiam-erp-manual-'+tiamInventoryProject+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return;
+        }
         if(data.id) tiamInventoryJob=data.id;
         if(data.status==='saved') {
             window.tiamInventoryConfigured=true;
@@ -132,6 +140,7 @@ async function tiamInventoryAction(action) {
             document.querySelectorAll('[data-tiam-field][type="password"]').forEach(el=>el.value=''); return;
         }
         document.getElementById('tiam-inventory-cancel').hidden=!data.can_cancel;
+        document.getElementById('tiam-inventory-export').hidden=!data.can_apply;
         const labels={queued:'در صف؛ هنوز توسط ایجنت دریافت نشده',running:'دریافت‌شده توسط ایجنت؛ منتظر نتیجه',cancelled:'لغو شده',expired:'مهلت درخواست تمام شده',done:'تست تمام شده',error:'عملیات ناموفق',preview:'آمادهٔ بررسی پیش‌نمایش',applied:'اعمال شده'};
         const seen=data.agent_last_seen?new Date(data.agent_last_seen*1000).toLocaleString('fa-IR',{timeZone:'Asia/Tehran'}):'هنوز ارتباط معتبری ثبت نشده';
         log.textContent=(labels[data.state]||'وضعیت ایجنت')+'\nآخرین ارتباط ایجنت: '+seen+' (تهران)\n'+(data.agent_connected?'ایجنت در ۹۰ ثانیهٔ اخیر با پنل ارتباط داشته است.':'ارتباط اخیر ایجنت ثبت نشده؛ آدرس، شناسهٔ پروژه و توکن را بررسی کنید.')+'\n'+JSON.stringify(data,null,2);
