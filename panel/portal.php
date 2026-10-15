@@ -187,26 +187,7 @@ if (!isModuleActive('products')) {
 }
 
 function isProductImageUrlApproved($p, $imgUrl) {
-    if (empty($p['images_list'])) {
-        return false;
-    }
-    $list = $p['images_list'];
-    if (is_string($list)) {
-        $list = json_decode($list, true) ?: [];
-    }
-    if (is_array($list)) {
-        $cleanImgUrl = strtok($imgUrl, '?');
-        foreach ($list as $item) {
-            $cleanItemUrl = isset($item['url']) ? strtok($item['url'], '?') : '';
-            if ($cleanItemUrl && $cleanItemUrl === $cleanImgUrl) {
-                return !empty($item['approved']);
-            }
-        }
-    }
-    if (isset($p['status']) && $p['status'] === 'active') {
-        return true;
-    }
-    return false;
+    return WebsiteCatalogSync::imageApproved($p,$imgUrl);
 }
 
 function renderCardImageCarousel($p) {
@@ -5939,7 +5920,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                     return cleanItemUrl && cleanItemUrl === cleanImg;
                 });
                 if (found) {
-                    return !!found.approved;
+                    return found.source === 'site' || !!found.site_verified_at || !!found.approved;
                 }
             }
             if ((p.status || '') === 'active') {

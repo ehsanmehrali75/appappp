@@ -1738,782 +1738,56 @@ $sections_json
         }
     }
 
+    if (in_array($action,['export_website_begin','export_website_chunk','export_website_finish'],true)) {
+        if(!hasPermission('products')){http_response_code(403);echo json_encode(['status'=>'failed','msg'=>'دسترسی غیرمجاز']);exit;}
+        try{
+            if(!hash_equals($_SESSION['website_catalog_csrf']??'',(string)($_POST['csrf']??''))||empty($_POST['csrf']))throw new RuntimeException('صفحه را تازه کنید و دوباره خروجی بگیرید.');
+            require_once __DIR__.'/inc/WebsiteExportPackage.php';
+            if($action==='export_website_begin'){
+                $ids=json_decode($_POST['product_ids']??'[]',true);if(!is_array($ids)||!$ids||count($ids)>5000||array_filter($ids,fn($id)=>!is_string($id)))throw new RuntimeException('فهرست انتخاب محصولات معتبر نیست.');
+                foreach(($_SESSION['website_export_batch']['parts']??[]) as $oldPart)if(preg_match('/^website_export_[a-f0-9]{32}\.zip$/',basename($oldPart)))@unlink(UPLOADS_DIR.basename($oldPart));
+                $job=['token'=>bin2hex(random_bytes(24)),'project'=>$project['id'],'expires'=>time()+3600,'ids'=>array_values(array_unique($ids)),'offset'=>0,'parts'=>[],'receipts'=>[],'warnings'=>[]];
+                $_SESSION['website_export_batch']=$job;
+                echo json_encode(['status'=>'success','token'=>$job['token'],'total'=>count($job['ids'])]);
+            }else{
+                $job=$_SESSION['website_export_batch']??[];
+                if(($job['project']??'')!==$project['id']||($job['expires']??0)<time()||!hash_equals($job['token']??'',(string)($_POST['token']??'')))throw new RuntimeException('درخواست خروجی منقضی یا متعلق به پروژهٔ دیگری است.');
+                $builder=new WebsiteExportPackage(UPLOADS_DIR,$_SERVER['HTTP_HOST']??'');
+                if($action==='export_website_chunk'){
+                    if($job['offset']<count($job['ids'])){
+                        $batch=array_slice($job['ids'],$job['offset'],5);$fresh=getCurrentProject($project['id'],true);@set_time_limit(120);
+                        $result=$builder->build($fresh,$batch,true);
+                        if($result['zip_url'])$job['parts'][]=$result['zip_url'];
+                        $job['receipts']+=$result['receipts'];$job['warnings']=array_merge($job['warnings'],$result['warnings']);$job['offset']+=count($batch);
+                        $_SESSION['website_export_batch']=$job;
+                    }
+                    echo json_encode(['status'=>'success','processed'=>$job['offset'],'total'=>count($job['ids']),'done'=>$job['offset']>=count($job['ids'])]);
+                }else{
+                    if($job['offset']<count($job['ids']))throw new RuntimeException('ساخت بسته‌ها هنوز تمام نشده است.');
+                    $url=$builder->merge($job['parts'],$job['warnings']);
+                    $_SESSION['website_export_receipt']=['project'=>$project['id'],'expires'=>time()+86400,'products'=>$job['receipts']];
+                    foreach($job['parts'] as $part)@unlink(UPLOADS_DIR.basename($part));unset($_SESSION['website_export_batch']);
+                    echo json_encode(['status'=>'success','zip_url'=>$url,'exported_ids'=>array_keys($job['receipts']),'warnings'=>$job['warnings']],JSON_UNESCAPED_UNICODE);
+                }
+            }
+        }catch(Throwable $e){http_response_code(400);echo json_encode(['status'=>'failed','msg'=>$e instanceof RuntimeException?$e->getMessage():'ساخت بستهٔ خروجی ناموفق بود.'],JSON_UNESCAPED_UNICODE);}
+        exit;
+    }
+
     if ($action === 'export_website') {
+        if (!hasPermission('products')) {echo json_encode(['status'=>'failed','msg'=>'دسترسی غیرمجاز']);exit;}
         try {
-            if (!hasPermission('products')) {
-            echo json_encode(['status' => 'failed', 'msg' => 'دسترسی غیرمجاز']);
-            exit();
-        }
-        $pids = $_POST['product_ids'] ?? [];
-        if (is_string($pids)) {
-            $pids = json_decode($pids, true) ?: [];
-        }
-        if (empty($pids)) {
-            echo json_encode(['status' => 'failed', 'msg' => 'هیچ محصولی انتخاب نشده است.']);
-            exit();
-        }
-
-        $selectedProducts = [];
-        foreach ($project['products'] as $p) {
-            if (in_array($p['id'], $pids)) {
-                $selectedProducts[] = $p;
-            }
-        }
-
-        if (empty($selectedProducts)) {
-            echo json_encode(['status' => 'failed', 'msg' => 'محصولی یافت نشد.']);
-            exit();
-        }
-
-        if (!class_exists('ZipArchive')) {
-            echo json_encode(['status' => 'failed', 'msg' => 'افزونه ZipArchive روی این سرور فعال نیست.']);
-            exit();
-        }
-        if (!extension_loaded('gd')) {
-            echo json_encode(['status' => 'failed', 'msg' => 'افزونه GD برای پردازش تصاویر روی سرور فعال نیست.']);
-            exit();
-        }
-
-        $resolveLocalPath = function($path) {
-            if (empty($path)) return false;
-            
-            // If it's a full URL, check if it belongs to our host
-            if (strpos($path, 'http://') === 0 || strpos($path, 'https://') === 0) {
-                $parsed = @parse_url($path);
-                if ($parsed) {
-                    $host = $parsed['host'] ?? '';
-                    $currentHost = $_SERVER['HTTP_HOST'] ?? '';
-                    $forwardedHost = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? '';
-                    
-                    // Clean ports if any
-                    $cleanHost = strtolower(explode(':', $host)[0]);
-                    $cleanCurr = strtolower(explode(':', $currentHost)[0]);
-                    $cleanFwd = strtolower(explode(':', $forwardedHost)[0]);
-                    
-                    $isSelf = false;
-                    if (empty($cleanHost)) {
-                        $isSelf = true;
-                    } elseif ($cleanHost === 'localhost' || $cleanHost === '127.0.0.1') {
-                        $isSelf = true;
-                    } elseif (!empty($cleanCurr) && $cleanHost === $cleanCurr) {
-                        $isSelf = true;
-                    } elseif (!empty($cleanFwd) && $cleanHost === $cleanFwd) {
-                        $isSelf = true;
-                    }
-                    
-                    if ($isSelf) {
-                        $urlPath = $parsed['path'] ?? '';
-                        $uPos = strpos($urlPath, 'uploads/');
-                        if ($uPos !== false) {
-                            $sub = substr($urlPath, $uPos + 8);
-                            if (($qPos = strpos($sub, '?')) !== false) {
-                                $sub = substr($sub, 0, $qPos);
-                            }
-                            $diskPath = UPLOADS_DIR . ltrim($sub, '/');
-                            if (file_exists($diskPath)) {
-                                return $diskPath;
-                            }
-                        }
-                        
-                        $rawPath = ltrim($urlPath, '/');
-                        if (($qPos = strpos($rawPath, '?')) !== false) {
-                            $rawPath = substr($rawPath, 0, $qPos);
-                        }
-                        $diskPath2 = __DIR__ . '/' . $rawPath;
-                        if (file_exists($diskPath2)) {
-                            return $diskPath2;
-                        }
-                        
-                        $diskPath3 = UPLOADS_DIR . basename($rawPath);
-                        if (file_exists($diskPath3)) {
-                            return $diskPath3;
-                        }
-                        
-                        return false; // Pointing to local domain but file does not exist on disk
-                    }
-                }
-            } else {
-                $clean = $path;
-                if (($qPos = strpos($clean, '?')) !== false) {
-                    $clean = substr($clean, 0, $qPos);
-                }
-                
-                if (file_exists($clean)) {
-                    return $clean;
-                }
-                
-                $diskPathSelf = UPLOADS_DIR . ltrim($clean, '/');
-                if (file_exists($diskPathSelf)) {
-                    return $diskPathSelf;
-                }
-                
-                $diskPath = __DIR__ . '/' . ltrim($clean, '/');
-                if (file_exists($diskPath)) {
-                    return $diskPath;
-                }
-                
-                $uPos = strpos($clean, 'uploads/');
-                if ($uPos !== false) {
-                    $sub = substr($clean, $uPos + 8);
-                    $diskPath = UPLOADS_DIR . ltrim($sub, '/');
-                    if (file_exists($diskPath)) {
-                        return $diskPath;
-                    }
-                }
-                
-                $diskPath = UPLOADS_DIR . basename($clean);
-                if (file_exists($diskPath)) {
-                    return $diskPath;
-                }
-            }
-            
-            return null; // External remote URL, needs download
-        };
-
-        $safeUrlEncode = function($url) {
-            if (empty($url)) return '';
-            if (strpos($url, 'http://') !== 0 && strpos($url, 'https://') !== 0) {
-                return $url;
-            }
-            $parsed = parse_url($url);
-            $scheme = isset($parsed['scheme']) ? $parsed['scheme'] . '://' : '';
-            $host = isset($parsed['host']) ? $parsed['host'] : '';
-            $port = isset($parsed['port']) ? ':' . $parsed['port'] : '';
-            $path = isset($parsed['path']) ? $parsed['path'] : '';
-            $query = isset($parsed['query']) ? '?' . $parsed['query'] : '';
-            
-            $pathParts = explode('/', $path);
-            foreach ($pathParts as &$part) {
-                $part = rawurlencode(rawurldecode($part));
-            }
-            $encodedPath = implode('/', $pathParts);
-            
-            if (!empty($query)) {
-                $queryParts = [];
-                parse_str($parsed['query'] ?? '', $queryParts);
-                $encodedQueryParts = [];
-                foreach ($queryParts as $k => $v) {
-                    $encodedQueryParts[] = urlencode($k) . '=' . urlencode($v);
-                }
-                $query = '?' . implode('&', $encodedQueryParts);
-            }
-            return $scheme . $host . $port . $encodedPath . $query;
-        };
-
-        $downloadUrlContent = function($url) use ($safeUrlEncode) {
-            $encodedUrl = $safeUrlEncode($url);
-            if (empty($encodedUrl)) return false;
-            
-            if (function_exists('curl_init')) {
-                $ch = curl_init();
-                curl_setopt($ch, CURLOPT_URL, $encodedUrl);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-                curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
-                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 8);
-                $userAgents = [
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                ];
-                curl_setopt($ch, CURLOPT_USERAGENT, $userAgents[array_rand($userAgents)]);
-                $data = curl_exec($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-                if ($httpCode === 200 && !empty($data)) {
-                    return $data;
-                }
-            }
-            
-            $ctx = stream_context_create([
-                'http' => [
-                    'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0\r\n",
-                    'timeout' => 8
-                ],
-                'ssl' => [
-                    'verify_peer' => false,
-                    'verify_peer_name' => false
-                ]
-            ]);
-            return @file_get_contents($encodedUrl, false, $ctx);
-        };
-
-        $contentCache = [];
-
-        $loadImageContent = function($path) use (&$contentCache, $downloadUrlContent, $resolveLocalPath) {
-            if (empty($path)) return false;
-            if (strpos($path, 'placehold') !== false) return false;
-            
-            if (isset($contentCache[$path])) {
-                return $contentCache[$path];
-            }
-            
-            $resolved = $resolveLocalPath($path);
-            if ($resolved === false) {
-                return false;
-            }
-            
-            $data = null;
-            if (is_string($resolved) && !empty($resolved)) {
-                $data = @file_get_contents($resolved);
-            } else {
-                $downloadUrl = $path;
-                if (strpos($downloadUrl, 'http://') !== 0 && strpos($downloadUrl, 'https://') !== 0) {
-                    $downloadUrl = getFullUrl($downloadUrl);
-                }
-                
-                $isSelfUrl = false;
-                $parsed = @parse_url($downloadUrl);
-                if ($parsed) {
-                    $host = $parsed['host'] ?? '';
-                    $currentHost = $_SERVER['HTTP_HOST'] ?? '';
-                    $forwardedHost = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? '';
-                    
-                    $cleanHost = strtolower(explode(':', $host)[0]);
-                    $cleanCurr = strtolower(explode(':', $currentHost)[0]);
-                    $cleanFwd = strtolower(explode(':', $forwardedHost)[0]);
-                    
-                    if (empty($cleanHost) || $cleanHost === 'localhost' || $cleanHost === '127.0.0.1' || 
-                        (!empty($cleanCurr) && $cleanHost === $cleanCurr) || 
-                        (!empty($cleanFwd) && $cleanHost === $cleanFwd)) {
-                        $isSelfUrl = true;
-                    }
-                }
-                
-                if (!$isSelfUrl && strpos($downloadUrl, 'http') === 0) {
-                    $data = $downloadUrlContent($downloadUrl);
-                }
-            }
-            
-            if ($data !== null && $data !== false && strlen($data) > 0) {
-                $contentCache[$path] = $data;
-                return $data;
-            }
-            return false;
-        };
-
-        $getOriginalExtension = function($path, $data = null) {
-            $cleanPath = $path;
-            if (($qPos = strpos($cleanPath, '?')) !== false) {
-                $cleanPath = substr($cleanPath, 0, $qPos);
-            }
-            $ext = strtolower(pathinfo($cleanPath, PATHINFO_EXTENSION));
-            if (in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif'])) {
-                return $ext;
-            }
-            
-            if ($data !== null && strlen($data) > 12) {
-                $signature = substr($data, 0, 12);
-                if (strpos($signature, 'RIFF') === 0 && strpos($signature, 'WEBP', 8) !== false) {
-                    return 'webp';
-                }
-                if (strpos($signature, "\x89PNG\r\n\x1a\n") === 0) {
-                    return 'png';
-                }
-                if (strpos($signature, "\xff\xd8\xff") === 0) {
-                    return 'jpg';
-                }
-                if (strpos($signature, 'GIF8') === 0) {
-                    return 'gif';
-                }
-            }
-            return 'jpg';
-        };
-
-        $resizeImage = function($src, $targetW = 1000, $targetH = 1250) {
-            $srcW = imagesx($src);
-            $srcH = imagesy($src);
-            $dst = imagecreatetruecolor($targetW, $targetH);
-            imagealphablending($dst, false);
-            imagesavealpha($dst, true);
-            $white = imagecolorallocatealpha($dst, 255, 255, 255, 127);
-            imagefill($dst, 0, 0, $white);
-            
-            $srcAspect = $srcW / $srcH;
-            $dstAspect = $targetW / $targetH;
-            $isSquare = (abs($srcAspect - 1.0) < 0.05);
-            
-            if ($isSquare) {
-                $srcCopyH = $srcH;
-                $srcCopyW = round($srcH * $dstAspect);
-                if ($srcCopyW > $srcW) {
-                    $srcCopyW = $srcW;
-                }
-                $srcX = round(($srcW - $srcCopyW) / 2);
-                $srcY = 0;
-            } elseif ($srcAspect > $dstAspect) {
-                $srcCopyH = $srcH;
-                $srcCopyW = round($srcH * $dstAspect);
-                if ($srcCopyW > $srcW) {
-                    $srcCopyW = $srcW;
-                }
-                $srcX = round(($srcW - $srcCopyW) / 2);
-                $srcY = 0;
-            } else {
-                $srcCopyW = $srcW;
-                $srcCopyH = round($srcW / $dstAspect);
-                if ($srcCopyH > $srcH) {
-                    $srcCopyH = $srcH;
-                }
-                $srcX = 0;
-                $srcY = round(($srcH - $srcCopyH) / 2);
-            }
-            
-            imagecopyresampled($dst, $src, 0, 0, $srcX, $srcY, $targetW, $targetH, $srcCopyW, $srcCopyH);
-            return $dst;
-        };
-
-        $saveToWebp = function($dst, $filepath) {
-            $qualities = [80, 60, 45];
-            foreach ($qualities as $q) {
-                ob_start();
-                imagewebp($dst, null, $q);
-                $data = ob_get_clean();
-                if (strlen($data) < 200 * 1024 || $q === 45) {
-                    file_put_contents($filepath, $data);
-                    return true;
-                }
-            }
-            return false;
-        };
-
-        $saveToJpg = function($dst, $filepath) {
-            $w = imagesx($dst);
-            $h = imagesy($dst);
-            $flat = imagecreatetruecolor($w, $h);
-            $white = imagecolorallocate($flat, 255, 255, 255);
-            imagefill($flat, 0, 0, $white);
-            imagecopy($flat, $dst, 0, 0, 0, 0, $w, $h);
-
-            $qualities = [100, 95, 90, 85, 80, 75, 70, 65, 60, 50, 40, 30];
-            $saved = false;
-            foreach ($qualities as $q) {
-                ob_start();
-                imagejpeg($flat, null, $q);
-                $data = ob_get_clean();
-                if (strlen($data) < 200 * 1024 || $q === 30) {
-                    file_put_contents($filepath, $data);
-                    $saved = true;
-                    break;
-                }
-            }
-            imagedestroy($flat);
-            return $saved;
-        };
-
-        $getColorHex = function($colorName) {
-            $colorName = trim($colorName);
-            if (empty($colorName)) return '#cccccc';
-            
-            $map = [
-                'مشکی' => '#000000', 'سیاه' => '#000000', 'سفید' => '#ffffff',
-                'قرمز' => '#ff0000', 'آبی' => '#0000ff', 'سبز' => '#008000',
-                'زرد' => '#ffff00', 'کرم' => '#f2e8c9', 'طوسی' => '#808080',
-                'خاکستری' => '#808080', 'قهوه ای' => '#8b4513', 'قهوه‌ای' => '#8b4513',
-                'بژ' => '#f5f5dc', 'صورتی' => '#ffc0cb', 'بنفش' => '#800080',
-                'نارنجی' => '#ffa500', 'سرمه ای' => '#000080', 'سرمه‌ای' => '#000080',
-                'یشمی' => '#2e8b57', 'کاکی' => '#f0e68c', 'زیتونی' => '#808000',
-                'فیروزه ای' => '#40e0d0', 'فیروزه‌ای' => '#40e0d0', 'لیمویی' => '#fdfd96',
-                'نسکافه ای' => '#b28e67', 'نسکافه‌ای' => '#b28e67', 'خردلی' => '#e1ad01',
-                'کاپوچینو' => '#7c533e', 'آبی روشن' => '#add8e6', 'بادمجانی' => '#4e2a5a'
-            ];
-            if (isset($map[$colorName])) return $map[$colorName];
-            foreach ($map as $pName => $hex) {
-                if (mb_strpos($colorName, $pName) !== false || mb_strpos($pName, $colorName) !== false) {
-                    return $hex;
-                }
-            }
-            $hash = md5($colorName);
-            return '#' . substr($hash, 0, 6);
-        };
-
-        $createPalette = function($colorHex, $targetW = 24, $targetH = 24) {
-            $hex = str_replace('#', '', $colorHex);
-            if (strlen($hex) == 3) {
-                $r = hexdec(substr($hex, 0, 1) . substr($hex, 0, 1));
-                $g = hexdec(substr($hex, 1, 1) . substr($hex, 1, 1));
-                $b = hexdec(substr($hex, 2, 1) . substr($hex, 2, 1));
-            } else {
-                $r = hexdec(substr($hex, 0, 2));
-                $g = hexdec(substr($hex, 2, 2));
-                $b = hexdec(substr($hex, 4, 2));
-            }
-            $dst = imagecreatetruecolor($targetW, $targetH);
-            $color = imagecolorallocate($dst, $r, $g, $b);
-            imagefill($dst, 0, 0, $color);
-            return $dst;
-        };
-
-        $zipName = 'website_export_' . time() . '_' . uniqid() . '.zip';
-        $zipPath = UPLOADS_DIR . $zipName;
-
-        $zip = new ZipArchive();
-        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            echo json_encode(['status' => 'failed', 'msg' => 'امکان ساخت فایل زیپ وجود ندارد.']);
-            exit();
-        }
-
-        $tempFiles = [];
-
-        $processAndAddImage = function($path, $imgTypeSuffix, $folderName, $cleanName, $cleanColor, $skipResize = false) use ($loadImageContent, $resizeImage, $saveToWebp, $saveToJpg, $getOriginalExtension, $zip, &$tempFiles) {
-            $data = $loadImageContent($path);
-            if (!$data) return false;
-            
-            if ($skipResize) {
-                // Return exact original, untouched file bytes with maximum resolution and visual quality!
-                $ext = $getOriginalExtension($path, $data);
-                $tmpPath = tempnam(sys_get_temp_dir(), 'export_') . '.' . $ext;
-                if (file_put_contents($tmpPath, $data)) {
-                    $zipZipPath = $folderName . '/' . $cleanName;
-                    if (!empty($cleanColor)) {
-                        $zipZipPath .= ' - ' . $cleanColor;
-                    }
-                    $zipZipPath .= ' - ' . $imgTypeSuffix . '.' . $ext;
-                    $zip->addFile($tmpPath, $zipZipPath);
-                    $tempFiles[] = $tmpPath;
-                    return true;
-                }
-                return false;
-            }
-            
-            $srcImg = @imagecreatefromstring($data);
-            if ($srcImg) {
-                if ($skipResize) {
-                    $resized = $srcImg;
-                } else {
-                    $resized = $resizeImage($srcImg, 1000, 1250);
-                }
-                
-                $webpSaved = false;
-                $jpgSaved = false;
-                
-                // 1. Try to save WebP first
-                if (function_exists('imagewebp')) {
-                    $tmpPathWebp = tempnam(sys_get_temp_dir(), 'export_') . '.webp';
-                    if ($saveToWebp($resized, $tmpPathWebp)) {
-                        $zipZipPathWebp = $folderName . '/' . $cleanName;
-                        if (!empty($cleanColor)) {
-                            $zipZipPathWebp .= ' - ' . $cleanColor;
-                        }
-                        $zipZipPathWebp .= ' - ' . $imgTypeSuffix . '.webp';
-                        
-                        $zip->addFile($tmpPathWebp, $zipZipPathWebp);
-                        $tempFiles[] = $tmpPathWebp;
-                        $webpSaved = true;
-                    }
-                }
-                
-                // 2. Save JPG
-                $tmpPathJpg = tempnam(sys_get_temp_dir(), 'export_') . '.jpg';
-                if ($saveToJpg($resized, $tmpPathJpg)) {
-                    $zipZipPathJpg = $folderName . '/' . $cleanName;
-                    if (!empty($cleanColor)) {
-                        $zipZipPathJpg .= ' - ' . $cleanColor;
-                    }
-                    $zipZipPathJpg .= ' - ' . $imgTypeSuffix . '.jpg';
-                    
-                    $zip->addFile($tmpPathJpg, $zipZipPathJpg);
-                    $tempFiles[] = $tmpPathJpg;
-                    $jpgSaved = true;
-                }
-                
-                if (!$skipResize) {
-                    imagedestroy($resized);
-                }
-                imagedestroy($srcImg);
-                return ($webpSaved || $jpgSaved);
-            }
-            
-            $ext = $getOriginalExtension($path, $data);
-            $tmpPath = tempnam(sys_get_temp_dir(), 'export_') . '.' . $ext;
-            if (file_put_contents($tmpPath, $data)) {
-                $zipZipPath = $folderName . '/' . $cleanName;
-                if (!empty($cleanColor)) {
-                    $zipZipPath .= ' - ' . $cleanColor;
-                }
-                $zipZipPath .= ' - ' . $imgTypeSuffix . '.' . $ext;
-                
-                $zip->addFile($tmpPath, $zipZipPath);
-                $tempFiles[] = $tmpPath;
-                return true;
-            }
-            return false;
-        };
-
-        foreach ($selectedProducts as $p) {
-            $cleanName = trim(preg_replace('/[\/\\\:\*\?\"\<\>\|]/', '_', $p['name']));
-            $cleanColor = trim(preg_replace('/[\/\\\:\*\?\"\<\>\|]/', '_', $p['color'] ?? ''));
-            
-            $folderName = $cleanName;
-            if (!empty($cleanColor)) {
-                $folderName .= ' - ' . $cleanColor;
-            }
-
-            $processedFiles = [];
-            $isDuplicateFile = function($path) use (&$processedFiles) {
-                if (empty($path)) return true;
-                if (strpos($path, 'placehold') !== false) return true;
-                $cleanPath = $path;
-                if (($qPos = strpos($cleanPath, '?')) !== false) {
-                    $cleanPath = substr($cleanPath, 0, $qPos);
-                }
-                $basename = strtolower(basename($cleanPath));
-                if (in_array($basename, $processedFiles)) return true;
-                $processedFiles[] = $basename;
-                return false;
-            };
-
-            // Check if product only has new manual images uploaded post-crawl:
-            $hasNewManualOnly = !empty($p['has_new_manual_image']);
-            $newFiles = $p['newly_uploaded_files'] ?? [];
-            
-            $shouldExportImage = function($imgPath) use ($hasNewManualOnly, $newFiles) {
-                if (empty($imgPath) || strpos($imgPath, 'placehold') !== false) {
-                    return false;
-                }
-                if (!$hasNewManualOnly) {
-                    return true;
-                }
-                if (!empty($newFiles) && is_array($newFiles)) {
-                    $cleanImg = $imgPath;
-                    if (($qPos = strpos($cleanImg, '?')) !== false) {
-                        $cleanImg = substr($cleanImg, 0, $qPos);
-                    }
-                    $base = strtolower(basename($cleanImg));
-                    foreach ($newFiles as $nf) {
-                        $cleanNf = $nf;
-                        if (($qPos = strpos($cleanNf, '?')) !== false) {
-                            $cleanNf = substr($cleanNf, 0, $qPos);
-                        }
-                        if ($nf === $imgPath || strtolower(basename($cleanNf)) === $base) {
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-                return (strpos($imgPath, 'uploads/') === 0);
-            };
-
-            // 1. Process Main Image
-            if (!empty($p['image']) && $shouldExportImage($p['image']) && !$isDuplicateFile($p['image'])) {
-                $processAndAddImage($p['image'], 'main', $folderName, $cleanName, $cleanColor);
-            }
-
-            // 2. Process Social Image
-            $socImgPath = $p['social_image'] ?? $p['socialImage'] ?? '';
-            if (!empty($socImgPath) && $shouldExportImage($socImgPath) && !$isDuplicateFile($socImgPath)) {
-                $processAndAddImage($socImgPath, 'social', $folderName, $cleanName, $cleanColor);
-            }
-
-            // 3. Process Gallery Images
-            $gal = $p['gallery'] ?? [];
-            if (is_string($gal)) {
-                $gal = json_decode($gal, true) ?: [];
-            }
-            if (is_array($gal) && !empty($gal)) {
-                $galIdx = 1;
-                foreach ($gal as $galImgPath) {
-                    if (!empty($galImgPath) && $shouldExportImage($galImgPath) && !$isDuplicateFile($galImgPath)) {
-                        if ($processAndAddImage($galImgPath, "gallery_{$galIdx}", $folderName, $cleanName, $cleanColor)) {
-                            $galIdx++;
-                        }
-                    }
-                }
-            }
-
-            // 3b. Process Reference Gallery Images
-            $refGal = $p['reference_gallery'] ?? [];
-            if (is_string($refGal)) {
-                $refGal = json_decode($refGal, true) ?: [];
-            }
-            if (is_array($refGal) && !empty($refGal)) {
-                $refIdx = 1;
-                foreach ($refGal as $refImgPath) {
-                    if (!empty($refImgPath) && $shouldExportImage($refImgPath) && !$isDuplicateFile($refImgPath)) {
-                        if ($processAndAddImage($refImgPath, "reference_{$refIdx}", $folderName, $cleanName, $cleanColor)) {
-                            $refIdx++;
-                        }
-                    }
-                }
-            }
-
-            // 4. Process Size Chart Image (Synced!)
-            $sizeChartPath = $p['size_chart'] ?? $p['sizeChart'] ?? '';
-            if (empty($sizeChartPath) && !empty($p['size_chart_template_id'])) {
-                $charts = $project['settings']['size_charts'] ?? [];
-                foreach ($charts as $c) {
-                    if (($c['id'] ?? '') === $p['size_chart_template_id']) {
-                        $sizeChartPath = $c['image_path'] ?? '';
-                        break;
-                    }
-                }
-            }
-            $shouldExportSizeChart = false;
-            if (!empty($sizeChartPath) && strpos($sizeChartPath, 'placehold') === false) {
-                if (!$hasNewManualOnly) {
-                    $shouldExportSizeChart = true;
-                } else {
-                    if ($shouldExportImage($sizeChartPath) || !empty($p['size_chart_template_id'])) {
-                        $shouldExportSizeChart = true;
-                    }
-                }
-            }
-            if ($shouldExportSizeChart && !$isDuplicateFile($sizeChartPath)) {
-                $processAndAddImage($sizeChartPath, 'size_chart', $folderName, $cleanName, $cleanColor, true);
-            }
-
-            // 5. Palette (Color Pal) Image
-            $colorNameStr = trim($p['color'] ?? '');
-            $paletteColorName = !empty($colorNameStr) ? $colorNameStr : 'بدون رنگ';
-            $paletteHex = $getColorHex($paletteColorName);
-            $paletteGd = $createPalette($paletteHex, 24, 24);
-            if ($paletteGd) {
-                // 1. WebP format
-                if (function_exists('imagewebp')) {
-                    $tmpPathPalWebp = tempnam(sys_get_temp_dir(), 'pal_') . '.webp';
-                    if (imagewebp($paletteGd, $tmpPathPalWebp, 90)) {
-                        $zipZipPathPalWebp = $folderName . '/' . preg_replace('/[\/\\\:\*\?\"\<\>\|]/', '_', $paletteColorName) . '.webp';
-                        $zip->addFile($tmpPathPalWebp, $zipZipPathPalWebp);
-                        $tempFiles[] = $tmpPathPalWebp;
-                    }
-                } else {
-                    $tmpPathPalPng = tempnam(sys_get_temp_dir(), 'pal_') . '.png';
-                    if (imagepng($paletteGd, $tmpPathPalPng)) {
-                        $zipZipPathPalPng = $folderName . '/' . preg_replace('/[\/\\\:\*\?\"\<\>\|]/', '_', $paletteColorName) . '.png';
-                        $zip->addFile($tmpPathPalPng, $zipZipPathPalPng);
-                        $tempFiles[] = $tmpPathPalPng;
-                    }
-                }
-                
-                // 2. JPG format (Sized 24*24)
-                $tmpPathPalJpg = tempnam(sys_get_temp_dir(), 'pal_') . '.jpg';
-                if (imagejpeg($paletteGd, $tmpPathPalJpg, 90)) {
-                    $zipZipPathPalJpg = $folderName . '/' . preg_replace('/[\/\\\:\*\?\"\<\>\|]/', '_', $paletteColorName) . '.jpg';
-                    $zip->addFile($tmpPathPalJpg, $zipZipPathPalJpg);
-                    $tempFiles[] = $tmpPathPalJpg;
-                }
-                
-                imagedestroy($paletteGd);
-            }
-
-            // 6. Generate and append a beautifully styled standalone HTML product description txt file
-            $pName = htmlspecialchars($p['name'] ?? 'نامشخص');
-            $pFeedback = htmlspecialchars($p['description'] ?? $p['notes'] ?? 'این کالا فاقد توضیحات دستی است.');
-
-            $htmlDesc = '
-<!DOCTYPE html>
-<html lang="fa" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <title>' . $pName . '</title>
-    <style>
-        @import url("https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css");
-        body {
-            font-family: "Vazirmatn", sans-serif;
-            background-color: #f8fafc;
-            color: #1e293b;
-            margin: 0;
-            padding: 40px 20px;
-            display: flex;
-            justify-content: center;
-        }
-        .container {
-            width: 100%;
-            max-width: 650px;
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 24px;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
-            padding: 32px;
-            box-sizing: border-box;
-        }
-        .header {
-            border-bottom: 2px solid #f1f5f9;
-            padding-bottom: 20px;
-            margin-bottom: 24px;
-        }
-        .title {
-            font-size: 20px;
-            font-weight: 900;
-            color: #0f172a;
-            margin: 0;
-            line-height: 1.4;
-        }
-        .description-box {
-            font-size: 14px;
-            line-height: 1.8;
-            color: #334155;
-            margin-bottom: 20px;
-            text-align: justify;
-        }
-        .footer {
-            text-align: center;
-            font-size: 11px;
-            color: #94a3b8;
-            border-top: 1px solid #f1f5f9;
-            padding-top: 20px;
-            margin-top: 24px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1 class="title">' . $pName . '</h1>
-        </div>
-        
-        <div class="description-box">
-            ' . nl2br($pFeedback) . '
-        </div>
-        
-        <div class="footer">
-            طراحی و بهینه‌سازی شده توسط دستیار هوشمند Maarksho | ' . date('Y/m/d') . '
-        </div>
-    </div>
-</body>
-</html>';
-
-            $tmpPathDesc = tempnam(sys_get_temp_dir(), 'desc_') . '.txt';
-            if (file_put_contents($tmpPathDesc, $htmlDesc)) {
-                $zipZipPathDesc = $folderName . '/توضیحات محصول.txt';
-                $zip->addFile($tmpPathDesc, $zipZipPathDesc);
-                $tempFiles[] = $tmpPathDesc;
-            }
-        }
-
-        $zip->close();
-
-        foreach ($tempFiles as $t) {
-            @unlink($t);
-        }
-
-        if (file_exists($zipPath) && filesize($zipPath) > 50) {
-            echo json_encode([
-                'status' => 'success',
-                'zip_url' => 'uploads/' . basename($zipPath),
-                'exported_ids' => $pids
-            ]);
-        } else {
-            @unlink($zipPath);
-            echo json_encode(['status' => 'failed', 'msg' => 'هیچ عکسی آماده خروجی گرفتن نبود یا پردازش عکس‌ها با خطا مواجه شد.']);
-        }
-        exit();
-        } catch (\Throwable $e) {
-            if (isset($zipPath) && file_exists($zipPath)) {
-                @unlink($zipPath);
-            }
-            if (isset($tempFiles) && is_array($tempFiles)) {
-                foreach ($tempFiles as $t) {
-                    @unlink($t);
-                }
-            }
-            echo json_encode([
-                'status' => 'failed',
-                'msg' => 'خطای سیستمی رخ داده است: ' . $e->getMessage() . ' در خط ' . $e->getLine() . ' فایل ' . basename($e->getFile())
-            ]);
-            exit();
-        }
+            require_once __DIR__.'/inc/WebsiteExportPackage.php';
+            $pids=$_POST['product_ids']??[];if(is_string($pids))$pids=json_decode($pids,true);
+            if(!is_array($pids)||!$pids)throw new RuntimeException('محصولی انتخاب نشده است.');
+            $pids=array_map('strval',$pids);
+            @set_time_limit(300);
+            $project=getCurrentProject($project['id'],true);
+            $result=(new WebsiteExportPackage(UPLOADS_DIR,$_SERVER['HTTP_HOST']??''))->build($project,$pids);
+            $_SESSION['website_export_receipt']=['project'=>$project['id'],'expires'=>time()+86400,'products'=>$result['receipts']];
+            unset($result['receipts']);echo json_encode(['status'=>'success']+$result,JSON_UNESCAPED_UNICODE);
+        } catch (Throwable $e) {echo json_encode(['status'=>'failed','msg'=>$e instanceof RuntimeException?$e->getMessage():'ساخت خروجی وب‌سایت ناموفق بود.'],JSON_UNESCAPED_UNICODE);}
+        exit;
     }
 
     if ($action === 'mark_as_uploaded') {
@@ -2521,6 +1795,8 @@ $sections_json
             echo json_encode(['status' => 'failed', 'msg' => 'دسترسی غیرمجاز']);
             exit();
         }
+        if(empty($_POST['csrf'])||!hash_equals($_SESSION['website_catalog_csrf']??'',(string)$_POST['csrf'])){http_response_code(403);echo json_encode(['status'=>'failed','msg'=>'نشست معتبر نیست؛ صفحه را تازه کنید.'],JSON_UNESCAPED_UNICODE);exit;}
+        $project=getCurrentProject($project['id'],true);
         $pids = $_POST['product_ids'] ?? [];
         if (is_string($pids)) {
             $pids = json_decode($pids, true) ?: [];
@@ -2536,8 +1812,11 @@ $sections_json
             foreach ($project['products'] as $p) {
                 if (!in_array($p['id'], $pids, true)) continue;
                 $workflow = WebsiteCatalogSync::state($project,$p);
-                if (in_array($workflow['publication']??'', ['technical_pending','pending_upload'], true)) {
-                    WebsiteCatalogSync::resolve($completedProject, $p['id'], $_SESSION['user']['username']??'');
+                if (!$workflow['archived']&&(in_array($workflow['publication']??'', ['technical_pending','pending_upload'], true)||$workflow['size_chart_upload_pending']||$workflow['description_upload_pending'])) {
+                    $receipt=$_SESSION['website_export_receipt']??[];
+                    $assets=null;
+                    if(($receipt['project']??'')===$project['id']&&($receipt['expires']??0)>=time())$assets=$receipt['products'][$p['id']]??null;
+                    WebsiteCatalogSync::resolve($completedProject, $p['id'], $_SESSION['user']['username']??'', $assets);
                     $updatedCount++;
                 }
             }
@@ -5893,6 +5172,7 @@ if ($project) {
                 $p['image_locked'] = isset($_POST['image_locked']);
 
                 $hasManualImageEdit = false;
+                $explicitlyRemovedImageUrls=[];
 
                 // Handle Reference Gallery deletions
                 if (!empty($_POST['delete_reference_images'])) {
@@ -5922,7 +5202,7 @@ if ($project) {
                     foreach ($_FILES['reference_files']['name'] as $k => $name) {
                         if ($_FILES['reference_files']['error'][$k] == 0) {
                             $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-                            $newName = "pref_{$safePid}_" . time() . "_$k.$ext";
+                            $newName = "pref_{$safePid}_" . time() . '_' . bin2hex(random_bytes(4)) . "_$k.$ext";
                             if (compressImageAndSave($_FILES['reference_files']['tmp_name'][$k], UPLOADS_DIR . $newName)) {
                                 chmod(UPLOADS_DIR . $newName, 0644);
                                 $p['reference_gallery'][] = 'uploads/' . $newName;
@@ -5934,6 +5214,7 @@ if ($project) {
 
                 // Process Deletions requested from UI
                 if (isset($_POST['delete_image']) && $_POST['delete_image'] === '1') {
+                    $explicitlyRemovedImageUrls[]=$p['image']??'';
                     if (!empty($p['image']) && strpos($p['image'], 'uploads/') === 0) {
                         $filePath = UPLOADS_DIR . basename($p['image']);
                         if (file_exists($filePath)) {
@@ -5945,6 +5226,7 @@ if ($project) {
                 }
 
                 if (isset($_POST['delete_social_image']) && $_POST['delete_social_image'] === '1') {
+                    $explicitlyRemovedImageUrls[]=$p['social_image']??'';
                     if (!empty($p['social_image']) && strpos($p['social_image'], 'uploads/') === 0) {
                         $filePath = UPLOADS_DIR . basename($p['social_image']);
                         if (file_exists($filePath)) {
@@ -5971,6 +5253,7 @@ if ($project) {
                     if (is_array($deletes)) {
                         if (!isset($p['gallery']) || !is_array($p['gallery'])) $p['gallery'] = [];
                         foreach ($deletes as $delImg) {
+                            $explicitlyRemovedImageUrls[]=$delImg;
                             if (($key = array_search($delImg, $p['gallery'])) !== false) {
                                 unset($p['gallery'][$key]);
                                 $hasManualImageEdit = true;
@@ -5996,7 +5279,7 @@ if ($project) {
                 $hasNewSiteImageUpload = false;
                 if (isset($_FILES['image_file']) && $_FILES['image_file']['error'] == 0) {
                     $ext = strtolower(pathinfo($_FILES['image_file']['name'], PATHINFO_EXTENSION));
-                    $newName = "p_{$safePid}_" . time() . ".$ext";
+                    $newName = "p_{$safePid}_" . time() . '_' . bin2hex(random_bytes(4)) . ".$ext";
                     if (move_uploaded_file($_FILES['image_file']['tmp_name'], UPLOADS_DIR . $newName)) {
                         chmod(UPLOADS_DIR . $newName, 0644);
                         $p['image'] = 'uploads/' . $newName;
@@ -6010,7 +5293,7 @@ if ($project) {
                 // Size Chart Image
                 if (isset($_FILES['size_chart_file']) && $_FILES['size_chart_file']['error'] == 0) {
                     $ext = strtolower(pathinfo($_FILES['size_chart_file']['name'], PATHINFO_EXTENSION));
-                    $newName = "psizechart_{$safePid}_" . time() . ".$ext";
+                    $newName = "psizechart_{$safePid}_" . time() . '_' . bin2hex(random_bytes(4)) . ".$ext";
                     if (move_uploaded_file($_FILES['size_chart_file']['tmp_name'], UPLOADS_DIR . $newName)) {
                         chmod(UPLOADS_DIR . $newName, 0644);
                         $p['size_chart'] = 'uploads/' . $newName;
@@ -6053,7 +5336,7 @@ if ($project) {
 
                 if ($social_file_key !== '') {
                     $ext = strtolower(pathinfo($_FILES[$social_file_key]['name'], PATHINFO_EXTENSION));
-                    $newName = "psocial_{$safePid}_" . time() . ".$ext";
+                    $newName = "psocial_{$safePid}_" . time() . '_' . bin2hex(random_bytes(4)) . ".$ext";
                     if (move_uploaded_file($_FILES[$social_file_key]['tmp_name'], UPLOADS_DIR . $newName)) {
                         chmod(UPLOADS_DIR . $newName, 0644);
                         $p['social_image'] = 'uploads/' . $newName;
@@ -6077,7 +5360,7 @@ if ($project) {
                     foreach ($_FILES[$gallery_file_key]['name'] as $k => $name) {
                         if ($_FILES[$gallery_file_key]['error'][$k] == 0) {
                             $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-                            $newName = "pg_{$safePid}_" . time() . "_$k.$ext";
+                            $newName = "pg_{$safePid}_" . time() . '_' . bin2hex(random_bytes(4)) . "_$k.$ext";
                             if (move_uploaded_file($_FILES[$gallery_file_key]['tmp_name'][$k], UPLOADS_DIR . $newName)) {
                                 chmod(UPLOADS_DIR . $newName, 0644);
                                 $p['gallery'][] = 'uploads/' . $newName;
@@ -6110,33 +5393,22 @@ if ($project) {
                     $p['rejection_side'] = '';
                 }
                 
-                // Rebuild images_list to tag manual/instagram sources
-                $imagesList = [];
-                if (!empty($p['image'])) {
-                    $isLocal = (strpos($p['image'], 'uploads/') === 0);
-                    $imagesList[] = [
-                        'url' => $p['image'],
-                        'source' => $isLocal ? 'manual' : 'site'
-                    ];
+                // Preserve approvals for unchanged images. Remote manual URLs are not scraper evidence.
+                $previousImageItems=$p['images_list']??[];
+                if(is_string($previousImageItems))$previousImageItems=json_decode($previousImageItems,true)?:[];
+                $imagesList=[];$currentImageUrls=[];
+                foreach(array_merge([$p['image']??'', $p['social_image']??''],is_array($p['gallery']??null)?$p['gallery']:[]) as $imageUrl){
+                    if(!is_string($imageUrl)||$imageUrl===''||isset($currentImageUrls[$imageUrl]))continue;
+                    $currentImageUrls[$imageUrl]=true;$previousItem=null;
+                    foreach($previousImageItems as $item)if(is_array($item)&&($item['url']??'')===$imageUrl){$previousItem=$item;break;}
+                    $imagesList[]=$previousItem?:['url'=>$imageUrl,'source'=>'manual','approved'=>false,'created_at'=>time()];
                 }
-                if (!empty($p['social_image'])) {
-                    $imagesList[] = [
-                        'url' => $p['social_image'],
-                        'source' => 'instagram'
-                    ];
+                foreach($previousImageItems as $item){
+                    if(is_string($item))$item=['url'=>$item,'source'=>'manual'];
+                    if(is_array($item)&&!isset($currentImageUrls[$item['url']??''])&&!in_array($item['url']??'',$explicitlyRemovedImageUrls,true))$imagesList[]=$item;
                 }
-                if (!empty($p['gallery']) && is_array($p['gallery'])) {
-                    foreach ($p['gallery'] as $galUrl) {
-                        if (!empty($p['image']) && $galUrl === $p['image']) continue;
-                        $isLocal = (strpos($galUrl, 'uploads/') === 0);
-                        $imagesList[] = [
-                            'url' => $galUrl,
-                            'source' => $isLocal ? 'manual' : 'site'
-                        ];
-                    }
-                }
-                $p['images_list'] = $imagesList;
-                
+                $p['images_list']=$imagesList;
+
                 // Recalculate image availability and status
                 $p['has_image'] = !empty($p['image']) && strpos($p['image'], 'placeholder') === false && strpos($p['image'], 'placehold.co') === false;
                 $p['media_status'] = $p['has_image'] ? 'ok' : 'missing';
@@ -6572,7 +5844,7 @@ $suggestions = getCalendarSuggestions($project);
                     return cleanItemUrl && cleanItemUrl === cleanImgUrl;
                 });
                 if (found) {
-                    return !!found.approved;
+                    return found.source === 'site' || !!found.site_verified_at || !!found.approved;
                 }
             }
             if ((prod.status || '') === 'active') {
@@ -9053,7 +8325,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         });
                     } elseif ($filter === 'pending_approval' || $filter === 'pending') {
                         $p_list = array_filter($all_products, function($p) { 
-                            return getProductWorkflowStatus($p) === 'pending_approval' || (!isProductOutOfStock($p) && ($p['status'] ?? '') === 'pending' && hasProductFinalImages($p)); 
+                            return getProductWorkflowStatus($p) === 'pending_approval';
                         });
                     } elseif ($filter === 'rejected') {
                         $p_list = array_filter($all_products, function($p) { 
@@ -9416,6 +8688,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                 
                 // 1. Filter out products with NO image UNLESS they are ERP products with stock and not uploaded yet, or they are active products without an image
                 foreach ($rawProds as $p) {
+                    if(WebsiteCatalogSync::inventory($p)==='out_of_stock')continue;
                     $export_image = getPrioritizedProductImage($p);
                     $hasImage = !empty($export_image) && strpos($export_image, 'placehold') === false;
                     $isERPWithStock = (
@@ -9432,94 +8705,14 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                 // 2. Score and Sort
                 $scoredProds = [];
                 $prodMeta = [];
-                $checkExternalImg = function($url) {
-                    if (empty($url)) return false;
-                    $isHttp = (strpos($url, 'http://') === 0 || strpos($url, 'https://') === 0 || strpos($url, '//') === 0);
-                    $isLocal = (strpos($url, 'uploads/') !== false || strpos($url, '/uploads/') !== false);
-                    $isPlaceholder = (strpos($url, 'placehold') !== false);
-                    return $isHttp && !$isLocal && !$isPlaceholder;
-                };
-
                 foreach ($allProds as $p) {
-                    $hasLocalManualPhoto = false;
-                    if (!empty($p['uploaded_by']) || !empty($p['is_manual_image']) || !empty($p['manualEdit'])) {
-                        $hasLocalManualPhoto = true;
-                    } else {
-                        if (!empty($p['image']) && strpos($p['image'], 'uploads/') === 0) {
-                            $hasLocalManualPhoto = true;
-                        }
-                        if (!empty($p['social_image']) && strpos($p['social_image'], 'uploads/') === 0) {
-                            $hasLocalManualPhoto = true;
-                        }
-                        if (!empty($p['size_chart']) && strpos($p['size_chart'], 'uploads/') === 0) {
-                            $hasLocalManualPhoto = true;
-                        }
-                        if (!empty($p['gallery'])) {
-                            $gal = $p['gallery'];
-                            if (is_string($gal)) {
-                                $gal = json_decode($gal, true) ?: [];
-                            }
-                            if (is_array($gal)) {
-                                foreach ($gal as $img) {
-                                    if (is_string($img) && strpos($img, 'uploads/') === 0) {
-                                        $hasLocalManualPhoto = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        if (!$hasLocalManualPhoto && !empty($p['reference_gallery'])) {
-                            $ref = $p['reference_gallery'];
-                            if (is_string($ref)) {
-                                $ref = json_decode($ref, true) ?: [];
-                            }
-                            if (is_array($ref)) {
-                                foreach ($ref as $img) {
-                                    if (is_string($img) && strpos($img, 'uploads/') === 0) {
-                                        $hasLocalManualPhoto = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    $hasExternalUrlImg = false;
-                    if ($checkExternalImg($p['image'] ?? '')) $hasExternalUrlImg = true;
-                    if ($checkExternalImg($p['social_image'] ?? '')) $hasExternalUrlImg = true;
-                    if ($checkExternalImg($p['size_chart'] ?? '')) $hasExternalUrlImg = true;
-                    if (!empty($p['gallery'])) {
-                        $gal = $p['gallery'];
-                        if (is_string($gal)) { $gal = json_decode($gal, true) ?: []; }
-                        if (is_array($gal)) {
-                            foreach ($gal as $img) {
-                                if ($checkExternalImg($img)) {
-                                    $hasExternalUrlImg = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    if (!$hasExternalUrlImg && !empty($p['reference_gallery'])) {
-                        $ref = $p['reference_gallery'];
-                        if (is_string($ref)) { $ref = json_decode($ref, true) ?: []; }
-                        if (is_array($ref)) {
-                            foreach ($ref as $img) {
-                                if ($checkExternalImg($img)) {
-                                    $hasExternalUrlImg = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
                     $websiteWorkflow = WebsiteCatalogSync::state($project,$p);
                     $hasNewManualUpload = !empty($p['has_new_manual_image']);
                     $isUploaded = in_array($websiteWorkflow['publication'], ['uploaded','resolved'], true);
                     $hasManualPhoto = !empty(WebsiteCatalogSync::photos($p)) && !$isUploaded;
 
                     $originallyNoImage = empty(WebsiteCatalogSync::photos($p));
-                    $p_status = $p['status'] ?? 'active';
+                    $p_status = $websiteWorkflow['approval_pending']?'pending':'active';
                     
                     $score = 0;
                     if ($p_status === 'active') {
@@ -9571,7 +8764,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                 foreach ($scoredProds as $item) {
                     $p = $item['product'];
                     $allProds[] = $p;
-                    $isApproved = ($p['status'] ?? 'active') === 'active';
+                    $isApproved = !WebsiteCatalogSync::state($project,$p)['approval_pending'];
                     if ($item['hasManualPhoto'] && !$item['isUploaded'] && $isApproved) {
                         $tab2Prods[] = $p;
                     }
@@ -9595,11 +8788,11 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     }
                 }
             ?>
-                <div class="card card-static card-body mb-8 bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 relative z-10">
+                <div id="website-export-workspace" class="card card-static card-body mb-8 bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 relative z-10">
                     <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-8 border-b border-slate-100 pb-6 relative z-10">
                         <div>
                             <h2 class="font-black text-2xl text-slate-800">خروجی وب‌سایت (بهینه‌سازی تصاویر)</h2>
-                            <p class="text-sm text-slate-500 mt-1">تولید و دانلود گروهی آرشیو زیپ تصاویر محصولات برای بارگذاری اختصاصی در سایت مرجع</p>
+                            <p class="text-sm text-slate-500 mt-1">خروجی عکس‌های تأییدشده، جدول سایز، پالت و توضیحات؛ ناموجودها فقط در آرشیو کتابخانه نگهداری می‌شوند.</p>
                         </div>
                         <div class="flex gap-3 flex-wrap">
                             <button id="btn-sizechart-incomplete-selected" class="btn bg-slate-100 text-slate-400 opacity-60 flex items-center gap-2 py-3 px-5 text-xs rounded-xl font-bold border border-slate-150 transition-all" disabled>
@@ -9624,7 +8817,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     <!-- Sub-tabs navigation -->
                     <div class="flex gap-4 mb-6 border-b border-slate-100 pb-3 flex-wrap">
                         <button onclick="switchExportSubTab('tab1')" id="subtab-btn-tab1" class="text-sm font-black pb-2 px-3 border-b-2 border-primary text-primary transition-all flex items-center gap-1">
-                            📋 <span>لیست کل محصولات</span>
+                            📋 <span>لیست محصولات (به‌جز ناموجود)</span>
                             <span class="bg-primary/10 text-primary text-xs rounded-full px-2 py-0.5"><?php echo count($allProds); ?></span>
                         </button>
                         <button onclick="switchExportSubTab('tab2')" id="subtab-btn-tab2" class="text-sm font-black pb-2 px-3 border-b-2 border-transparent text-slate-400 hover:text-slate-600 transition-all flex items-center gap-1">
@@ -9707,13 +8900,13 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                     $hasManualPhoto = $meta['hasManualPhoto'];
                                     
                                     $isManual = $hasManualPhoto;
-                                    $isActive = ($p['status'] ?? 'active') === 'active';
+                                    $isActive = !WebsiteCatalogSync::state($project,$p)['approval_pending'];
                                     $originallyNoImage = empty(WebsiteCatalogSync::photos($p));
                                     
                                     $statusKey = 'pending_upload';
                                     if ($originallyNoImage) {
                                         $statusKey = 'pending_image';
-                                    } elseif (($p['status'] ?? 'active') !== 'active') {
+                                    } elseif (!$isActive) {
                                         $statusKey = 'pending_portal';
                                     } elseif ($isUploaded) {
                                         $statusKey = 'uploaded';
@@ -9831,7 +9024,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                         <!-- Status on Site -->
                                         <div class="w-24 sm:w-40 flex-shrink-0 block-status">
                                             <?php 
-                                            $p_status = $p['status'] ?? 'active';
+                                            $p_status = $websiteQueue['approval_pending']?'pending':'active';
                                             $originallyNoImage = empty(WebsiteCatalogSync::photos($p));
                                             
                                             if ($originallyNoImage): ?>
@@ -9867,8 +9060,9 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                 </div>
 
                 <script>
-                    let currentExportSubTab = 'tab1';
+                    let currentExportSubTab = 'tab2';
                     let lastExportedProductIds = [];
+                    let websiteExportBusy = false;
 
                     function switchExportSubTab(tabName) {
                         currentExportSubTab = tabName;
@@ -10048,6 +9242,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     function updateSelectedExportCount() {
                         const checkedItems = document.querySelectorAll('.product-export-row:not(.hidden) .chk-export-item:checked');
                         const count = checkedItems.length;
+                        if(websiteExportBusy){document.getElementById('btn-export-selected').disabled=true;document.getElementById('btn-mark-uploaded-selected').disabled=true;return;}
                         
                         const btn = document.getElementById('btn-export-selected');
                         const markBtn = document.getElementById('btn-mark-uploaded-selected');
@@ -10122,9 +9317,10 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             
                             const formData = new FormData();
                             formData.append('ajax_action', 'mark_as_uploaded');
+                            formData.append('csrf', websiteCatalogCsrf);
                             formData.append('product_ids', JSON.stringify(pids));
                             
-                            fetch('admin.php', {
+                            fetch('admin.php?tab=website_export', {
                                 method: 'POST',
                                 body: formData
                             })
@@ -10192,7 +9388,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             formData.append('ajax_action', 'mark_size_chart_incomplete');
                             formData.append('product_ids', JSON.stringify(pids));
                             
-                            fetch('admin.php', {
+                            fetch('admin.php?tab=website_export', {
                                 method: 'POST',
                                 body: formData
                             })
@@ -10265,7 +9461,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             formData.append('ajax_action', 'mark_size_chart_complete');
                             formData.append('product_ids', JSON.stringify(pids));
                             
-                            fetch('admin.php', {
+                            fetch('admin.php?tab=website_export', {
                                 method: 'POST',
                                 body: formData
                             })
@@ -10328,7 +9524,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             formData.append('ajax_action', 'export_size_charts_only');
                             formData.append('product_ids', JSON.stringify(pids));
                             
-                            fetch('admin.php', {
+                            fetch('admin.php?tab=website_export', {
                                 method: 'POST',
                                 body: formData
                             })
@@ -10359,74 +9555,42 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         });
                     }
 
-                    // Export Trigger
-                    document.getElementById('btn-export-selected').addEventListener('click', function() {
-                        const checkedChks = document.querySelectorAll('.product-export-row:not(.hidden) .chk-export-item:checked');
-                        const pids = [];
-                        checkedChks.forEach(chk => {
-                            pids.push(chk.value);
-                        });
-                        
-                        if (pids.length === 0) return;
-                        
-                        const btn = document.getElementById('btn-export-selected');
-                        const originalHtml = btn.innerHTML;
-                        
-                        btn.disabled = true;
-                        btn.innerHTML = "⏳ <span>در حال فشرده‌سازی و پردازش...</span>";
-                        
-                        const formData = new FormData();
-                        formData.append('ajax_action', 'export_website');
-                        formData.append('product_ids', JSON.stringify(pids));
-                        
-                        fetch('admin.php', {
-                            method: 'POST',
-                            body: formData
-                        })
-                        .then(res => res.json())
-                        .then(data => {
-                            btn.disabled = false;
-                            btn.innerHTML = originalHtml;
-                            updateSelectedExportCount();
-                            
-                            if (data.status === 'success') {
-                                lastExportedProductIds = data.exported_ids || pids;
-                                
-                                // Direct browser download
-                                const link = document.createElement('a');
-                                link.href = data.zip_url;
-                                link.download = '';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                                
-                                // Display Custom Elegant Confirmation Modal after a short tiny delay
-                                setTimeout(() => {
-                                    showExportConfirmModal(true);
-                                }, 1500);
-                            } else {
-                                alert(data.msg || 'خطا در صدور خروجی زیپ');
-                            }
-                        })
-                        .catch(err => {
-                            btn.disabled = false;
-                            btn.innerHTML = originalHtml;
-                            updateSelectedExportCount();
-                            alert('خطای سیستمی رخ داده است.');
-                        });
+                    // Process bounded chunks, then download one combined archive.
+                    document.getElementById('btn-export-selected').addEventListener('click', async function() {
+                        const pids=Array.from(document.querySelectorAll('.product-export-row:not(.hidden) .chk-export-item:checked'),el=>el.value);
+                        if(!pids.length||websiteExportBusy)return;
+                        websiteExportBusy=true;document.getElementById('btn-mark-uploaded-selected').disabled=true;
+                        const button=this,original=button.innerHTML;button.disabled=true;
+                        const request=async(action,values={})=>{
+                            const response=await fetch('admin.php?tab=website_export',{method:'POST',body:new URLSearchParams({ajax_action:action,csrf:websiteCatalogCsrf,...values})});
+                            const result=await response.json();if(!response.ok||result.status!=='success')throw new Error(result.msg||'ساخت خروجی ناموفق بود.');return result;
+                        };
+                        try{
+                            const job=await request('export_website_begin',{product_ids:JSON.stringify(pids)});let progress;
+                            do{progress=await request('export_website_chunk',{token:job.token});button.textContent=`پردازش ${progress.processed} از ${progress.total} محصول…`;}while(!progress.done);
+                            button.textContent='آماده‌سازی ZIP نهایی…';const result=await request('export_website_finish',{token:job.token});
+                            lastExportedProductIds=result.exported_ids||[];
+                            const link=document.createElement('a');link.href=result.zip_url;link.download='';document.body.append(link);link.click();link.remove();
+                            window.websiteExportReport?.(result.warnings||[],lastExportedProductIds.length);
+                            setTimeout(()=>showExportConfirmModal(true),500);
+                        }catch(error){alert(error.message);}
+                        finally{websiteExportBusy=false;button.innerHTML=original;updateSelectedExportCount();}
                     });
 
+                    let exportModalPreviousFocus=null;
                     function showExportConfirmModal(show) {
                         const modal = document.getElementById('export-confirm-modal');
                         if (!modal) return;
                         const innerDiv = modal.querySelector('.scale-95, .max-w-md');
                         if (show) {
+                            exportModalPreviousFocus=document.activeElement;
                             modal.classList.remove('hidden');
                             modal.style.display = 'flex';
                             modal.style.pointerEvents = 'auto';
                             setTimeout(() => {
                                 modal.classList.remove('opacity-0');
                                 if (innerDiv) innerDiv.classList.remove('scale-95');
+                                modal.querySelector('button')?.focus();
                             }, 50);
                         } else {
                             modal.classList.add('opacity-0');
@@ -10434,8 +9598,16 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             modal.style.pointerEvents = 'none';
                             modal.classList.add('hidden');
                             modal.style.display = 'none';
+                            exportModalPreviousFocus?.focus();
                         }
                     }
+                    document.addEventListener('keydown', event=>{
+                        const modal=document.getElementById('export-confirm-modal');if(!modal||modal.classList.contains('hidden'))return;
+                        if(event.key==='Escape'){event.preventDefault();showExportConfirmModal(false);return;}
+                        if(event.key!=='Tab')return;
+                        const buttons=Array.from(modal.querySelectorAll('button'));const first=buttons[0],last=buttons[buttons.length-1];
+                        if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}
+                    });
 
                     function confirmExportMarkUploaded(response) {
                         showExportConfirmModal(false);
@@ -10443,9 +9615,10 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         if (response === true && lastExportedProductIds.length > 0) {
                             const formData = new FormData();
                             formData.append('ajax_action', 'mark_as_uploaded');
+                            formData.append('csrf', websiteCatalogCsrf);
                             formData.append('product_ids', JSON.stringify(lastExportedProductIds));
                             
-                            fetch('admin.php', {
+                            fetch('admin.php?tab=website_export', {
                                 method: 'POST',
                                 body: formData
                             })
@@ -10600,6 +9773,8 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                 </div>
             <?php endif; ?>
 
+                <?php if($tab === 'website_export'): ?><link rel="stylesheet" href="/panel/assets/website-export.css?v=<?php echo filemtime(__DIR__.'/assets/website-export.css'); ?>">
+                <script src="/panel/assets/website-export.js?v=<?php echo filemtime(__DIR__.'/assets/website-export.js'); ?>" defer></script><?php endif; ?>
             <?php if ($tab === 'extract'): ?>
                 <link rel="stylesheet" href="/panel/assets/extract-workspace.css?v=<?php echo filemtime(__DIR__.'/assets/extract-workspace.css'); ?>">
                 <script src="/panel/assets/extract-workspace.js?v=<?php echo filemtime(__DIR__.'/assets/extract-workspace.js'); ?>" defer></script>
@@ -24985,7 +24160,7 @@ ${desc2}
                     return cleanItemUrl && cleanItemUrl === cleanImgUrl;
                 });
                 if (found) {
-                    return !!found.approved;
+                    return found.source === 'site' || !!found.site_verified_at || !!found.approved;
                 }
             }
             if ((prod.status || '') === 'active') {
@@ -26592,12 +25767,12 @@ ${desc2}
         }
     </script>
     <!-- Beautiful Custom Modal for Post-Download Confirmation (Globally placed to avoid stacking context issues) -->
-    <div id="export-confirm-modal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] flex items-center justify-center hidden opacity-0 transition-all duration-300 font-sans">
+    <div id="export-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="export-confirm-title" aria-describedby="export-confirm-description" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[9999] flex items-center justify-center hidden opacity-0 transition-all duration-300 font-sans">
         <div class="bg-white rounded-[2rem] shadow-xl border border-slate-100 max-w-md w-full p-8 mx-4 transform scale-95 transition-all duration-300">
             <div class="text-center">
                 <div class="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">⚠️</div>
-                <h3 class="font-black text-xl text-slate-800 mb-2">تأیید آپلود محصولات روی وب‌سایت</h3>
-                <p class="text-sm text-slate-500 leading-relaxed mb-6 font-medium">آیا فایل زیپ تصاویر محصولات منتخب را با موفقیت در پنل وب‌سایت هم آپلود کردید؟ با تأیید این مورد، وضعیت این کالاها به "آپلود شده" تغییر کرده و از لیست انتظار آماده آپلود خارج خواهند شد.</p>
+                <h3 id="export-confirm-title" class="font-black text-xl text-slate-800 mb-2">تأیید آپلود محصولات روی وب‌سایت</h3>
+                <p id="export-confirm-description" class="text-sm text-slate-500 leading-relaxed mb-6 font-medium">پس از بارگذاری فایل‌های این بسته در سایت، آپلود را تأیید کنید. فقط عکس، جدول سایز و توضیحات واقعاً صادرشده از صف آپلود خارج می‌شوند.</p>
                 
                 <div class="flex gap-3 justify-center">
                     <button onclick="confirmExportMarkUploaded(true)" class="btn bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 px-6 rounded-xl flex-1 text-sm shadow-sm transition-all focus:outline-none cursor-pointer">

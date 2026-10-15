@@ -1179,6 +1179,7 @@ function getProductWorkflowStatus($p) {
     $hasSizeChart = hasProductSizeChart($p);
     $hasPriority = !empty($p['content_gen_requested']) || !empty($p['publish_priority']);
     $rawStatus = $p['status'] ?? 'active';
+    $hasUnapprovedImages = (bool)WebsiteCatalogSync::pendingApprovalPhotos($p,true);
     
     if ($rawStatus === 'rejected') {
         return 'rejected';
@@ -1198,7 +1199,7 @@ function getProductWorkflowStatus($p) {
     }
     
     // ۳. اگر عکس ساخته شده دارد ولی وضعیت آن در انتظار تایید است (در پورتال یا سیستم)
-    if ($hasFinal && ($rawStatus === 'pending' || $rawStatus === 'waiting_approval' || !empty($p['portal_pending']))) {
+    if ($hasFinal && $hasUnapprovedImages && ($rawStatus === 'pending' || $rawStatus === 'waiting_approval' || !empty($p['portal_pending']))) {
         return 'pending_approval';
     }
 
