@@ -16,4 +16,8 @@ FeatureFlags::saveConfig(['size_studio'=>'disabled']);
 verify(FeatureFlags::isAvailable('size_studio'),'unrestricted bypass of actual disabled feature');
 try{SystemAdmins::create('test-owner','NewPassword123!',true);throw new LogicException('overwritten');}catch(RuntimeException $e){}
 verify(SystemAdmins::authenticate('test-owner','TestPassword123!')!==null,'existing password retained');
+verify(SystemAdmins::authenticateGlobal('legacy-root','LegacyPassword123!',[['username'=>'legacy-root','password'=>password_hash('LegacyPassword123!',PASSWORD_DEFAULT)]])['role']==='superadmin','legacy hashed global account can reauthenticate');
+verify(SystemAdmins::authenticateGlobal('legacy-root','WrongPassword123!',[['username'=>'legacy-root','password'=>'LegacyPassword123!']])===null,'wrong legacy credential rejected');
+verify(SystemAdmins::authenticateGlobal('project-admin','ProjectPassword123!',[])===null,'project-only account never gains global role');
+verify(SystemAdmins::authenticateGlobal('legacy-root','LegacyPassword123!',[['username'=>'legacy-root','password'=>'LegacyPassword123!']])['role']==='superadmin','legacy plaintext compatibility');
 echo "System administrator authentication and storage checks passed\n";

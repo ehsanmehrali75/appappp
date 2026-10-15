@@ -25,6 +25,20 @@ class SystemAdmins {
             return true;
         } finally { flock($lock, LOCK_UN); fclose($lock); }
     }
+    /** Revalidate stale legacy sessions against global accounts, never project users. */
+    public static function authenticateGlobal($username, $password, $superUsers) {
+        if (!is_string($username) || !is_string($password)) return null;
+        $account = self::authenticate($username, $password);
+        if ($account) return $account;
+        foreach ($superUsers as $candidate) {
+            if (($candidate['username'] ?? '') !== $username) continue;
+            $stored = (string)($candidate['password'] ?? '');
+            if ($stored === '') continue;
+            $valid = password_get_info($stored)['algo'] ? password_verify($password, $stored) : hash_equals($stored, $password);
+            if ($valid) return ['username'=>$username, 'role'=>'superadmin'];
+        }
+        return null;
+    }
     public static function authenticate($username, $password) {
         $account = self::all()[$username] ?? null;
         if (!$account || !password_verify($password, $account['password'])) return null;
