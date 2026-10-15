@@ -3546,8 +3546,12 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
             
             $total_active = count($active_products);
             $total_active_pages = ceil($total_active / $limit);
+            // The pending queue above clamps its own page; the library has a separate total.
+            $library_page = ($active_tab === 'library')
+                ? min(max(1, (int)($_GET['p'] ?? 1)), max(1, (int)$total_active_pages))
+                : 1;
             if (($active_tab ?? 'pending') === 'library') {
-                $active_products = array_slice($active_products, ($page - 1) * $limit, $limit);
+                $active_products = array_slice($active_products, ($library_page - 1) * $limit, $limit);
             } else {
                 $active_products = array_slice($active_products, 0, $limit);
             }
@@ -3745,13 +3749,54 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
         <?php endif; ?>
         
         <?php if ($total_active_pages > 1): ?>
-            <div class="flex justify-center items-center gap-2 mt-12 pb-6">
-                <?php for($i=1; $i<=$total_active_pages; $i++): 
-                    $pageUrl = 'portal.php?' . http_build_query(array_merge($_GET, ['tab' => 'library', 'p' => $i]));
-                ?>
-                    <a href="<?php echo htmlspecialchars($pageUrl); ?>" class="w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black <?php echo ($active_tab == 'library' && $page == $i) ? 'bg-brand-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'; ?> transition-all"><?php echo $i; ?></a>
-                <?php endfor; ?>
-            </div>
+            <?php
+                $library_last_page = (int)$total_active_pages;
+                $library_page_url = static function($target) {
+                    return htmlspecialchars('portal.php?' . http_build_query(array_merge($_GET, ['tab' => 'library', 'p' => $target])), ENT_QUOTES, 'UTF-8');
+                };
+                $library_number = static function($number) {
+                    return strtr(number_format($number), ['0'=>'۰','1'=>'۱','2'=>'۲','3'=>'۳','4'=>'۴','5'=>'۵','6'=>'۶','7'=>'۷','8'=>'۸','9'=>'۹']);
+                };
+                $library_window_start = max(1, min($library_page - 1, $library_last_page - 2));
+                $library_pages = $library_last_page <= 5
+                    ? range(1, $library_last_page)
+                    : array_unique(array_merge([1], range($library_window_start, min($library_last_page, $library_window_start + 2)), [$library_last_page]));
+                sort($library_pages, SORT_NUMERIC);
+            ?>
+            <nav class="portal-pagination" aria-label="صفحه‌بندی کتابخانه محصولات">
+                <p class="portal-pagination-summary">
+                    <span>صفحه <?php echo $library_number($library_page); ?> از <?php echo $library_number($library_last_page); ?></span>
+                    <span>نمایش <?php echo $library_number(($library_page - 1) * $limit + 1); ?>–<?php echo $library_number(min($library_page * $limit, $total_active)); ?> از <?php echo $library_number($total_active); ?> محصول</span>
+                </p>
+                <?php if ($library_page > 1): ?>
+                    <a class="portal-pagination-link portal-pagination-previous" href="<?php echo $library_page_url($library_page - 1); ?>" rel="prev" aria-label="صفحه قبلی">
+                <?php else: ?>
+                    <span class="portal-pagination-link portal-pagination-previous" aria-disabled="true">
+                <?php endif; ?>
+                        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg><span>قبلی</span>
+                <?php echo $library_page > 1 ? '</a>' : '</span>'; ?>
+                <ol class="portal-pagination-pages">
+                <?php $library_previous_number = 0; foreach ($library_pages as $i): ?>
+                    <?php if ($library_previous_number && $i - $library_previous_number > 1): ?>
+                        <li class="portal-pagination-gap" aria-hidden="true">…</li>
+                    <?php endif; ?>
+                    <li>
+                    <?php if ($library_page === $i): ?>
+                        <span class="portal-pagination-link" aria-current="page" aria-label="صفحه <?php echo $library_number($i); ?>، صفحه فعلی"><?php echo $library_number($i); ?></span>
+                    <?php else: ?>
+                        <a href="<?php echo $library_page_url($i); ?>" class="portal-pagination-link" aria-label="صفحه <?php echo $library_number($i); ?>"><?php echo $library_number($i); ?></a>
+                    <?php endif; ?>
+                    </li>
+                <?php $library_previous_number = $i; endforeach; ?>
+                </ol>
+                <?php if ($library_page < $library_last_page): ?>
+                    <a class="portal-pagination-link portal-pagination-next" href="<?php echo $library_page_url($library_page + 1); ?>" rel="next" aria-label="صفحه بعدی">
+                <?php else: ?>
+                    <span class="portal-pagination-link portal-pagination-next" aria-disabled="true">
+                <?php endif; ?>
+                        <span>بعدی</span><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>
+                <?php echo $library_page < $library_last_page ? '</a>' : '</span>'; ?>
+            </nav>
         <?php endif; ?>
     </div>
 

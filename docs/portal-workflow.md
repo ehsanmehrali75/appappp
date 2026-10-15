@@ -42,3 +42,7 @@ The same host already had `zlib.output_compression` enabled. Admin and portal no
 Isolated host tests disable the list helper and enable zlib, then check both controllers, single-decompression output and CSRF enforcement. Additional HTTP tests cover gallery/reference entries stored as URL metadata objects, pending-image approval filtering, serialized chart URL lists, and unchanged original files/data.
 
 The browser run also passes all 59 checks with the native list helper disabled and host zlib enabled. The harness supplies actual static asset bytes directly because PHP's built-in development router can emit malformed static-file HTTP responses under global zlib; PHP documents and AJAX actions still use the real compressed HTTP responses. Production Apache/Nginx deployment has not been verified from this environment.
+
+## Library pagination
+
+The library footer now uses scoped RTL controls with a visible current page, previous/next, a compact numbered range and ellipses. It preserves project and filter query parameters, with 44px targets and an unclipped layout down to 320px. The library computes its page independently; the pending queue's page clamp can no longer make a library page-two request repeat page one. Isolated HTTP tests and real browser navigation verify distinct product slices, valid status filters, boundaries and retained filters.
