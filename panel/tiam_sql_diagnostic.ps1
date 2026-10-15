@@ -12,7 +12,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $report = [ordered]@{
-    diagnostic_version = 1
+    diagnostic_version = 2
     generated_at = [DateTimeOffset]::Now.ToString('o')
     server = $Server; port = $Port; database = $Database; schema = $Schema; object = $View
     network_mode = 'existing_system_network'; vpn_changed = $false
@@ -28,6 +28,18 @@ function Convert-SampleValue($value) {
     if ($value -is [DateTime] -or $value -is [DateTimeOffset]) { return $value.ToString('o') }
     if ($value -is [string] -and $value.Length -gt 200) { return $value.Substring(0,200) + ' [truncated]' }
     return $value
+}
+function New-DiagnosticConnectionString {
+    param([string]$Server,[int]$Port,[string]$Database)
+    $builder = [System.Data.SqlClient.SqlConnectionStringBuilder]::new()
+    # PowerShell adapts this IDictionary: use SQL keywords, not CLR property names.
+    $builder['Data Source'] = 'tcp:' + $Server + ',' + $Port
+    $builder['Initial Catalog'] = $Database
+    $builder['Encrypt'] = $true
+    $builder['TrustServerCertificate'] = $false
+    $builder['Connect Timeout'] = 15
+    $builder['Application Name'] = 'MaarkshoReadOnlyDiagnostic'
+    return $builder.ConnectionString
 }
 try {
     if ($env:OS -ne 'Windows_NT') { throw [PlatformNotSupportedException]::new('Run this tool on Windows PowerShell.') }
@@ -46,15 +58,12 @@ try {
     $stage = 'sql_connection'
     $password = Read-Host 'SQL password' -AsSecureString
     $password.MakeReadOnly()
-    $builder = [System.Data.SqlClient.SqlConnectionStringBuilder]::new()
-    $builder.DataSource = 'tcp:' + $Server + ',' + $Port
-    $builder.InitialCatalog = $Database
-    $builder.Encrypt = $true
-    $builder.TrustServerCertificate = $false
-    $builder.ConnectTimeout = 15
-    $builder.ApplicationName = 'MaarkshoReadOnlyDiagnostic'
-    $connection = [System.Data.SqlClient.SqlConnection]::new($builder.ConnectionString)
+    $stage = 'sql_parameters'
+    $connectionString = New-DiagnosticConnectionString -Server $Server -Port $Port -Database $Database
+    $stage = 'sql_credentials'
+    $connection = [System.Data.SqlClient.SqlConnection]::new($connectionString)
     $connection.Credential = [System.Data.SqlClient.SqlCredential]::new($Username,$password)
+    $stage = 'sql_connection'
     $connection.Open()
     $report.stages += @{stage=$stage;status='success';message='Encrypted SQL connection and login verified'}
     $stage = 'object_catalog'
