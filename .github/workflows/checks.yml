@@ -32,5 +32,7 @@ jobs:
         env:
           PHP_BINARY: php
         run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Legacy host list compatibility
+        run: php -d disable_functions=array_is_list tests/website_workflow.php
       - name: Validate deployment package
         run: python tools/build_release.py --output /tmp/maarksho-release.zip

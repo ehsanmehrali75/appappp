@@ -7355,20 +7355,26 @@ function getProjectStorageUsage($projectOrId) {
     if (is_dir(UPLOADS_DIR)) {
         $allUploads = @scandir(UPLOADS_DIR) ?: [];
         $referencedFiles = [];
+        $addReferencedFile = static function($entry) use (&$referencedFiles) {
+            $url = ProductSizeChartCatalog::entryUrl($entry);
+            if ($url === '') return;
+            $path = parse_url($url, PHP_URL_PATH);
+            if (is_string($path) && $path !== '') $referencedFiles[] = basename($path);
+        };
         
         // Collect filenames referenced in products / schedules / settings
         if (!empty($project['products']) && is_array($project['products'])) {
             foreach ($project['products'] as $p) {
-                if (!empty($p['image'])) $referencedFiles[] = basename($p['image']);
-                if (!empty($p['social_image'])) $referencedFiles[] = basename($p['social_image']);
-                if (!empty($p['gallery']) && is_array($p['gallery'])) {
-                    foreach ($p['gallery'] as $g) $referencedFiles[] = basename($g);
-                }
+                $addReferencedFile($p['image'] ?? '');
+                $addReferencedFile($p['social_image'] ?? $p['socialImage'] ?? '');
+                $gallery = $p['gallery'] ?? [];
+                if (is_string($gallery)) $gallery = json_decode($gallery, true);
+                if (is_array($gallery)) foreach ($gallery as $g) $addReferencedFile($g);
             }
         }
         if (!empty($project['schedules']) && is_array($project['schedules'])) {
             foreach ($project['schedules'] as $s) {
-                if (!empty($s['mediaUrl'])) $referencedFiles[] = basename($s['mediaUrl']);
+                $addReferencedFile($s['mediaUrl'] ?? '');
             }
         }
         

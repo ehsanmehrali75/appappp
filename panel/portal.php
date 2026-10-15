@@ -1,7 +1,6 @@
 <?php
-if (!ob_start("ob_gzhandler")) {
-    ob_start();
-}
+require_once __DIR__.'/inc/OutputBuffer.php';
+OutputBuffer::start();
 /**
  * Maarksho Flow v3 - پورتال نمایش محصولات برای کاربران نهایی
  * 
@@ -193,95 +192,33 @@ function isProductImageUrlApproved($p, $imgUrl) {
 }
 
 function renderCardImageCarousel($p) {
-    $images = [];
-    $isPending = (isset($p['status']) && $p['status'] === 'pending');
-    
-    // 1. Social Image
-    if (!empty($p['social_image']) && strpos($p['social_image'], 'placehold') === false) {
-        if (!$isPending || !isProductImageUrlApproved($p, $p['social_image'])) {
-            $images[] = $p['social_image'];
+    $allImages = [];
+    $addImage = static function($entry) use (&$allImages) {
+        $url = ProductSizeChartCatalog::entryUrl($entry);
+        if ($url !== '' && isValidProductImage($url)) $allImages[$url] = true;
+    };
+    $addImage($p['social_image'] ?? $p['socialImage'] ?? '');
+    foreach (['gallery', 'image', 'reference_gallery'] as $field) {
+        if ($field === 'image') {
+            $addImage($p[$field] ?? '');
+            continue;
         }
+        $items = $p[$field] ?? [];
+        if (is_string($items)) $items = json_decode($items, true);
+        if (is_array($items)) foreach ($items as $item) $addImage($item);
     }
-    // 2. Gallery Images
-    if (!empty($p['gallery'])) {
-        $gal = $p['gallery'];
-        if (is_string($gal)) {
-            $gal = json_decode($gal, true) ?: [];
-        }
-        if (is_array($gal)) {
-            foreach ($gal as $g) {
-                if (!empty($g) && strpos($g, 'placehold') === false) {
-                    if (!$isPending || !isProductImageUrlApproved($p, $g)) {
-                        $images[] = $g;
-                    }
-                }
-            }
-        }
+    $images = array_keys($allImages);
+    if (($p['status'] ?? '') === 'pending') {
+        $pendingImages = array_values(array_filter($images, static fn($url) => !isProductImageUrlApproved($p, $url)));
+        if ($pendingImages) $images = $pendingImages;
     }
-    // 3. Website Image
-    if (!empty($p['image']) && strpos($p['image'], 'placehold') === false) {
-        if (!$isPending || !isProductImageUrlApproved($p, $p['image'])) {
-            $images[] = $p['image'];
-        }
-    }
-    // 4. Reference Gallery
-    if (!empty($p['reference_gallery'])) {
-        $ref = $p['reference_gallery'];
-        if (is_string($ref)) {
-            $ref = json_decode($ref, true) ?: [];
-        }
-        if (is_array($ref)) {
-            foreach ($ref as $r) {
-                if (!empty($r) && strpos($r, 'placehold') === false) {
-                    if (!$isPending || !isProductImageUrlApproved($p, $r)) {
-                        $images[] = $r;
-                    }
-                }
-            }
-        }
-    }
-    $images = array_values(array_unique($images));
-    if (empty($images)) {
-        if (!empty($p['social_image']) && strpos($p['social_image'], 'placehold') === false) {
-            $images[] = $p['social_image'];
-        }
-        if (!empty($p['gallery'])) {
-            $gal = $p['gallery'];
-            if (is_string($gal)) { $gal = json_decode($gal, true) ?: []; }
-            if (is_array($gal)) {
-                foreach ($gal as $g) {
-                    if (!empty($g) && strpos($g, 'placehold') === false) { $images[] = $g; }
-                }
-            }
-        }
-        if (!empty($p['image']) && strpos($p['image'], 'placehold') === false) {
-            $images[] = $p['image'];
-        }
-        if (!empty($p['reference_gallery'])) {
-            $ref = $p['reference_gallery'];
-            if (is_string($ref)) { $ref = json_decode($ref, true) ?: []; }
-            if (is_array($ref)) {
-                foreach ($ref as $r) {
-                    if (!empty($r) && strpos($r, 'placehold') === false) { $images[] = $r; }
-                }
-            }
-        }
-        $images = array_values(array_unique($images));
-    }
-    
-    if (empty($images)) {
-        if (!empty($p['image'])) {
-            $images[] = $p['image'];
-        } else {
-            $images[] = 'https://placehold.co/400x500?text=Maarksho';
-        }
-    }
-    
+    if (!$images) $images = ['https://placehold.co/400x500?text=Maarksho'];
+
     $productId = $p['id'];
     $count = count($images);
     
     if ($count <= 1) {
-        $imgUrl = getFullUrl($images[0]);
+        $imgUrl = htmlspecialchars($images[0], ENT_QUOTES, 'UTF-8');
         echo '<img src="' . $imgUrl . '" loading="lazy" referrerpolicy="no-referrer" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105" onerror="this.src=\'https://placehold.co/400x500?text=Maarksho\'">';
         return;
     }
@@ -292,7 +229,7 @@ function renderCardImageCarousel($p) {
              onscroll="updateCardDots('<?php echo $productId; ?>')"
              class="flex w-full h-full overflow-x-auto scroll-smooth snap-x snap-mandatory scrollbar-none">
             <?php foreach ($images as $img): 
-                $imgUrl = getFullUrl($img);
+                $imgUrl = htmlspecialchars($img, ENT_QUOTES, 'UTF-8');
             ?>
                 <div class="w-full h-full flex-shrink-0 snap-start relative h-full cursor-pointer" onclick="openDetailById('<?php echo $productId; ?>')">
                     <img src="<?php echo $imgUrl; ?>" loading="lazy" referrerpolicy="no-referrer" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105" onerror="this.src='https://placehold.co/400x500?text=Maarksho'">
@@ -2012,7 +1949,8 @@ foreach (($project['products'] ?? []) as $p) {
         }
         if (!empty($p['gallery']) && is_array($p['gallery'])) {
             foreach ($p['gallery'] as $galImg) {
-                if (!empty($galImg) && strpos($galImg, 'placeholder') === false) {
+                $galleryUrl = ProductSizeChartCatalog::entryUrl($galImg);
+                if ($galleryUrl !== '' && isValidProductImage($galleryUrl)) {
                     $man_images_count++;
                 }
             }

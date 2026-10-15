@@ -1,7 +1,6 @@
 <?php
-if (!ob_start("ob_gzhandler")) {
-    ob_start();
-}
+require_once __DIR__.'/inc/OutputBuffer.php';
+OutputBuffer::start();
 require_once 'inc/functions.php';
 require_once 'inc/cors.php';
 

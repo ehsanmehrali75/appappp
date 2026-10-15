@@ -1,7 +1,8 @@
 """Optional Chromium interaction regression: install playwright and set CHROMIUM_PATH if needed.
 Uses the same disposable synthetic fixture as test_http_security.py.
 """
-import json, os, sqlite3, sys, tempfile
+import json, os, sqlite3, sys, tempfile, mimetypes
+from urllib.parse import urlparse, unquote
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 sys.path.insert(0,str(Path(__file__).resolve().parent))
@@ -16,7 +17,14 @@ def check(value, message):
     checks.append(message)
 def route(r):
     if '/cron.php' in r.request.url:return r.fulfill(status=200,body='fixture worker disabled')
-    if r.request.url.startswith(base):return r.continue_()
+    if r.request.url.startswith(base):
+      # PHP's development router emits an empty gzip stream before static-file
+      # headers when zlib is globally enabled. Apache serves these files directly.
+      # Supply their real bytes while retaining HTTP/gzip for PHP pages and actions.
+      asset=(case.app/unquote(urlparse(r.request.url).path).lstrip('/')).resolve()
+      if asset.is_file() and (asset.is_relative_to(case.app/'panel/assets') or asset.is_relative_to(case.app/'assets')):
+        return r.fulfill(status=200,path=str(asset),content_type=mimetypes.guess_type(asset)[0] or 'application/octet-stream')
+      return r.continue_()
     return r.fulfill(status=200, content_type='image/svg+xml' if r.request.resource_type=='image' else 'text/plain', body='<svg xmlns="http://www.w3.org/2000/svg"/>' if r.request.resource_type=='image' else '')
 try:
  with sync_playwright() as p:

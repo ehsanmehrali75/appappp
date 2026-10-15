@@ -32,3 +32,13 @@ The shared HTML/CSRF decorator previously matched entire script blocks with a la
 The decorator now scans short opening tags, skips script/style/template/text blocks by their closing boundaries, and inserts protection only into real local POST forms. It preserves multi-megabyte scripts exactly and never replaces the document with a regex failure. Legacy serialized website metadata lists are normalized before workflow calculations, without creating approval or upload evidence from malformed values.
 
 Regression coverage includes a 5 MB inline script under a deliberately low PCRE limit, a real compressed portal response with 900 additional products, both the bare portal URL and the library, and Chromium rendering with the large catalog at desktop/mobile sizes. The full browser run passes 59 checks with no page errors. Live-host deployment remains a separate verification.
+
+## Shared-host runtime correction
+
+A subsequent host log identified an unavailable native `array_is_list()` at `WebsiteCatalogSync.php:9`. List validation now uses portable array keys and retains strict rejection of object/scalar metadata. The fix does not require enabling that native helper or changing the host's PHP version.
+
+The same host already had `zlib.output_compression` enabled. Admin and portal now share `OutputBuffer`, which uses hosting compression when active and starts an application gzip handler only when it is absent. This avoids the conflicting-handler warnings and double compression.
+
+Isolated host tests disable the list helper and enable zlib, then check both controllers, single-decompression output and CSRF enforcement. Additional HTTP tests cover gallery/reference entries stored as URL metadata objects, pending-image approval filtering, serialized chart URL lists, and unchanged original files/data.
+
+The browser run also passes all 59 checks with the native list helper disabled and host zlib enabled. The harness supplies actual static asset bytes directly because PHP's built-in development router can emit malformed static-file HTTP responses under global zlib; PHP documents and AJAX actions still use the real compressed HTTP responses. Production Apache/Nginx deployment has not been verified from this environment.

@@ -25,6 +25,7 @@ PNG = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4
 
 
 class HttpSecurity(unittest.TestCase):
+    PHP_SETTINGS = ()
     @classmethod
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory(prefix='maarksho-http-security-')
@@ -43,7 +44,7 @@ class HttpSecurity(unittest.TestCase):
         cls.base = f'http://127.0.0.1:{port}'
         cls.log = tempfile.TemporaryFile()
         env = dict(os.environ, MAARKSHO_AUTH_STATE_DIR=str(Path(cls.temp.name) / 'auth'))
-        cls.server = subprocess.Popen([PHP, '-S', f'127.0.0.1:{port}', 'router.php'], cwd=cls.app, env=env, stdout=cls.log, stderr=cls.log)
+        cls.server = subprocess.Popen([PHP, *cls.PHP_SETTINGS, '-S', f'127.0.0.1:{port}', 'router.php'], cwd=cls.app, env=env, stdout=cls.log, stderr=cls.log)
         for _ in range(100):
             try:
                 urllib.request.urlopen(cls.base+'/', timeout=1).read()

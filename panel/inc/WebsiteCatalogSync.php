@@ -6,7 +6,10 @@ class WebsiteCatalogSync {
     /** Legacy imports may serialize nested metadata again; malformed values carry no evidence. */
     private static function metadataArray($value,$list=false) {
         if(is_string($value))$value=json_decode($value,true);
-        return is_array($value)&&(!$list||array_is_list($value))?$value:[];
+        if(!is_array($value))return [];
+        // PHP 8.0 hosts have no array_is_list(); keep the same strict list rule.
+        if($list&&$value!==[]&&array_keys($value)!==range(0,count($value)-1))return [];
+        return $value;
     }
     private static function metadata($product) {
         $meta=self::metadataArray($product['website_sync']??[]);

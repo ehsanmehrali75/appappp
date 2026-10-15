@@ -1,6 +1,11 @@
 <?php
 /** Read only the current project's explicitly linked Size Studio chart. */
 class ProductSizeChartCatalog {
+    /** Imported gallery entries may store a URL together with media metadata. */
+    public static function entryUrl($value) {
+        if (is_array($value)) $value=$value['url']??$value['src']??$value['image']??'';
+        return self::mediaUrl($value);
+    }
     public static function mediaUrl($value) {
         if (!is_string($value)) return '';
         $value=trim($value);
@@ -23,7 +28,11 @@ class ProductSizeChartCatalog {
         $data=$chart && !empty($chart['columns']) && !empty($chart['rows']) && is_array($chart['columns']) && is_array($chart['rows']);
         $image=$studioImage?:$direct;
         $exists=$image!=='' || $data;
-        $siteUrls=$product['website_sync']['size_guide_urls']??[];
+        $meta=$product['website_sync']??[];
+        if(is_string($meta))$meta=json_decode($meta,true);
+        $siteUrls=is_array($meta)?($meta['size_guide_urls']??[]):[];
+        if(is_string($siteUrls))$siteUrls=json_decode($siteUrls,true);
+        $siteUrls=is_array($siteUrls)&&$siteUrls===array_values($siteUrls)?array_values(array_filter(array_map([self::class,'mediaUrl'],$siteUrls))):[];
         $siteOnly=$image!=='' && in_array($image,$siteUrls,true) && !$data && $studioImage==='';
         return ['exists'=>$exists,'has_local'=>$exists&&!$siteOnly,'image_url'=>$image,'chart_id'=>$chart?$id:'','source'=>$chart?'studio':($siteOnly?'site':'product'),
             'columns'=>$data?$chart['columns']:[],'rows'=>$data?$chart['rows']:[],
