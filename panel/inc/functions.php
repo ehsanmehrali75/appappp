@@ -33,6 +33,7 @@ require_once __DIR__ . '/InstagramPublishHandler.php';
 require_once __DIR__ . '/MarkShowCore.php';
 require_once __DIR__ . '/TiamVpnManager.php';
 require_once __DIR__ . '/TiamConnector.php';
+require_once __DIR__ . '/TiamInventory.php';
 
 // بررسی پیش‌نیازها و وضعیت اکستنشن‌ها
 define('HAS_CURL_EXTENSION', extension_loaded('curl') && function_exists('curl_init'));
@@ -671,6 +672,9 @@ function getCurrentProject($id = null, $forceReload = false) {
             }
         }
         
+        foreach ($project['products'] as &$productWithTiam) $productWithTiam = TiamInventory::restoreProduct($productWithTiam);
+        unset($productWithTiam);
+
         // بارگذاری لاگ‌ها
         $stmtL = $conn->prepare("SELECT * FROM logs WHERE project_id = ? ORDER BY at DESC LIMIT 100");
         if ($stmtL) {

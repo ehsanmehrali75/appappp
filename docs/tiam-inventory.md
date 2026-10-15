@@ -73,3 +73,34 @@ TLS در HTTPS و SQL فعال است. گواهی SQL باید مورد اعتم
 ## SQL compatibility mode (explicit project setting)
 
 Under «امنیت اتصال SQL», select «بدون الزام رمزگذاری و بدون بررسی گواهی» and save to enable `sql_security=compatibility` for that project. The updated agent uses ODBC `Encrypt=no;TrustServerCertificate=yes` and omits `HostNameInCertificate` in this mode. Verified TLS is still the default for new configurations; invalid mode values are rejected. Changing the mode changes the connection fingerprint and requires a fresh approved preview before daily synchronization. This SQL setting does not change HTTPS authentication with the panel or the selected system-network/VPN mode. Client-side optional encryption does not override encryption enforced by SQL Server. Update the downloaded Python agent before use.
+
+## Confirmed FactInventory schema preset
+
+The supplied version-3 diagnostic confirmed a successful SQL login and SELECT metadata for `dbo.FactInventory`. SQL metadata identifies it as a table; the connector's selected-object SELECT works for tables and views. The report contained no sample rows. `Grade` semantics remain unconfirmed by the user.
+
+The opt-in «جایگزینی نگاشت با الگوی FactInventory» button fills only the current project's form; save explicitly, then obtain and approve a preview. It does not write products automatically or replace other projects' configuration.
+
+| Source column | Import field |
+|---|---|
+| ProCode | SKU and stable product/model identifier |
+| ProDes | Product name |
+| StockTedad | Decimal inventory |
+| ShopCode | Branch/warehouse identifier |
+| ShopName | Source branch name |
+| Category / SubCategory / ProductType | Source classification metadata |
+| Grade | Uninterpreted source Grade |
+| LastUpdateDateTime | Source update timestamp |
+
+Size, color and price mappings are empty because the confirmed schema has no explicit columns for them. Grade is not assumed to be size. Source classifications are preserved as source metadata, without guessing an application category ID. Product codes retain leading zeroes. Products with different ProCode and the same description stay separate; name changes keep the stable identity. Branch stock is aggregated. Ambiguous matching of several source codes to one legacy product is rejected for manual review. NULL code/name/stock and duplicate SKU/color/size/branch rows remain errors; they cannot silently zero or double inventory. If Grade distinguishes multiple rows for the same code/branch, clarify the grain with actual row samples before applying.
+
+Branch source attributes and the stable product key are also stored inside the existing variants JSON. The SQL-backed project loader reconstructs Tiam metadata after reload, avoiding new database columns and preserving the key through later name changes. Comparison normalizes SQL string stock values and excludes transient aliases so identical data does not create false update counts. Missing size produces an empty size list. Existing images, descriptions and prices remain when those fields are absent from the source.
+
+Validation: `php tests/tiam_factinventory.php` runs 16 schema-specific checks using explicitly synthetic rows shaped like the confirmed schema; the general Tiam suite runs 39 checks and Python agent suite runs 9 tests. Chromium/HTTP tests exercised the preset, saving it, preview/approval, decimal branch stock, actual SQLite-backed reload, preserved source metadata and an identical preview returning unchanged. The user's diagnostic establishes actual SQL connectivity/schema; live inventory values, Grade meaning and real import are still unverified.
+
+For the next row-level investigation, the existing native Windows tool supports:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tiam_sql_diagnostic.ps1 -AllowInsecureConnection -IncludeSample
+```
+
+This explicitly reads at most five sample rows. Review the JSON before sharing it to clarify Grade and whether descriptions/codes contain size or color. Do not infer those fields from column names alone.

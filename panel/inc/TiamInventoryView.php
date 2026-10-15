@@ -1,5 +1,6 @@
 <?php
 if (!isset($project) || !function_exists('hasPermission') || !hasPermission('settings')) { http_response_code(403); exit; }
+require_once __DIR__.'/TiamInventory.php';
 if (empty($_SESSION['tiam_csrf'])) $_SESSION['tiam_csrf'] = bin2hex(random_bytes(32));
 $inventoryCfg = $project['settings']['tiam_inventory'] ?? [];
 ?>
@@ -44,8 +45,10 @@ $inventoryCfg = $project['settings']['tiam_inventory'] ?? [];
         </select>
     </label>
     <h4 class="font-bold text-sm">نگاشت ستون‌های ویو به ساختار محصولات</h4>
+    <button type="button" id="tiam-factinventory-preset" onclick="tiamFactInventoryPreset()" class="bg-slate-700 text-white px-4 py-2 rounded-lg text-xs">جایگزینی نگاشت با الگوی FactInventory</button>
+    <p class="text-xs">الگو بر اساس ساختار بررسی‌شده: کد ProCode، نام ProDes، موجودی StockTedad و شعبه ShopCode. هویت محصول بر اساس ProCode است. سایز، رنگ و قیمت خالی می‌مانند؛ Grade با نام خودش در اطلاعات منبع حفظ می‌شود. الگو فقط این فرم را تغییر می‌دهد؛ سپس ذخیره کنید و پیش‌نمایش بگیرید.</p>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-    <?php foreach (['sku'=>'کد / بارکد کالا *', 'name'=>'نام کالا *', 'stock'=>'موجودی *', 'size'=>'سایز', 'color'=>'رنگ', 'warehouse'=>'انبار / شعبه', 'price'=>'قیمت (واحد فعلی سیستم)', 'model'=>'کد مدل مادر (اختیاری)'] as $field=>$label): ?>
+    <?php foreach (['sku'=>'کد / بارکد کالا *', 'name'=>'نام کالا *', 'stock'=>'موجودی *', 'size'=>'سایز', 'color'=>'رنگ', 'warehouse'=>'انبار / شعبه', 'price'=>'قیمت (واحد فعلی سیستم)', 'model'=>'شناسهٔ پایدار محصول / مدل مادر', 'category'=>'دسته‌بندی منبع', 'subcategory'=>'زیردسته‌بندی منبع', 'product_type'=>'نوع محصول منبع', 'grade'=>'Grade (بدون فرض سایز)', 'warehouse_name'=>'نام شعبه', 'source_updated_at'=>'زمان به‌روزرسانی منبع'] as $field=>$label): ?>
         <label class="text-xs"><?php echo $label; ?><input data-tiam-map="<?php echo $field; ?>" value="<?php echo htmlspecialchars($inventoryCfg['mapping'][$field] ?? ''); ?>" class="input text-xs mt-1" dir="ltr"></label>
     <?php endforeach; ?>
     </div>
@@ -71,6 +74,12 @@ window.tiamInventoryConfigured = <?php echo !empty($inventoryCfg['host'])?'true'
 let tiamInventoryJob = null, tiamInventoryTimer = null, tiamInventoryRequest = 0;
 const tiamInventoryProject = <?php echo json_encode($project['id']); ?>;
 const tiamInventoryCsrf = <?php echo json_encode($_SESSION['tiam_csrf']); ?>;
+function tiamFactInventoryPreset() {
+    const mapping=<?php echo json_encode(TiamInventory::factInventoryMapping(), JSON_UNESCAPED_UNICODE); ?>;
+    document.querySelectorAll('[data-tiam-map]').forEach(el=>el.value=mapping[el.dataset.tiamMap]||'');
+    document.querySelector('[data-tiam-field="view"]').value='FactInventory';
+    document.getElementById('tiam-inventory-log').textContent='نگاشت FactInventory در فرم وارد شد؛ سایز، رنگ و قیمت تعیین نشده‌اند. تنظیمات را ذخیره کنید، سپس پیش‌نمایش را بررسی کنید.';
+}
 function tiamUpdateNetworkMode() {
     const managed=document.getElementById('tiam-network-mode').value==='1';
     document.querySelectorAll('[data-tiam-field^="vpn_"]').forEach(el=>{

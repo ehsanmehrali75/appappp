@@ -41,7 +41,7 @@ class TiamInventory {
         $cfg['price_unit'] = $input['price_unit'] ?? 'toman';
         if (!in_array($cfg['price_unit'], ['toman', 'rial'], true)) throw new RuntimeException('واحد قیمت معتبر نیست.');
         $cfg['mapping'] = [];
-        foreach (['sku', 'name', 'stock', 'size', 'color', 'warehouse', 'price', 'model'] as $field) {
+        foreach (['sku', 'name', 'stock', 'size', 'color', 'warehouse', 'price', 'model', 'category', 'subcategory', 'product_type', 'grade', 'warehouse_name', 'source_updated_at'] as $field) {
             $column = trim((string)($input['mapping'][$field] ?? ''));
             if ($column !== '' && !preg_match('/^[\p{L}_][\p{L}\p{N}_ ]{0,127}$/uD', $column)) throw new RuntimeException('نام ستون معتبر نیست.');
             $cfg['mapping'][$field] = $column;
@@ -52,6 +52,12 @@ class TiamInventory {
         }
         if (self::fingerprint($cfg) !== self::fingerprint($old)) unset($cfg['approved']);
         return $cfg;
+    }
+    /** Opt-in mapping from the supplied FactInventory schema; Grade semantics are unconfirmed. */
+    public static function factInventoryMapping() {
+        return ['sku'=>'ProCode','name'=>'ProDes','stock'=>'StockTedad','warehouse'=>'ShopCode','model'=>'ProCode',
+            'category'=>'Category','subcategory'=>'SubCategory','product_type'=>'ProductType','grade'=>'Grade',
+            'warehouse_name'=>'ShopName','source_updated_at'=>'LastUpdateDateTime', 'size'=>'','color'=>'','price'=>''];
     }
     public static function normalize($rows, $cfg) {
         if (!is_array($rows) || !$rows || count($rows) > 50000) throw new RuntimeException('دریافت خالی یا بیش از ۵۰۰۰۰ ردیف؛ هیچ داده‌ای اعمال نشد.');
@@ -77,6 +83,26 @@ class TiamInventory {
         return $out;
     }
     public static function productKey($name, $color) { return mb_strtolower(trim(preg_replace('/\s+/u', ' ', $name))) . '|' . mb_strtolower(trim($color)); }
+    public static function restoreProduct($product) {
+        $warehouses=[]; $key=null;
+        foreach (($product['variants']??[]) as $variant) {
+            if (!empty($variant['tiam_product_key']) && is_string($variant['tiam_product_key'])) {
+                if ($key===null) $key=$variant['tiam_product_key'];
+                foreach (($variant['tiam_warehouses']??[]) as $warehouse) if (is_array($warehouse)) $warehouses[]=$warehouse;
+            }
+        }
+        if ($key!==null) { $product['tiam_key']=$key; $product['tiam_warehouses']=$warehouses; }
+        return $product;
+    }
+    private static function syncValue($product) {
+        $value=[];
+        foreach (['sku','name','color','price','variants','sizes','stock_total','stock_online','tiam_key','tiam_warehouses'] as $field) {
+            $item=$product[$field]??null;
+            if (in_array($field,['stock_total','stock_online'],true)) $item=is_numeric($item)?(float)$item:null;
+            $value[$field]=$item;
+        }
+        return json_encode($value);
+    }
     public static function merge($project, $items, $cfg) {
         $products = $project['products'] ?? []; $groups = []; $changes = []; $counts = ['new' => 0, 'updated' => 0, 'unchanged' => 0, 'missing' => 0];
         foreach ($items as $item) {
@@ -85,34 +111,40 @@ class TiamInventory {
         }
         $indices = [];
         foreach ($products as $i => $p) $indices[$p['tiam_key'] ?? self::productKey($p['name'] ?? '', $p['color'] ?? '')] = $i;
-        $touched = [];
+        $touched = []; $matchedIndices = [];
         foreach ($groups as $key => $rows) {
             $index = $indices[$key] ?? ($indices[self::productKey($rows[0]['name'], $rows[0]['color'] ?? '')] ?? null); $old = $index !== null ? $products[$index] : [];
+            if ($index !== null) {
+                if (isset($matchedIndices[$index])) throw new RuntimeException('چند کد مستقل به یک محصول قدیمی با نام یکسان می‌رسند؛ قبل از اعمال، هویت کالاها را اصلاح کنید.');
+                $matchedIndices[$index] = true;
+            }
             $variants = []; $warehouses = [];
             foreach ($rows as $row) {
                 $vk = json_encode([$row['sku'], $row['size'] ?? '']);
                 if (isset($variants[$vk]['price'], $row['price']) && (float)$variants[$vk]['price'] !== (float)$row['price']) throw new RuntimeException('قیمت یک واریانت بین انبارها متفاوت است؛ نگاشت یا ویو را اصلاح کنید.');
                 if (!isset($variants[$vk])) {
-                    $variants[$vk] = ['sku' => $row['sku'], 'size' => $row['size'] ?? '', 'inventory' => 0];
+                    $variants[$vk] = ['sku' => $row['sku'], 'size' => $row['size'] ?? '', 'inventory' => 0, 'tiam_product_key'=>$key, 'tiam_warehouses'=>[]];
                     if (isset($row['price'])) $variants[$vk]['price'] = (float)$row['price'];
                 }
                 $variants[$vk]['inventory'] += $row['stock'];
-                $warehouses[] = ['sku' => $row['sku'], 'size' => $row['size'] ?? '', 'warehouse' => $row['warehouse'] ?? '', 'inventory' => $row['stock']];
+                $sourceAttributes = array_intersect_key($row, array_flip(['category','subcategory','product_type','grade','warehouse_name','source_updated_at']));
+                $warehouseRecord = ['sku' => $row['sku'], 'size' => $row['size'] ?? '', 'warehouse' => $row['warehouse'] ?? '', 'inventory' => $row['stock']] + ($sourceAttributes ? ['tiam_attributes'=>$sourceAttributes] : []);
+                $warehouses[]=$warehouseRecord; $variants[$vk]['tiam_warehouses'][]=$warehouseRecord;
             }
             foreach (($old['variants'] ?? []) as $oldVariant) {
                 $vk = json_encode([(string)($oldVariant['sku'] ?? ''), (string)($oldVariant['size'] ?? '')]);
                 if (isset($variants[$vk])) $variants[$vk] = array_replace($oldVariant, $variants[$vk]);
-                else { $variants[$vk] = $oldVariant; if (!empty($cfg['zero_missing'])) $variants[$vk]['inventory'] = 0; }
+                else { $variants[$vk] = $oldVariant; if (!empty($cfg['zero_missing'])) { $variants[$vk]['inventory'] = 0; foreach (($variants[$vk]['tiam_warehouses']??[]) as $wi=>$record) $variants[$vk]['tiam_warehouses'][$wi]['inventory']=0; } }
             }
             $stock = array_sum(array_column($variants, 'inventory'));
             $new = array_replace($old, ['id' => $old['id'] ?? ('tiam_' . substr(hash('sha256', $project['id'] . $key), 0, 24)),
                 'name' => $rows[0]['name'], 'color' => $rows[0]['color'] ?? '', 'sku' => $rows[0]['sku'],
-                'variants' => array_values($variants), 'sizes' => array_values(array_unique(array_column($variants, 'size'))),
+                'variants' => array_values($variants), 'sizes' => array_values(array_unique(array_filter(array_column($variants, 'size'), static fn($size)=>(string)$size!==''))),
                 'stock_total' => $stock, 'stock_online' => $stock, 'inventory' => $stock, 'quantity' => $stock,
                 'tiam_key' => $key, 'tiam_warehouses' => $warehouses]);
             if (isset($rows[0]['price'])) $new['price'] = (string)$rows[0]['price'];
             if (!$old) { $new['status'] = 'draft'; $new['extracted_at'] = date('Y-m-d H:i:s'); }
-            $changed = json_encode($old) !== json_encode($new); $type = !$old ? 'new' : ($changed ? 'updated' : 'unchanged'); $counts[$type]++;
+            $changed = !$old || self::syncValue($old) !== self::syncValue($new); $type = !$old ? 'new' : ($changed ? 'updated' : 'unchanged'); $counts[$type]++;
             if ($changed) $changes[] = ['type' => $type, 'name' => $new['name'], 'color' => $new['color'], 'before' => $old['stock_total'] ?? null, 'after' => $stock, 'sizes' => $new['sizes'], 'variants' => $new['variants']];
             if ($index === null) $products[] = $new; else $products[$index] = $new;
             $touched[$key] = true;
@@ -123,7 +155,7 @@ class TiamInventory {
             if (!empty($cfg['zero_missing'])) {
                 $changes[] = ['type' => 'zero_missing', 'name' => $p['name'], 'before' => $p['stock_total'] ?? null, 'after' => 0];
                 foreach (['stock_total', 'stock_online', 'inventory', 'quantity'] as $f) $p[$f] = 0;
-                foreach ($p['variants'] as &$v) $v['inventory'] = 0; unset($v);
+                foreach ($p['variants'] as &$v) { $v['inventory'] = 0; foreach (($v['tiam_warehouses']??[]) as $wi=>$record) $v['tiam_warehouses'][$wi]['inventory']=0; } unset($v);
                 foreach (($p['tiam_warehouses'] ?? []) as $i => $w) $p['tiam_warehouses'][$i]['inventory'] = 0;
             }
         } unset($p);
