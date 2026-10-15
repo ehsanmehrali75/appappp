@@ -76,7 +76,7 @@ try{
 }
 ?>
 <!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>پشتیبانی</title>
-<link rel="stylesheet" href="/panel/assets/support.css?v=2"></head><body><main>
+<link rel="stylesheet" href="/panel/assets/neo-tokens.css?v=1"><link rel="stylesheet" href="/panel/assets/support.css?v=3"></head><body><main>
 <header><h1>🎫 پشتیبانی</h1><div class="row"><span><?php echo supportEscape($actor); ?></span><a href="<?php echo canAccessManagement()?'/panel/admin.php':'/panel/portal.php'; ?>">بازگشت به پنل</a><a href="<?php echo supportEscape(supportUrl($pid)); ?>">فهرست درخواست‌ها</a><?php if($admin): ?><a href="/panel/system-admin-setup.php">فعال‌سازی مدیر کل</a><?php endif; ?></div></header>
 <?php if($error): ?><p class="error" role="alert"><?php echo supportEscape($error); ?></p><?php endif; ?>
 <form method="GET" class="row"><label>پروژه <select name="project"><option value=""><?php echo $admin?'همهٔ پروژه‌ها':'انتخاب پروژه'; ?></option><?php foreach($projects as $p): ?><option value="<?php echo supportEscape($p['id']); ?>" <?php echo $pid===$p['id']?'selected':''; ?>><?php echo supportEscape($p['name']); ?></option><?php endforeach; ?></select></label><button>نمایش</button></form>

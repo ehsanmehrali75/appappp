@@ -6893,8 +6893,14 @@ $suggestions = getCalendarSuggestions($project);
             .ig-grid { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
+<?php $neoPilot = ($tab === 'dashboard' && !empty($project) && ($_GET['design'] ?? '') !== 'legacy'); ?>
+<?php if ($neoPilot): ?>
+    <link rel="stylesheet" href="/panel/assets/neo-tokens.css?v=1">
+    <link rel="stylesheet" href="/panel/assets/neo-dashboard.css?v=<?php echo filemtime(__DIR__.'/assets/neo-dashboard.css'); ?>">
+    <script src="/panel/assets/neo-shell.js?v=<?php echo filemtime(__DIR__.'/assets/neo-shell.js'); ?>" defer></script>
+<?php endif; ?>
 </head>
-<body class="tab-<?php echo htmlspecialchars($tab ?? 'none'); ?>">
+<body class="tab-<?php echo htmlspecialchars($tab ?? 'none'); ?><?php echo $neoPilot?' maarksho-pilot':''; ?>">
     <div id="global-loader">
         <div class="spinner"></div>
         <p class="font-black mt-8 text-primary">در حال پردازش هوشمند...</p>
@@ -6905,10 +6911,10 @@ $suggestions = getCalendarSuggestions($project);
     <header class="navbar sticky top-0 bg-white/80 backdrop-blur-md z-[500] border-b border-slate-100">
             <div class="container flex justify-between py-4">
             <div class="flex items-center">
-                <button onclick="toggleSidebar()" class="lg:hidden w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 ml-4 border border-slate-100">
+                <button onclick="toggleSidebar()" class="<?php echo $neoPilot?'neo-mobile-toggle neo-nav-toggle ':''; ?>lg:hidden w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 ml-4 border border-slate-100">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
                 </button>
-                <span class="font-black" style="font-size: 1.5rem; color: var(--primary);">M Flow</span>
+                <span class="font-black neo-brand" style="font-size: 1.5rem; color: var(--primary);"><?php echo $neoPilot?'مارک‌شو':'M Flow'; ?></span>
                 <span class="badge bg-warning mr-2">v3.0 Standalone</span>
             </div>
             <div class="flex items-center gap-2">
@@ -7313,10 +7319,10 @@ $suggestions = getCalendarSuggestions($project);
             <?php if($project): ?>
             <div class="mt-4 p-5 bg-white/70 backdrop-blur-md border border-slate-100 rounded-[2rem] shadow-sm flex-shrink-0">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-[10px] font-black text-slate-400">سلامت هسته</span>
+                    <span class="text-[10px] font-black text-slate-400"><?php echo $neoPilot?'پروژهٔ انتخاب‌شده':'سلامت هسته'; ?></span>
                     <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-lg shadow-emerald-200"></span>
                 </div>
-                <p class="text-[10px] text-slate-500 leading-relaxed font-medium">سیستم در وضعیت پایدار است. پایش خودکار Maarksho Engine فعال می‌باشد.</p>
+                <p class="text-[10px] text-slate-500 leading-relaxed font-medium"><?php echo $neoPilot?htmlspecialchars($project['name'], ENT_QUOTES, 'UTF-8'):'سیستم در وضعیت پایدار است. پایش خودکار Maarksho Engine فعال می‌باشد.'; ?></p>
             </div>
             <?php endif; ?>
         </aside>
@@ -7330,9 +7336,10 @@ $suggestions = getCalendarSuggestions($project);
             <?php endif; ?>
 
             <?php if ($tab === 'dashboard' && $project): ?>
-                <div class="mb-10 flex between items-end">
+                <?php if($neoPilot) require __DIR__.'/inc/NeoDashboardIntro.php'; ?>
+                <div <?php echo $neoPilot?'hidden':''; ?> class="mb-10 flex between items-end">
                     <div>
-                        <h2 class="font-black text-4xl mb-3 text-slate-900 tracking-tight">داشبورد هوشمند: <?php echo $project['name']; ?></h2>
+                        <h2 class="font-black text-4xl mb-3 text-slate-900 tracking-tight">داشبورد هوشمند: <?php echo htmlspecialchars($project['name'], ENT_QUOTES, 'UTF-8'); ?></h2>
                         <p class="text-sm text-slate-500 font-medium leading-relaxed">پایش تخصصی و مانیتورینگ عملکرد کتابخانه Maarksho Engine v3</p>
                     </div>
                 </div>
@@ -7402,10 +7409,11 @@ $suggestions = getCalendarSuggestions($project);
                                 روند استخراج محتوا
                              </h3>
                              <div class="flex gap-2">
-                                 <span class="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1 rounded-full">Real-time Data</span>
+                                 <span class="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1 rounded-full"><?php echo $neoPilot?'بر اساس زمان ثبت‌شده':'Real-time Data'; ?></span>
                              </div>
                         </div>
                         <canvas id="scrapingChart" style="max-height: 280px;"></canvas>
+                        <?php if($neoPilot): ?><p class="neo-chart-note">فقط محتواهای دارای تاریخ استخراج معتبر شمرده می‌شوند.</p><?php endif; ?>
                     </div>
                     <?php endif; ?>
 
@@ -7422,9 +7430,11 @@ $suggestions = getCalendarSuggestions($project);
                             $top = $project['products'];
                             usort($top, function($a, $b) { return (($b['likes']??0)+($b['dislikes']??0)) - (($a['likes']??0)+($a['dislikes']??0)); });
                             $top = array_slice($top, 0, 4);
+                            $visibleTop = 0;
                             foreach($top as $t): 
                                 $v = ($t['likes']??0) + ($t['dislikes']??0);
                                 if($v == 0) continue;
+                                $visibleTop++;
                             ?>
                                 <div class="flex items-center gap-5 group/item">
                                     <div class="w-16 h-16 rounded-2xl overflow-hidden shadow-sm relative">
@@ -7442,6 +7452,7 @@ $suggestions = getCalendarSuggestions($project);
                                     </div>
                                 </div>
                             <?php endforeach; ?>
+                            <?php if($neoPilot && !$visibleTop): ?><p class="neo-empty">هنوز رأیی برای محتواهای این پروژه ثبت نشده است.</p><?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -7527,6 +7538,7 @@ $suggestions = getCalendarSuggestions($project);
                 // Real data connections for scraper trend chart
                 $months = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
                 $currentJalaliMonth = (int)jdate('m', time());
+                $currentJalaliYear = (int)jdate('Y', time());
                 $last6MonthsNames = [];
                 $last6MonthsValues = [];
 
@@ -7536,9 +7548,9 @@ $suggestions = getCalendarSuggestions($project);
                     
                     $count = 0;
                     foreach ($project['products'] ?? [] as $prod) {
-                        $eat = $prod['extractedAt'] ?? $prod['extracted_at'] ?? time();
+                        $eat = $prod['extractedAt'] ?? $prod['extracted_at'] ?? ($neoPilot ? 0 : time());
                         if (!is_numeric($eat)) $eat = strtotime($eat);
-                        if ($eat > 0 && (int)jdate('m', $eat) == ($mIndex + 1)) {
+                        if ($eat > 0 && (int)jdate('m', $eat) == ($mIndex + 1) && (!$neoPilot || (int)jdate('Y', $eat) === $currentJalaliYear + (int)floor(($currentJalaliMonth - 1 - $i) / 12))) {
                             $count++;
                         }
                     }
@@ -7552,6 +7564,10 @@ $suggestions = getCalendarSuggestions($project);
                     document.addEventListener('DOMContentLoaded', () => {
                         const canvas = document.getElementById('scrapingChart');
                         if (!canvas) return;
+                        <?php if($neoPilot): ?>
+                        canvas.setAttribute('role', 'img');
+                        canvas.setAttribute('aria-label', 'تعداد استخراج ثبت‌شده در شش ماه اخیر: ' + <?php echo $jsLabels; ?>.map((month,index) => month + ': ' + <?php echo $jsValues; ?>[index]).join('، '));
+                        <?php endif; ?>
                         const ctx = canvas.getContext('2d');
                         new Chart(ctx, {
                             type: 'line',
@@ -7560,17 +7576,18 @@ $suggestions = getCalendarSuggestions($project);
                                 datasets: [{
                                     label: 'استخراج کالا',
                                     data: <?php echo $jsValues; ?>,
-                                    borderColor: '#4f46e5',
+                                    borderColor: <?php echo json_encode($neoPilot?'#3f6358':'#4f46e5'); ?>,
                                     tension: 0.4,
                                     fill: true,
-                                    backgroundColor: 'rgba(79, 70, 229, 0.05)'
+                                    backgroundColor: <?php echo json_encode($neoPilot?'rgba(63, 99, 88, 0.08)':'rgba(79, 70, 229, 0.05)'); ?>
                                 }]
                             },
-                            options: { responsive: true, plugins: { legend: { display: false } } }
+                            options: { responsive: true, plugins: { legend: { display: false } }, <?php if($neoPilot): ?>scales: { y: { beginAtZero:true, ticks:{precision:0} } },<?php endif; ?> }
                         });
                     });
                 </script>
             <?php endif; ?>
+                <?php if($neoPilot): ?><a class="neo-legacy" href="?tab=dashboard&amp;design=legacy">مشاهدهٔ ظاهر قبلی برای مقایسه</a><?php endif; ?>
 
             <?php if ($tab === 'feature_flags' && isMainAdmin()): ?>
                 <?php include __DIR__ . '/inc/feature_flags_view.php'; ?>

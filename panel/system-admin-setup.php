@@ -31,7 +31,7 @@ if (($_SERVER['REQUEST_METHOD']??'GET')==='POST') {
 }
 function adminSetupEscape($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 ?>
-<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>فعال‌سازی مدیر کل | مارک‌شو</title><link rel="stylesheet" href="/panel/assets/support.css?v=2"></head><body><main>
+<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>فعال‌سازی مدیر کل | مارک‌شو</title><link rel="stylesheet" href="/panel/assets/neo-tokens.css?v=1"><link rel="stylesheet" href="/panel/assets/support.css?v=3"></head><body><main>
 <header><div><small>مدیریت سامانه</small><h1>فعال‌سازی مدیر کل</h1></div><nav class="row"><a href="/panel/admin.php">بازگشت به پنل</a><a href="/panel/support.php">پشتیبانی</a></nav></header>
 <?php if ($error): ?><p class="error" role="alert"><?=adminSetupEscape($error)?></p><?php endif; ?>
 <?php if (!isMainAdmin()): ?>
