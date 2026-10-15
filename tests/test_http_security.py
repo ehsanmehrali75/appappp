@@ -1,6 +1,7 @@
 """Isolated real-PHP HTTP regressions. Never connects to a deployment database."""
 import base64
 import contextlib
+import gzip
 import http.cookiejar
 import json
 import os
@@ -85,7 +86,9 @@ class HttpSecurity(unittest.TestCase):
             response = opener.open(req, timeout=10)
         except urllib.error.HTTPError as exc:
             response = exc
-        return response.code, response.read().decode('utf-8', errors='replace')
+        content=response.read()
+        if response.headers.get('Content-Encoding')=='gzip':content=gzip.decompress(content)
+        return response.code, content.decode('utf-8', errors='replace')
 
     def login(self, username='fixture_owner'):
         opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
@@ -227,6 +230,29 @@ class HttpSecurity(unittest.TestCase):
         code, page = self.request(opener, '/panel/admin.php?'+urllib.parse.urlencode({'tab': tab, 'we_view': 'work', 'wc_queue': queue}))
         self.assertEqual(code, 200)
         return re.findall(r'<article[^>]*data-product-id="([^"]+)"', page), page
+
+    def seed_large_catalog(self):
+        with sqlite3.connect(self.database) as db:
+            for number in range(900):
+                pid=f'catalog-{number:04d}'
+                db.execute('INSERT INTO products(id,project_id,sku,name,image,images_list,gallery,stock_total,status,description,website_sync) VALUES (?,?,?,?,?,?,?,?,?,?,?)', (pid, 'p', pid, 'کالای بزرگ '+str(number), 'uploads/original.png', '[{"url":"uploads/original.png","source":"site","approved":true}]', '[]', '5', 'active', 'catalog description '*80, '{}'))
+        for path in (self.app/'panel/db/cache').glob('*.cache'):
+            path.unlink()
+
+    def test_large_portal_catalog_renders_complete_gzip_response(self):
+        # Inline product JSON exceeded the old whole-document regex limit.
+        self.seed_large_catalog()
+        opener, _ = self.login()
+        for tab in [None, 'library']:
+            with self.subTest(tab=tab):
+                code, page = self.request(opener, '/panel/portal.php'+('?tab='+tab if tab else ''), headers={'Accept-Encoding': 'gzip'})
+                self.assertEqual(code, 200)
+                self.assertGreater(len(page), 2_000_000)
+                self.assertIn('class="portal-header"', page)
+                self.assertIn('id="portal-main-container"', page)
+                self.assertIn('name="app-csrf"', page)
+                self.assertIn('catalog-0899', page)
+                self.assertIn('</html>', page)
 
     def test_pretty_admin_route_enforces_security(self):
         opener, token = self.login('limited')

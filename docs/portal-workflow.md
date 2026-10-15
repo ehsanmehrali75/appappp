@@ -23,4 +23,12 @@ Both extraction and Website Export's work view offer request, missing-reference,
 
 - 42 pure production checks cover all checkbox combinations, project isolation, real versus stale references, final/social assets, stock-zero exclusion and request operators.
 - Real HTTP tests cover stage transitions, actor persistence, unauthorized operators, prerequisite bypass, approvals, stock thresholds, pagination, private files, backups, CSRF, uploads, canonical routes and explicit database failure.
-- `tests/browser_workspace.py` exercises request → actual reference-file upload → production, real settings persistence, mobile drawer/search/Escape/account access, and five portal views at 1440/768/375/320px. The recorded run passed 51 checks with no JavaScript errors or horizontal document overflow. It uses a disposable SQLite fixture and stubs remote assets/workers; it does not verify the live hosting environment or real external integrations.
+- `tests/browser_workspace.py` exercises request → actual reference-file upload → production, real settings persistence, mobile drawer/search/Escape/account access, and five portal views at 1440/768/375/320px. The recorded run passed 59 checks with no JavaScript errors or horizontal document overflow. It uses a disposable SQLite fixture and stubs remote assets/workers; it does not verify the live hosting environment or real external integrations.
+
+## Large-catalog blank-page correction
+
+The shared HTML/CSRF decorator previously matched entire script blocks with a lazy whole-document regular expression. A product JSON block larger than PHP's PCRE backtracking limit made that replacement return null, leading to a successful HTTP response with an empty body. A small fixture did not expose this failure.
+
+The decorator now scans short opening tags, skips script/style/template/text blocks by their closing boundaries, and inserts protection only into real local POST forms. It preserves multi-megabyte scripts exactly and never replaces the document with a regex failure. Legacy serialized website metadata lists are normalized before workflow calculations, without creating approval or upload evidence from malformed values.
+
+Regression coverage includes a 5 MB inline script under a deliberately low PCRE limit, a real compressed portal response with 900 additional products, both the bare portal URL and the library, and Chromium rendering with the large catalog at desktop/mobile sizes. The full browser run passes 59 checks with no page errors. Live-host deployment remains a separate verification.

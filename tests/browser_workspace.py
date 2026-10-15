@@ -65,6 +65,16 @@ try:
       form.evaluate('(form,marker)=>{const h=document.createElement("input");h.name=marker;h.value="1";form.append(h);form.submit()}',marker)
     with sqlite3.connect(case.database) as db:settings=json.loads(db.execute('SELECT settings FROM projects WHERE id="p"').fetchone()[0])
     check(not settings['prod_require_reference'] and settings['prod_require_image_request'],'real project settings persist independent prerequisites')
+    # Production-size payload: verify actual DOM and JavaScript, including the bare URL.
+    case.seed_large_catalog()
+    for width,tab in [(1440,None),(375,'library')]:
+      page.set_viewport_size({'width':width,'height':950})
+      response=page.goto(base+'/panel/portal.php'+('?tab='+tab if tab else ''));page.wait_for_load_state()
+      check(response.status==200 and page.locator('.portal-header').is_visible(),f'{width} large catalog renders portal')
+      check(page.evaluate('Object.keys(window.portalProducts||{}).length')>=900,f'{width} large product JSON preserved')
+      check(page.locator('meta[name="app-csrf"]').count()==1,f'{width} large page keeps CSRF protection')
+      check(page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),f'{width} large catalog no horizontal overflow')
+      page.screenshot(path=str(out/f'large-catalog-{width}.png'),full_page=False)
     check(not errors,'no JavaScript errors: '+repr(errors))
     browser.close()
  print(json.dumps({'checks':len(checks),'passed':checks,'javascript_errors':errors},ensure_ascii=False,indent=2))

@@ -38,4 +38,24 @@ $beforeEdit=WebsiteCatalogSync::reconcile($project,$rows,['update_price'=>false]
 $edited=$beforeEdit['project'];$edited['products'][0]['image']='uploads/new-final.jpg';wfCheck(WebsiteCatalogSync::state($edited,$edited['products'][0])['publication']==='pending_upload','new photo after snapshot detected without volatile manual flag');
 $seenNoImage=$project;$seenNoImage['products'][0]['image']='uploads/local.jpg';$seenNoImage['products'][0]['website_sync']=['presence'=>'seen','image_urls'=>[]];WebsiteCatalogSync::resolve($seenNoImage,'p','operator');wfCheck(WebsiteCatalogSync::state($seenNoImage,$seenNoImage['products'][0])['publication']==='resolved','manual receipt also applies when product was seen but site gallery was empty');
 $seenNoImage['products'][0]['image']='uploads/newer.jpg';wfCheck(WebsiteCatalogSync::state($seenNoImage,$seenNoImage['products'][0])['publication']==='pending_upload','new photo after receipt returns to upload queue');
+$legacy=['id'=>'legacy','stock_total'=>5,'status'=>'pending','image'=>'https://shop.example/photo.jpg','size_chart'=>'https://shop.example/chart.jpg','description'=>'متن ثبت شده','uploaded_to_site'=>1,'images_list'=>[['url'=>'https://shop.example/photo.jpg','approved'=>false]]];
+$legacy['website_sync']=['presence'=>'seen','has_size_chart'=>false,'has_description'=>false,'image_urls'=>['https://shop.example/photo.jpg'],'size_guide_urls'=>['https://shop.example/chart.jpg'],'manual_upload_receipt'=>['assets'=>['images','chart','description'],'chart_fingerprint'=>WebsiteCatalogSync::chartFingerprint(ProductSizeChartCatalog::forProduct($other,$legacy)),'description_fingerprint'=>hash('sha256',$legacy['description'])]];
+$expected=WebsiteCatalogSync::state($other,$legacy);
+$legacy['website_sync']['image_urls']=json_encode($legacy['website_sync']['image_urls']);$legacy['website_sync']['size_guide_urls']=json_encode($legacy['website_sync']['size_guide_urls']);
+$legacy['website_sync']['manual_upload_receipt']['assets']=json_encode($legacy['website_sync']['manual_upload_receipt']['assets']);$legacy['website_sync']['manual_upload_receipt']=json_encode($legacy['website_sync']['manual_upload_receipt']);
+$legacy['website_sync']=json_encode($legacy['website_sync']);
+wfCheck(WebsiteCatalogSync::state($other,$legacy)===$expected,'serialized website metadata and nested lists preserve native metadata behavior');
+wfCheck(WebsiteCatalogSync::photos($legacy,true)===[]&&WebsiteCatalogSync::imageApproved($legacy,$legacy['image']),'serialized website photo evidence is shared by local-photo and approval checks');
+wfCheck(!$expected['size_chart_upload_pending']&&!$expected['description_upload_pending']&&!$expected['chart']['has_local'],'valid legacy receipt and site chart retain their upload and source evidence');
+foreach([true,42,'broken-json','"https://shop.example/photo.jpg"','{"url":"https://shop.example/photo.jpg"}',[false,['url'=>'https://shop.example/photo.jpg'],'javascript:alert(1)']] as $invalid) {
+    $bad=$legacy;$bad['website_sync']=['presence'=>'missing','image_urls'=>$invalid,'size_guide_urls'=>$invalid,'local_image_fingerprint'=>[],'local_chart_fingerprint'=>[],'local_description_fingerprint'=>[],'manual_upload_receipt'=>['assets'=>$invalid,'chart_fingerprint'=>[],'description_fingerprint'=>[]]];
+    $state=WebsiteCatalogSync::state($other,$bad);
+    wfCheck(WebsiteCatalogSync::photos($bad,true)===[$bad['image']]&&!WebsiteCatalogSync::imageApproved($bad,$bad['image']),'malformed metadata does not invent website photo approval');
+    wfCheck($state['site_image_urls']===[]&&$state['site_chart_urls']===[]&&$state['size_chart_upload_pending']&&$state['description_upload_pending'],'malformed nested lists and fingerprints cannot suppress required upload work');
+}
+$bad['website_sync']=true;wfCheck(WebsiteCatalogSync::photos($bad,true)===[$bad['image']]&&!WebsiteCatalogSync::imageApproved($bad,$bad['image'])&&WebsiteCatalogSync::state($other,$bad)['site_image_urls']===[],'scalar website metadata is safely treated as absent');
+$bad['website_sync']=['presence'=>'missing','manual_upload_receipt'=>['assets'=>'["chart","description"]','chart_fingerprint'=>[],'description_fingerprint'=>[]]];$state=WebsiteCatalogSync::state($other,$bad);
+wfCheck($state['size_chart_upload_pending']&&$state['description_upload_pending'],'recognized receipt assets with malformed fingerprints do not count as upload evidence');
+$bad['website_sync']=['image_urls'=>json_encode([$bad['image'],false,['url'=>$bad['image']],'javascript:alert(1)'])];$state=WebsiteCatalogSync::state($other,$bad);
+wfCheck($state['site_image_urls']===[$bad['image']]&&WebsiteCatalogSync::imageApproved($bad,$bad['image']),'mixed legacy URL lists retain only valid scalar media URLs');
 echo "$n website workflow checks passed\n";

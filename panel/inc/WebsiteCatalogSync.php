@@ -3,6 +3,32 @@
 require_once __DIR__.'/ProductSizeChartCatalog.php';
 require_once __DIR__.'/ImageProduction.php';
 class WebsiteCatalogSync {
+    /** Legacy imports may serialize nested metadata again; malformed values carry no evidence. */
+    private static function metadataArray($value,$list=false) {
+        if(is_string($value))$value=json_decode($value,true);
+        return is_array($value)&&(!$list||array_is_list($value))?$value:[];
+    }
+    private static function metadata($product) {
+        $meta=self::metadataArray($product['website_sync']??[]);
+        foreach(['image_urls','size_guide_urls'] as $field) {
+            $urls=[];
+            foreach(self::metadataArray($meta[$field]??[],true) as $url) {
+                $url=ProductSizeChartCatalog::mediaUrl($url);
+                if($url!=='')$urls[$url]=true;
+            }
+            $meta[$field]=array_keys($urls);
+        }
+        foreach(['local_image_fingerprint','local_chart_fingerprint','local_description_fingerprint'] as $field)
+            if(isset($meta[$field])&&!is_string($meta[$field]))$meta[$field]='';
+        if(array_key_exists('manual_upload_receipt',$meta)) {
+            $receipt=self::metadataArray($meta['manual_upload_receipt']);
+            $receipt['assets']=array_values(array_filter(self::metadataArray($receipt['assets']??[],true),static fn($asset)=>is_string($asset)&&in_array($asset,['images','chart','description'],true)));
+            foreach(['image_fingerprint','all_image_fingerprint','chart_fingerprint','description_fingerprint'] as $field)
+                if(isset($receipt[$field])&&!is_string($receipt[$field]))$receipt[$field]='';
+            $meta['manual_upload_receipt']=$receipt;
+        }
+        return $meta;
+    }
     public static function code($value) {
         return trim(strtr((string)$value, array_combine(preg_split('//u','۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩',-1,PREG_SPLIT_NO_EMPTY),str_split('01234567890123456789'))));
     }
@@ -53,7 +79,7 @@ class WebsiteCatalogSync {
     }
     /** Website photos exclude references and social-only assets; portal rules remain untouched. */
     public static function photos($product,$localOnly=false) {
-        $out=[];$site=$product['website_sync']['image_urls']??[];
+        $out=[];$site=self::metadata($product)['image_urls'];
         $social=ProductSizeChartCatalog::mediaUrl($product['social_image']??$product['socialImage']??'');
         $add=function($item) use (&$out,$localOnly,$site,$social) {
             $url=ProductSizeChartCatalog::mediaUrl(is_array($item)?($item['url']??$item['src']??$item['image']??''):$item);
@@ -79,7 +105,7 @@ class WebsiteCatalogSync {
             if(($item['source']??'')==='site'||!empty($item['site_verified_at']))return true;
             if(array_key_exists('approved',$item))$decision=(bool)$item['approved'];
         }
-        foreach(($product['website_sync']['image_urls']??[]) as $siteUrl)if(ProductSizeChartCatalog::mediaUrl($siteUrl)===$url)return true;
+        foreach(self::metadata($product)['image_urls'] as $siteUrl)if($siteUrl===$url)return true;
         if($decision!==null)return $decision;
         return !in_array($product['status']??'active',['pending','waiting_approval','rejected'],true)&&empty($product['portal_pending']);
     }
@@ -113,7 +139,7 @@ class WebsiteCatalogSync {
         return $positive?'in_stock':($known?'out_of_stock':'unknown');
     }
     public static function state($project,$product) {
-        $meta=is_array($product['website_sync']??null)?$product['website_sync']:[];
+        $meta=self::metadata($product);$product['website_sync']=$meta;
         $hasDescription=trim((string)($product['description']??''))!=='';
         $chart=ProductSizeChartCatalog::forProduct($project,$product);
         $siteChart=($meta['has_size_chart']??null)===true;
@@ -200,7 +226,7 @@ class WebsiteCatalogSync {
         $now=time();
         foreach($groups as $index=>$group) {
             $product=&$project['products'][$index];$id=(string)$product['id'];
-            $meta=$product['website_sync']??[];
+            $meta=self::metadata($product);$product['website_sync']=$meta;
             $meta=array_replace($meta,['presence'=>'seen','origin'=>$origin,'checked_at'=>$now,'publication'=>'uploaded']);
             $siteImages=[];$descriptions=[];$charts=[];$prices=[];$descriptionObserved=false;$chartObserved=false;$imageObserved=false;
             foreach($group as $row) {
@@ -265,7 +291,7 @@ class WebsiteCatalogSync {
         if($options['complete'])foreach($project['products'] as $index=>&$product) {
             if(isset($covered[$index]))continue;
             $linkedOrigin=self::origin($product['link']??$product['url']??'');if($linkedOrigin!==''&&$linkedOrigin!==$origin)continue;
-            $id=(string)$product['id'];$meta=$product['website_sync']??[];
+            $id=(string)$product['id'];$meta=self::metadata($product);$product['website_sync']=$meta;
             $hasImage=(bool)self::photos($product);
             if(self::inventory($product)==='out_of_stock'){
                 $product['website_sync']=array_replace($meta,['presence'=>'missing','origin'=>$origin,'checked_at'=>$now,'has_description'=>false,'has_size_chart'=>false]);
@@ -284,7 +310,7 @@ class WebsiteCatalogSync {
     }
     public static function resolve(&$project,$id,$user,$receipt=null) {
         foreach($project['products'] as &$product)if((string)$product['id']===(string)$id) {
-            $meta=$product['website_sync']??[];
+            $meta=self::metadata($product);$product['website_sync']=$meta;
             $derived=self::state($project,$product);
             if(empty(self::photos($product)))throw new RuntimeException('ابتدا عکس نهایی غیرسوشیال محصول را آماده کنید.');
             if(!empty($derived['approval_pending']))throw new RuntimeException('ابتدا تأیید تصویر در پورتال انجام شود.');

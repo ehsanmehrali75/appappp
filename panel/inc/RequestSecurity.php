@@ -48,23 +48,61 @@ class RequestSecurity {
         }
         ob_start([self::class,'decorateHtml']);
     }
+    /** Find a tag boundary without treating a quoted > as the end of the tag. */
+    private static function tagEnd($html,$start) {
+        $length=strlen($html);$cursor=$start+1;
+        while($cursor<$length) {
+            $cursor+=strcspn($html,"\"'>",$cursor);
+            if($cursor>=$length)return null;
+            if($html[$cursor]==='>')return $cursor+1;
+            $quote=$html[$cursor];$close=strpos($html,$quote,$cursor+1);
+            if($close===false)return null;
+            $cursor=$close+1;
+        }
+        return null;
+    }
+    private static function postForm($tag) {
+        $attributes=[];
+        preg_match_all('~\s([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+)))?~',$tag,$matches,PREG_SET_ORDER|PREG_UNMATCHED_AS_NULL);
+        foreach($matches as $attribute) {
+            $name=strtolower($attribute[1]);
+            // Browsers use the first occurrence of a duplicate attribute.
+            if(!array_key_exists($name,$attributes))$attributes[$name]=html_entity_decode($attribute[2]??$attribute[3]??$attribute[4]??'',ENT_QUOTES,'UTF-8');
+        }
+        return strtolower($attributes['method']??'get')==='post'&&self::sameOrigin($attributes['action']??'');
+    }
     public static function decorateHtml($html) {
         foreach(headers_list() as $header)if(stripos($header,'Content-Type:')===0&&stripos($header,'text/html')===false)return $html;
         if(stripos($html,'<html')===false)return $html;
         $token=htmlspecialchars(self::token(),ENT_QUOTES,'UTF-8');
-        $html=preg_replace_callback('~<!--.*?-->|<(script|style|textarea|template)\b[^>]*>.*?</\1\s*>|<form\b[^>]*>~is',static function($m)use($token){
-            if(stripos($m[0],'<form')!==0)return $m[0];
-            $attributes=[];
-            preg_match_all('~\s([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+)))?~',$m[0],$matches,PREG_SET_ORDER|PREG_UNMATCHED_AS_NULL);
-            foreach($matches as $attribute) {
-                $name=strtolower($attribute[1]);
-                // Browsers use the first occurrence of a duplicate attribute.
-                if(!array_key_exists($name,$attributes))$attributes[$name]=html_entity_decode($attribute[2]??$attribute[3]??$attribute[4]??'',ENT_QUOTES,'UTF-8');
-            }
-            if(strtolower($attributes['method']??'get')!=='post'||!self::sameOrigin($attributes['action']??''))return $m[0];
-            return $m[0].'<input type="hidden" name="app_csrf" value="'.$token.'">';
-        },$html);
         $assets='<meta name="app-csrf" content="'.$token.'"><script src="/panel/assets/request-security.js?v=1"></script>';
-        return preg_replace('~</head\s*>~i',$assets.'</head>',$html,1);
+        $hidden='<input type="hidden" name="app_csrf" value="'.$token.'">';
+        $parts=[];$offset=0;$copied=0;$headAdded=false;
+        // Match only small opening tokens. A whole-page .*? regex can exhaust
+        // pcre.backtrack_limit on the multi-megabyte product JSON and erase output.
+        while(preg_match('~<!--|<(script|style|textarea|template)\b|<form\b|</head\b~i',$html,$match,PREG_OFFSET_CAPTURE,$offset)===1) {
+            $start=$match[0][1];$opening=$match[0][0];
+            if($opening==='<!--') {
+                $close=strpos($html,'-->',$start+4);
+                if($close===false)break;
+                $offset=$close+3;continue;
+            }
+            $end=self::tagEnd($html,$start);if($end===null)break;
+            $rawTag=$match[1][0]??'';
+            if($rawTag!=='') {
+                if(preg_match('~</'.preg_quote($rawTag,'~').'(?=[\s/>])~i',$html,$close,PREG_OFFSET_CAPTURE,$end)!==1)break;
+                $closeEnd=self::tagEnd($html,$close[0][1]);if($closeEnd===null)break;
+                $offset=$closeEnd;continue;
+            }
+            if(strcasecmp($opening,'</head')===0&&!$headAdded) {
+                $parts[]=substr($html,$copied,$start-$copied);$parts[]=$assets;
+                $copied=$start;$headAdded=true;
+            } elseif(strcasecmp($opening,'<form')===0&&self::postForm(substr($html,$start,$end-$start))) {
+                $parts[]=substr($html,$copied,$end-$copied);$parts[]=$hidden;$copied=$end;
+            }
+            $offset=$end;
+        }
+        $parts[]=substr($html,$copied);
+        return implode('',$parts);
     }
 }
