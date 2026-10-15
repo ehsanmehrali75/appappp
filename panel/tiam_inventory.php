@@ -48,6 +48,8 @@ try {
         if (in_array($action, ['vpn_test', 'view_test', 'preview'], true)) {
             if (empty($cfg['agent_token_hash'])) throw new RuntimeException('ابتدا تنظیمات و کلید ایجنت را ذخیره کنید.');
             $job = TiamInventory::createJob($project, $action, TiamInventory::owner());
+        } elseif ($action === 'cancel') {
+            $job = TiamInventory::cancelJob($id,$body['job']??'',TiamInventory::owner(),isMainAdmin() || isProjectAdmin());
         } elseif ($action === 'latest') {
             // Settings users can inspect the latest scheduled run across sessions.
         } elseif ($action === 'status') {
@@ -57,6 +59,8 @@ try {
             if (!hash_equals($job['owner'] ?? '', TiamInventory::owner()) || !hash_equals($job['id'] ?? '', $body['job'] ?? '')) throw new RuntimeException('پیش‌نمایش متعلق به این نشست نیست.');
             $job = TiamInventory::apply($project, $job);
         } elseif ($action === 'agent_poll') {
+            $job['agent_last_seen'] = time();
+            TiamInventory::write($id,$job);
             $pending = in_array($job['state'] ?? '', ['queued', 'running'], true) && ($job['expires'] ?? 0) > time();
             $waitingForConfirmation = ($job['state'] ?? '') === 'preview' && ($job['expires'] ?? 0) > time();
             if (!$pending && !$waitingForConfirmation && TiamInventory::due($cfg)) {
@@ -67,7 +71,7 @@ try {
             if (!$pending) return ['status' => 'idle'];
             // A job is leased for 15 minutes. Polling never starts it twice.
             if (($job['state'] ?? '') === 'running') return ['status' => 'idle'];
-            $job['state'] = 'running'; TiamInventory::write($id, $job);
+            $job['state'] = 'running'; $job['started_at'] = time(); TiamInventory::write($id, $job);
             unset($cfg['agent_token_hash'], $cfg['approved']);
             return ['status' => 'job', 'job' => $job['id'], 'kind' => $job['kind'], 'config' => $cfg];
         } elseif ($action === 'agent_result') {
@@ -101,6 +105,8 @@ try {
             return ['status' => 'received', 'state' => $job['state']];
         } else throw new RuntimeException('عملیات ناشناخته است.');
         if (($job['expires'] ?? 0) < time() && in_array($job['state'] ?? '', ['queued','running','preview'], true)) $job['state'] = 'expired';
+        $job['can_cancel'] = in_array($job['state']??'', ['queued','running','preview'],true) && (isMainAdmin() || isProjectAdmin() || hash_equals($job['owner']??'', TiamInventory::owner()));
+        $job['agent_connected'] = !empty($job['agent_last_seen']) && $job['agent_last_seen'] >= time()-90;
         $job['can_apply'] = ($job['state'] ?? '') === 'preview' && hash_equals($job['owner'] ?? '', TiamInventory::owner());
         unset($job['products'], $job['owner'], $job['config_hash'], $job['base']);
         return $job;
@@ -108,5 +114,5 @@ try {
     tiamReply($response);
 } catch (Throwable $e) {
     // Detailed driver messages stay on the agent; responses contain no connection strings.
-    tiamReply(['error' => $e instanceof RuntimeException ? $e->getMessage() : 'خطای داخلی همگام‌سازی؛ تنظیمات و لاگ مراحل را بررسی کنید.'], 400);
+    tiamReply(['code' => $e instanceof TiamJobBusy ? 'TIAM_JOB_BUSY' : 'TIAM_ERROR', 'error' => $e instanceof RuntimeException ? $e->getMessage() : 'خطای داخلی همگام‌سازی؛ تنظیمات و لاگ مراحل را بررسی کنید.'], 400);
 }

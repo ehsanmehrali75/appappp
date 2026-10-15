@@ -49,4 +49,13 @@ $zero=TiamInventory::merge($missing,$items,array_replace($cfg,['zero_missing'=>t
 $prices=$cfg;$prices['mapping']['price']='Price';$prices['price_unit']='rial';$priced=$rows;foreach($priced as &$r)$r['Price']=1000;unset($r);
 check(TiamInventory::normalize($priced,$prices)[0]['price']===100.0,'rial conversion explicit');
 $badCfg=$input;$badCfg['view']='Factinventory; DELETE FROM x';rejects(fn()=>TiamInventory::config([],$badCfg),'SQL injection rejected');
+$queueProject=['id'=>'queue-test','products'=>[],'settings'=>['tiam_inventory'=>$cfg]];
+$q=TiamInventory::createJob($queueProject,'vpn_test','owner-a');
+check(TiamInventory::createJob($queueProject,'vpn_test','owner-a')['id']===$q['id'],'repeat click follows same job');
+rejects(fn()=>TiamInventory::cancelJob('queue-test',$q['id'],'other-owner'),'other user cannot cancel');
+rejects(fn()=>TiamInventory::cancelJob('queue-test','stale-job','owner-a'),'stale cancel cannot cancel replacement');
+$cancelled=TiamInventory::cancelJob('queue-test',$q['id'],'owner-a');check($cancelled['state']==='cancelled','queued job can be cancelled');
+$running=TiamInventory::createJob($queueProject,'preview','owner-a');$running['state']='running';$running['agent_last_seen']=time();TiamInventory::write('queue-test',$running);
+$cancelled=TiamInventory::cancelJob('queue-test',$running['id'],'admin',true);check($cancelled['state']==='cancelled' && !isset($cancelled['products']),'administrator cancels running job');
+$next=TiamInventory::createJob($queueProject,'preview','owner-a');check($next['id']!==$running['id'] && $next['agent_last_seen']===$running['agent_last_seen'],'replacement preserves agent presence');
 echo "$count Tiam inventory checks passed\n";

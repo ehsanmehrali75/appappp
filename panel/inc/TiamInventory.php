@@ -1,5 +1,6 @@
 <?php
 /** Outbound SQL Server bridge for shared hosting. No VPN commands run in PHP. */
+class TiamJobBusy extends RuntimeException {}
 class TiamInventory {
     public static function directory() {
         $dir = getenv('TIAM_STATE_DIR') ?: sys_get_temp_dir() . '/maarksho-tiam-' . substr(hash('sha256', __DIR__), 0, 16);
@@ -136,11 +137,25 @@ class TiamInventory {
     }
     public static function createJob($project, $kind, $owner = '') {
         $old = self::read($project['id']);
-        if (in_array($old['state'] ?? '', ['queued', 'running'], true) && ($old['expires'] ?? 0) > time()) throw new RuntimeException('درخواست قبلی هنوز در حال اجرا است.');
+        if (in_array($old['state'] ?? '', ['queued', 'running'], true) && ($old['expires'] ?? 0) > time()) {
+            if (($old['kind']??'') === $kind && $owner !== '' && hash_equals($old['owner']??'', $owner)) return $old;
+            throw new TiamJobBusy(($old['state']==='queued')?'درخواست قبلی در صف و منتظر دریافت توسط ایجنت است.':'ایجنت درخواست قبلی را دریافت کرده؛ منتظر نتیجه است.');
+        }
         $cfg = $project['settings']['tiam_inventory'] ?? [];
-        $job = ['id' => bin2hex(random_bytes(24)), 'kind' => $kind, 'state' => 'queued', 'owner' => $owner, 'created' => time(), 'expires' => time()+900,
+        $job = ['id' => bin2hex(random_bytes(24)), 'kind' => $kind, 'state' => 'queued', 'owner' => $owner, 'created' => time(), 'expires' => time()+900, 'agent_last_seen' => $old['agent_last_seen']??0,
             'config_hash' => self::fingerprint($cfg), 'base' => self::base($project)];
         self::write($project['id'], $job); return $job;
+    }
+    public static function cancelJob($projectId, $jobId, $owner, $admin = false) {
+        $job = self::read($projectId);
+        if (!is_string($jobId) || $jobId === '' || !hash_equals($job['id']??'', $jobId)) throw new RuntimeException('درخواست تغییر کرده است؛ آخرین وضعیت را دوباره دریافت کنید.');
+        if (!$admin && !hash_equals($job['owner']??'', $owner)) throw new RuntimeException('لغو این درخواست به ایجادکننده یا مدیر پروژه نیاز دارد.');
+        if (!in_array($job['state']??'', ['queued','running','preview'], true)) throw new RuntimeException('این درخواست دیگر فعال نیست.');
+        $job['state']='cancelled'; $job['cancelled_at']=time();
+        $job['logs'][]=['stage'=>'queue','status'=>'cancelled','message'=>'درخواست لغو شد؛ نتیجهٔ دیررس ایجنت پذیرفته نمی‌شود.','elapsed_ms'=>0];
+        unset($job['products']);
+        self::write($projectId,$job);
+        return $job;
     }
     public static function preview($project, $job, $rows) {
         $cfg = $project['settings']['tiam_inventory'];

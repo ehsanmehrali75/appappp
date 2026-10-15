@@ -172,10 +172,14 @@ def main():
     parsed = urllib.parse.urlsplit(url)
     if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password or len(token) < 32 or not project:
         raise SystemExit('Configure an HTTPS TIAM_PANEL_URL, TIAM_PROJECT_ID and TIAM_AGENT_TOKEN in the service environment')
+    print('Agent started; checking panel connection...', flush=True)
+    last_idle_log = None
     while True:
         try:
             job = request(url, project, token, 'agent_poll')
             if job.get('status') == 'job':
+                print(time.strftime('%Y-%m-%d %H:%M:%S'), 'job received; executing', flush=True)
+                last_idle_log = None
                 result = execute_job(job, project)
                 try:
                     reply = request(url, project, token, 'agent_result', job=job['job'], **result)
@@ -183,6 +187,16 @@ def main():
                     reply = request(url, project, token, 'agent_result', job=job['job'], success=False,
                             logs=[{'stage': 'upload', 'status': 'error', 'message': 'Payload too large; no changes applied'}])
                 print(time.strftime('%Y-%m-%d %H:%M:%S'), 'job finished:', 'ok' if result['success'] and reply.get('state') != 'error' else 'failed', flush=True)
+            elif job.get('status') == 'idle':
+                now = time.monotonic()
+                if last_idle_log is None or now-last_idle_log >= 300:
+                    print(time.strftime('%Y-%m-%d %H:%M:%S'), 'panel connected; waiting for a queued job', flush=True)
+                    last_idle_log = now
+            else:
+                print('Panel returned an unexpected status; check endpoint configuration', flush=True)
+        except urllib.error.HTTPError as exc:
+            hints = {401: 'check saved agent token', 404: 'check endpoint and project ID', 405: 'check endpoint URL', 403: 'check host firewall or access rules'}
+            print(time.strftime('%Y-%m-%d %H:%M:%S'), 'panel HTTP', exc.code, hints.get(exc.code, 'check panel/server status'), flush=True)
         except Exception as exc:
             # Printing exception text may leak headers, credentials or driver details.
             print(time.strftime('%Y-%m-%d %H:%M:%S'), 'connection failed:', type(exc).__name__, flush=True)

@@ -1,3 +1,6 @@
+import contextlib
+import io
+import urllib.error
 import importlib.util
 import pathlib
 import sys
@@ -12,6 +15,21 @@ spec.loader.exec_module(agent)
 
 
 class AgentTests(unittest.TestCase):
+    def test_idle_connection_is_visible_without_secrets(self):
+        output = io.StringIO()
+        with patch.dict(agent.os.environ, {'TIAM_PANEL_URL':'https://example.test/tiam_inventory.php','TIAM_PROJECT_ID':'p1','TIAM_AGENT_TOKEN':'a'*64}), patch.object(sys,'argv',['agent','--once']), patch.object(agent,'request',return_value={'status':'idle'}), contextlib.redirect_stdout(output):
+            agent.main()
+        self.assertIn('panel connected; waiting',output.getvalue())
+        self.assertNotIn('a'*64,output.getvalue())
+
+    def test_http_error_has_status_without_server_body(self):
+        output=io.StringIO()
+        error=urllib.error.HTTPError('https://example.test',401,'private driver detail',None,None)
+        with patch.dict(agent.os.environ, {'TIAM_PANEL_URL':'https://example.test/tiam_inventory.php','TIAM_PROJECT_ID':'p1','TIAM_AGENT_TOKEN':'a'*64}), patch.object(sys,'argv',['agent','--once']), patch.object(agent,'request',side_effect=error), contextlib.redirect_stdout(output):
+            agent.main()
+        self.assertIn('HTTP 401',output.getvalue())
+        self.assertNotIn('private driver detail',output.getvalue())
+
     def test_identifiers_and_dsn_escape(self):
         self.assertEqual(agent.identifier('Factinventory'), '[Factinventory]')
         self.assertEqual(agent.dsn_value('a};PWD=x'), '{a}};PWD=x}')

@@ -43,11 +43,13 @@ $inventoryCfg = $project['settings']['tiam_inventory'] ?? [];
     </div>
     <p class="text-xs">آخرین روز موفق: <?php echo htmlspecialchars($inventoryCfg['last_success'] ?? 'هنوز اجرا نشده'); ?> — ساعت پیش‌فرض ۱۲:۰۰ تهران. هنگام قطع ایجنت، کار به‌صورت خودکار انجام نمی‌شود.</p>
     <pre id="tiam-inventory-log" class="text-xs bg-slate-900 text-slate-100 p-4 rounded-lg whitespace-pre-wrap max-h-96 overflow-auto" dir="rtl" aria-live="polite"></pre>
+    <p class="text-xs">لغو درخواست، نتیجهٔ آن را بی‌اعتبار می‌کند؛ اتصال VPN یا پردازش محلی در حال اجرا را فوراً متوقف نمی‌کند.</p>
+    <button type="button" id="tiam-inventory-cancel" hidden onclick="tiamInventoryAction('cancel')" class="bg-rose-700 text-white px-4 py-2 rounded-lg text-xs">لغو درخواست معطل / جاری</button>
     <button type="button" id="tiam-inventory-confirm" hidden onclick="tiamInventoryAction('apply')" class="bg-emerald-600 text-white px-5 py-3 rounded-lg font-bold">تأیید پیش‌نمایش و اعمال تغییرات</button>
 </section>
 <script>
 window.tiamInventoryConfigured = <?php echo !empty($inventoryCfg['host'])?'true':'false'; ?>;
-let tiamInventoryJob = null, tiamInventoryTimer = null;
+let tiamInventoryJob = null, tiamInventoryTimer = null, tiamInventoryRequest = 0;
 const tiamInventoryProject = <?php echo json_encode($project['id']); ?>;
 const tiamInventoryCsrf = <?php echo json_encode($_SESSION['tiam_csrf']); ?>;
 async function tiamGenerateKey() {
@@ -58,6 +60,7 @@ async function tiamGenerateKey() {
     catch(e) { alert('کپی خودکار ممکن نشد؛ کلید در فیلد کلید ایجنت قرار گرفت.'); }
 }
 async function tiamInventoryAction(action) {
+    const requestVersion = ++tiamInventoryRequest;
     clearTimeout(tiamInventoryTimer);
     const log = document.getElementById('tiam-inventory-log');
     document.getElementById('tiam-inventory-confirm').hidden = true;
@@ -70,20 +73,27 @@ async function tiamInventoryAction(action) {
     }
     try {
         const response=await fetch(<?php echo json_encode('/panel/tiam_inventory.php'); ?>,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-        const data=await response.json(); if(!response.ok || data.error) throw new Error(data.error || 'خطای سرور');
+        const data=await response.json();
+        if(requestVersion!==tiamInventoryRequest) return;
+        if(data.code==='TIAM_JOB_BUSY') { await tiamInventoryAction('latest'); if(tiamInventoryRequest===requestVersion+1) log.textContent='درخواست جدید ساخته نشد؛ وضعیت درخواست قبلی:\n'+log.textContent; return; }
+        if(!response.ok || data.error) throw new Error(data.error || 'خطای سرور');
         if(data.id) tiamInventoryJob=data.id;
         if(data.status==='saved') {
             window.tiamInventoryConfigured=true;
             log.textContent='تنظیمات این پروژه ذخیره شد. ایجنت را با آدرس '+window.location.origin+<?php echo json_encode('/panel/tiam_inventory.php'); ?>+' و شناسهٔ پروژه '+tiamInventoryProject+' اجرا کنید.';
             document.querySelectorAll('[data-tiam-field][type="password"]').forEach(el=>el.value=''); return;
         }
-        log.textContent=JSON.stringify(data,null,2);
+        document.getElementById('tiam-inventory-cancel').hidden=!data.can_cancel;
+        const labels={queued:'در صف؛ هنوز توسط ایجنت دریافت نشده',running:'دریافت‌شده توسط ایجنت؛ منتظر نتیجه',cancelled:'لغو شده',expired:'مهلت درخواست تمام شده',done:'تست تمام شده',error:'عملیات ناموفق',preview:'آمادهٔ بررسی پیش‌نمایش',applied:'اعمال شده'};
+        const seen=data.agent_last_seen?new Date(data.agent_last_seen*1000).toLocaleString('fa-IR',{timeZone:'Asia/Tehran'}):'هنوز ارتباط معتبری ثبت نشده';
+        log.textContent=(labels[data.state]||'وضعیت ایجنت')+'\nآخرین ارتباط ایجنت: '+seen+' (تهران)\n'+(data.agent_connected?'ایجنت در ۹۰ ثانیهٔ اخیر با پنل ارتباط داشته است.':'ارتباط اخیر ایجنت ثبت نشده؛ آدرس، شناسهٔ پروژه و توکن را بررسی کنید.')+'\n'+JSON.stringify(data,null,2);
         if(data.state==='queued') log.textContent='در انتظار اتصال ایجنت این پروژه…\n'+log.textContent;
         if(data.state==='preview') {
             log.textContent='پیش‌نمایش (حداکثر ۱۰۰ تغییر نمایش داده می‌شود؛ تعداد کل در change_count):\n'+log.textContent;
             document.getElementById('tiam-inventory-confirm').hidden=!data.can_apply;
         }
         if(['queued','running'].includes(data.state)) tiamInventoryTimer=setTimeout(()=>tiamInventoryAction(action==='latest'?'latest':'status'),3000);
-    } catch(e) {log.textContent=e.message;}
+    } catch(e) {if(requestVersion===tiamInventoryRequest) log.textContent=e.message;}
 }
+document.addEventListener('DOMContentLoaded',()=>tiamInventoryAction('latest'),{once:true});
 </script>
