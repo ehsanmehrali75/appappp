@@ -49,6 +49,7 @@ $inventoryCfg = $project['settings']['tiam_inventory'] ?? [];
         <?php endforeach; ?>
         <a href="<?php echo htmlspecialchars('/panel/tiam_inventory_agent.py'); ?>" download class="px-3 py-2 rounded-lg bg-white text-xs">دانلود ایجنت SQL</a>
     </div>
+    <p class="text-xs"><a href="/panel/tiam_sql_diagnostic.ps1" download class="underline">دانلود ابزار تست مستقیم SQL در ویندوز</a> — بدون نیاز به ایجنت یا ساخت VPN؛ خروجی ساختار ستون‌ها برای بررسی و اصلاح نگاشت. نمونهٔ ردیف‌ها فقط با انتخاب صریح شما دریافت می‌شود.</p>
     <p class="text-xs">آخرین روز موفق: <?php echo htmlspecialchars($inventoryCfg['last_success'] ?? 'هنوز اجرا نشده'); ?> — ساعت پیش‌فرض ۱۲:۰۰ تهران. هنگام قطع ایجنت، کار به‌صورت خودکار انجام نمی‌شود.</p>
     <button type="button" onclick="tiamCopyLog()" id="tiam-copy-log" class="bg-slate-700 text-white px-4 py-2 rounded-lg text-xs">کپی لاگ</button>
     <span id="tiam-copy-result" class="text-xs" role="status" aria-live="polite"></span>
