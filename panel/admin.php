@@ -6894,13 +6894,16 @@ $suggestions = getCalendarSuggestions($project);
         }
     </style>
 <?php $neoPilot = ($tab === 'dashboard' && !empty($project) && ($_GET['design'] ?? '') !== 'legacy'); ?>
-<?php if ($neoPilot): ?>
+<?php $neoWorkspace = !empty($project) && in_array($tab, ['settings', 'extract', 'users', 'calendar'], true) && ($_GET['design'] ?? '') !== 'legacy'; $neoShell = $neoPilot || $neoWorkspace; ?>
+<?php if ($neoShell): ?>
     <link rel="stylesheet" href="/panel/assets/neo-tokens.css?v=1">
-    <link rel="stylesheet" href="/panel/assets/neo-dashboard.css?v=<?php echo filemtime(__DIR__.'/assets/neo-dashboard.css'); ?>">
+    <link rel="stylesheet" href="/panel/assets/neo-app-shell.css?v=<?php echo filemtime(__DIR__.'/assets/neo-app-shell.css'); ?>">
+    <?php if ($neoWorkspace): ?><link rel="stylesheet" href="/panel/assets/neo-workspace.css?v=<?php echo filemtime(__DIR__.'/assets/neo-workspace.css'); ?>"><?php endif; ?>
+    <?php if ($neoPilot): ?><link rel="stylesheet" href="/panel/assets/neo-dashboard.css?v=<?php echo filemtime(__DIR__.'/assets/neo-dashboard.css'); ?>"><?php endif; ?>
     <script src="/panel/assets/neo-shell.js?v=<?php echo filemtime(__DIR__.'/assets/neo-shell.js'); ?>" defer></script>
 <?php endif; ?>
 </head>
-<body class="tab-<?php echo htmlspecialchars($tab ?? 'none'); ?><?php echo $neoPilot?' maarksho-pilot':''; ?>">
+<body class="tab-<?php echo htmlspecialchars($tab ?? 'none'); ?><?php echo $neoShell?' maarksho-shell':''; ?><?php echo $neoWorkspace?' neo-workspace':''; ?><?php echo $neoPilot?' maarksho-pilot':''; ?>">
     <div id="global-loader">
         <div class="spinner"></div>
         <p class="font-black mt-8 text-primary">در حال پردازش هوشمند...</p>
@@ -6911,10 +6914,10 @@ $suggestions = getCalendarSuggestions($project);
     <header class="navbar sticky top-0 bg-white/80 backdrop-blur-md z-[500] border-b border-slate-100">
             <div class="container flex justify-between py-4">
             <div class="flex items-center">
-                <button onclick="toggleSidebar()" class="<?php echo $neoPilot?'neo-mobile-toggle neo-nav-toggle ':''; ?>lg:hidden w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 ml-4 border border-slate-100">
+                <button onclick="toggleSidebar()" class="<?php echo $neoShell?'neo-mobile-toggle neo-nav-toggle ':''; ?>lg:hidden w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 ml-4 border border-slate-100">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
                 </button>
-                <span class="font-black neo-brand" style="font-size: 1.5rem; color: var(--primary);"><?php echo $neoPilot?'مارک‌شو':'M Flow'; ?></span>
+                <span class="font-black neo-brand" style="font-size: 1.5rem; color: var(--primary);"><?php echo $neoShell?'مارک‌شو':'M Flow'; ?></span>
                 <span class="badge bg-warning mr-2">v3.0 Standalone</span>
             </div>
             <div class="flex items-center gap-2">

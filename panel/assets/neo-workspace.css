@@ -1,0 +1,43 @@
+/* Administrative workspaces only. Never loaded by product/image editors or public pages. */
+.neo-workspace .admin-content{padding-block:8px 56px;line-height:1.9}
+.neo-workspace .admin-content h2{font-size:clamp(21px,2.3vw,29px);line-height:1.7;letter-spacing:-.4px}
+.neo-workspace .admin-content h3{font-size:18px;line-height:1.8;letter-spacing:0}
+.neo-workspace .admin-content :is(.card,.premium-card){background:var(--neo-surface)!important;background-image:none!important;border:1px solid #ffffffb3!important;box-shadow:var(--neo-shadow)!important;border-radius:22px;transform:none!important;min-width:0}
+.neo-workspace .admin-content :is(input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=color]),select,textarea){background:var(--neo-surface)!important;color:var(--neo-ink)!important;border:1px solid #bdcbc4!important;border-radius:12px;box-shadow:var(--neo-inset)!important;min-height:46px;max-width:100%;font-size:13px;line-height:1.8;padding:11px 14px}
+.neo-workspace .admin-content textarea{min-height:140px;resize:vertical;user-select:text}
+.neo-workspace .admin-content :is(input,select,textarea):disabled{opacity:.6;cursor:not-allowed}
+.neo-workspace .admin-content :is(input[type=checkbox],input[type=radio]){accent-color:var(--neo-accent);width:18px;height:18px;flex-shrink:0}
+.neo-workspace .admin-content label{line-height:1.9;letter-spacing:0;user-select:text}
+.neo-workspace .admin-content :is(button,.btn){min-height:44px;white-space:normal;line-height:1.8;border-radius:12px;letter-spacing:0;cursor:pointer}
+.neo-workspace .admin-content :is(.btn-primary,button.bg-primary,button.bg-indigo-600){background:var(--neo-accent)!important;color:#fff!important;box-shadow:3px 3px 8px #c7cfd4,-3px -3px 8px #fff;border:1px solid var(--neo-accent)}
+.neo-workspace .admin-content :is(button,.btn):disabled{opacity:.55;cursor:not-allowed}
+.neo-workspace .admin-content :is(.text-slate-400,.text-slate-500){color:var(--neo-muted)}
+.neo-workspace .admin-content :is(.text-indigo-600,.text-indigo-700){color:var(--neo-accent)}
+.neo-workspace .admin-content .overflow-x-auto{max-width:100%;overscroll-behavior-inline:contain}
+.neo-workspace .neo-table-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;border-radius:16px;scrollbar-width:thin}
+.neo-workspace .neo-table-scroll table{width:100%;border-collapse:separate;border-spacing:0}
+.neo-workspace .neo-table-scroll th{background:#dce5df;color:var(--neo-ink);font-size:12px;white-space:nowrap}
+.neo-workspace .neo-table-scroll :is(th,td){padding:14px 16px;border-bottom:1px solid #cbd5cf;text-align:start}
+.neo-workspace .neo-table-scroll tbody tr:hover{background:#e0e7e3}
+.neo-workspace .neo-section-nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;padding:12px;border-radius:16px;border:1px solid #fff;background:var(--neo-surface);box-shadow:var(--neo-shadow)}
+.neo-workspace .neo-section-nav a{padding:9px 13px;font-size:12px;color:var(--neo-ink);border:1px solid #c6d0ca;border-radius:10px;min-height:44px}
+.neo-workspace .neo-section-nav a:hover{background:#dce5df}
+.neo-workspace .admin-content [id]{scroll-margin-top:130px}
+.neo-workspace.tab-settings form.select-none{user-select:auto}
+@media(max-width:767px){
+.neo-workspace .admin-content :is(.card,.premium-card){padding:20px;border-radius:18px}
+.neo-workspace .admin-content :is(.p-10,.p-8){padding:20px}
+.neo-workspace .admin-content :is(.gap-10,.gap-12){gap:20px}
+.neo-workspace .admin-content>.flex,.neo-workspace .admin-content>div>.flex:first-child{flex-wrap:wrap;gap:16px}
+.neo-workspace .admin-content .grid-2{grid-template-columns:minmax(0,1fr)}
+.neo-workspace .admin-content :is(.flex-1,.grid>div){min-width:0}
+.neo-workspace .admin-content :is(input,select,textarea){font-size:16px!important}
+.neo-workspace .neo-table-scroll table{min-width:660px}
+.neo-workspace .neo-section-nav{gap:6px;padding:10px}.neo-workspace .neo-section-nav a{flex:1;text-align:center}
+}
+/* Section shortcuts remain a compact strip, including long Persian titles. */
+.neo-workspace .neo-section-nav{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:thin;align-items:center}
+.neo-workspace .neo-section-nav a{flex:0 0 auto;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:767px){.neo-workspace .neo-section-nav a{max-width:180px}}
+@media(max-width:767px){.neo-workspace .admin-content .flex-1{max-width:100%;width:100%}.neo-workspace .admin-content .flex.items-center.justify-between{flex-wrap:wrap;gap:12px}}
+@media(max-width:767px){.neo-workspace.tab-extract .admin-content .flex>div{min-width:0;max-width:100%}.neo-workspace.tab-extract #erp_tiam_panel,.neo-workspace.tab-extract #erp_manual_panel{width:100%;min-width:0}.neo-workspace.tab-extract .w-fit{max-width:100%;flex-wrap:wrap}.neo-workspace.tab-extract #tiam-inventory-panel{padding:16px}}

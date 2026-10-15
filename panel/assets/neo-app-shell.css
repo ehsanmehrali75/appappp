@@ -1,0 +1,39 @@
+/* Shared shell only; module previews and exports retain their own styles. */
+body.maarksho-shell{--neo-surface:var(--ms-surface);--neo-ink:var(--ms-ink);--neo-muted:var(--ms-muted);--neo-accent:var(--ms-accent);--neo-shadow:var(--ms-raised);--neo-inset:var(--ms-inset);--primary:var(--neo-accent);--primary-hover:#305345;--primary-light:#dce7df;--text-muted:var(--neo-muted);--slate-400:#52665c;--slate-500:#52665c;--slate-800:var(--neo-ink);background:var(--neo-surface)!important;color:var(--neo-ink)}
+.maarksho-shell .container{max-width:1600px;padding-inline:28px}
+.maarksho-shell .navbar{background:#e9edf2f0;border-bottom:1px solid #fff;backdrop-filter:blur(12px)}
+.maarksho-shell .navbar>.container{gap:20px;align-items:center;flex-wrap:wrap}
+.maarksho-shell .navbar .badge{display:none}
+.maarksho-shell .navbar a,.maarksho-shell .neo-nav-toggle{min-height:44px;border-radius:13px;background:var(--neo-surface);border:1px solid #ffffffa6;color:var(--neo-ink);box-shadow:4px 4px 10px #cdd3da,-4px -4px 10px #fff}
+.maarksho-shell .navbar a:hover{background:#dce6df}
+.maarksho-shell .navbar a>span:first-child{font-size:16px}
+.maarksho-shell .navbar a>span+span{display:none}
+.maarksho-shell .navbar a[href='logout.php']>span+span{display:inline}
+.maarksho-shell .navbar a[href='/panel/system-admin-setup.php']{font-size:11px}
+.maarksho-shell .neo-nav-toggle{padding:10px;cursor:pointer}
+.maarksho-shell .admin-layout{gap:30px;padding-top:28px}
+.maarksho-shell .admin-sidebar{width:250px;flex-shrink:0;top:110px;height:calc(100vh - 138px)}
+.maarksho-shell .sidebar-glass{background:var(--neo-surface);box-shadow:var(--neo-shadow);border:1px solid #ffffffa6;border-radius:24px;padding:20px 14px;backdrop-filter:none}
+.maarksho-shell .nav-link{color:var(--neo-muted);min-height:44px;border:1px solid transparent;font-size:12px}
+.maarksho-shell .nav-link:hover{background:#dce6df;color:var(--neo-ink)}
+.maarksho-shell .nav-link.active{color:var(--neo-ink);background:var(--neo-surface);box-shadow:var(--neo-inset);border-color:#c6d0ca}
+.maarksho-shell #sidebar-search-input{background:var(--neo-surface);box-shadow:var(--neo-inset);border:1px solid #c6d0ca;min-height:46px;color:var(--neo-ink);font-size:12px}
+.maarksho-shell .neo-category-toggle{width:100%;text-align:start;cursor:pointer;border:0;background:transparent;color:var(--neo-muted);font:inherit;min-height:44px;display:flex;justify-content:space-between;align-items:center}
+.maarksho-shell .neo-category-toggle::after{content:'−';font-size:20px}
+.maarksho-shell .neo-category-toggle[aria-expanded=false]::after{content:'+'}
+.maarksho-shell .neo-category-closed>.nav-link{display:none}
+.maarksho-shell .admin-content{min-width:0;flex:1;padding-bottom:48px}
+.maarksho-shell :focus-visible{outline:3px solid #28634c!important;outline-offset:4px}
+.maarksho-shell .admin-content,.maarksho-shell .admin-sidebar{background:transparent}
+.maarksho-shell .navbar svg.neo-icon{width:20px;height:20px;display:block}
+.maarksho-shell .navbar a[aria-label]{min-width:44px}
+.maarksho-shell #browser-relay-status-widget{z-index:900!important;max-width:calc(100vw - 32px)}
+@media(min-width:1025px){.maarksho-shell .neo-mobile-toggle{display:none}.maarksho-shell .neo-desktop-toggle{display:inline-flex}.maarksho-shell.neo-sidebar-collapsed .admin-sidebar{display:none}}
+@media(max-width:1024px){
+.maarksho-shell .container{padding-inline:20px}.maarksho-shell .admin-layout{gap:0}
+.maarksho-shell .neo-mobile-toggle{display:inline-flex!important;margin-inline-end:12px}.maarksho-shell .neo-desktop-toggle{display:none}
+.maarksho-shell .admin-sidebar{position:fixed;top:0;bottom:0;right:auto;inset-inline-start:0;width:min(310px,88vw);height:100dvh;padding:14px;background:var(--neo-surface);transform:translateX(105%);z-index:10000;visibility:hidden;transition:transform .2s,visibility .2s}
+.maarksho-shell .admin-sidebar.show{transform:translateX(0);visibility:visible}.maarksho-shell .sidebar-glass{overflow-y:auto;padding-top:20px}
+}
+@media(max-width:640px){.maarksho-shell .container{padding-inline:16px}.maarksho-shell .navbar>.container{padding-block:14px}.maarksho-shell .navbar>.container>div:last-child{width:100%;gap:8px;flex-wrap:wrap}.maarksho-shell .navbar a{padding:9px 12px}.maarksho-shell .admin-layout{padding-top:20px}}
+@media(prefers-reduced-motion:reduce){.maarksho-shell *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

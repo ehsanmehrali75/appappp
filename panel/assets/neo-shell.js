@@ -93,11 +93,43 @@
             group.querySelector('.neo-category-toggle').setAttribute('aria-expanded', 'true');
         });
     });
-    document.querySelectorAll('.admin-content table tbody tr').forEach(row => {
+    document.querySelectorAll('.maarksho-pilot .admin-content table tbody tr').forEach(row => {
         const headings = Array.from(row.closest('table').querySelectorAll('thead th'));
         Array.from(row.cells).forEach((cell, index) => {
             if (cell.colSpan === 1 && headings[index]) cell.dataset.label = headings[index].textContent.trim();
         });
     });
+    if (document.body.classList.contains('neo-workspace')) {
+        // Retain table semantics and calendar geometry; scrolling is local to the table.
+        main.querySelectorAll('table').forEach((table, index) => {
+            if (table.closest('.overflow-x-auto,.neo-table-scroll')) return;
+            const wrapper = document.createElement('div');
+            wrapper.className = 'neo-table-scroll';
+            wrapper.tabIndex = 0;
+            wrapper.setAttribute('role', 'region');
+            wrapper.setAttribute('aria-label', table.caption?.textContent || `جدول ${index + 1}؛ برای مشاهدهٔ ستون‌ها پیمایش کنید`);
+            table.before(wrapper);wrapper.append(table);
+        });
+        if (document.body.classList.contains('tab-settings')) {
+            const sections = Array.from(main.querySelectorAll('form[method="POST"] h2'));
+            if (sections.length > 1) {
+                const nav = document.createElement('nav');
+                nav.className = 'neo-section-nav';
+                nav.setAttribute('aria-label', 'رفتن به بخش تنظیمات');
+                sections.forEach((heading, index) => {
+                    heading.id ||= `neo-settings-section-${index}`;
+                    const link = document.createElement('a');link.href = `#${heading.id}`;
+                    link.textContent = heading.textContent.trim();nav.append(link);
+                });
+                main.prepend(nav);
+            }
+        }
+        // Associate existing labels without changing field names or form submission.
+        main.querySelectorAll('label:not([for])').forEach((label, index) => {
+            const field = label.querySelector('input,select,textarea') || label.nextElementSibling;
+            if (!field?.matches('input,select,textarea')) return;
+            field.id ||= `neo-field-${index}`;label.htmlFor = field.id;
+        });
+    }
     sync();
 })();
