@@ -1,0 +1,25 @@
+{
+  "original_seconds": 12.676,
+  "optimized_seconds": 2.034,
+  "ratio_local_only": 6.23,
+  "products": 12,
+  "peak_requests": 4,
+  "checks": [
+    "bounded real browser concurrency, deterministic rows, monotonic progress",
+    "all 12 fixture rows match original output exactly",
+    "batch stops discovery after first sufficient category page",
+    "continue appends next unsaved products",
+    "explicit refresh preserves unselected fields",
+    "delayed JS price retained without networkidle",
+    "failed fresh run leaves previous JSON intact",
+    "fresh and merge journals recover rows before snapshot",
+    "concurrent output writers excluded, lock reusable",
+    "thread-safe pause blocks navigation until resumed"
+  ],
+  "note": "Local controlled fixture only; no production site speed claim. Original browser path adjusted for Linux only.",
+  "additional_recovery_checks": [
+    "incomplete UTF-8 journal tail is ignored safely",
+    "fresh snapshot/journal reset crash window replays idempotently",
+    "corrupt JSON raises instead of silently resetting data"
+  ]
+}
