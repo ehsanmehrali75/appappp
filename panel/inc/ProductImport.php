@@ -35,7 +35,7 @@ class ProductImport {
                 if($action==='upload') {
                     if($state['state']!=='uploading')throw new RuntimeException('مرحلهٔ ارسال پایان یافته است.');
                     $index=$body['index']??-1;$rows=$body['rows']??null;
-                    if(!is_int($index)||$index<0||$index>=$state['chunks']||!is_array($rows)||!array_is_list($rows)||!count($rows)||count($rows)>100)throw new RuntimeException('بخش ارسالی معتبر نیست.');
+                    if(!is_int($index)||$index<0||$index>=$state['chunks']||!is_array($rows)||!count($rows)||count($rows)>100||array_keys($rows)!==range(0,count($rows)-1))throw new RuntimeException('بخش ارسالی معتبر نیست.');
                     foreach($rows as $row)if(!is_array($row)||isset($row['id'])||isset($row['products']))throw new RuntimeException('این مسیر فقط برای ردیف‌های موجودی ERP است؛ فایل پشتیبان را از بخش بازیابی وارد کنید.');
                     if(WebsiteCatalogSync::looksLikeWebsite($rows))throw new RuntimeException('خروجی وب‌سایت را از بخش تطبیق وارد کنید.');
                     $json=json_encode($rows,JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);

@@ -13,7 +13,8 @@ class ProductImport(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.state=tempfile.TemporaryDirectory(prefix='product-import-')
-        cls.fixture=type('ImportFixture',(fixtures.HttpSecurity,),{})
+        # Reproduce PHP 8.0 hosting where array_is_list does not exist.
+        cls.fixture=type('ImportFixture',(fixtures.HttpSecurity,),{'PHP_SETTINGS':('-d','disable_functions=array_is_list')})
         with patch.dict(os.environ,{'MAARKSHO_IMPORT_STATE_DIR':cls.state.name}):
             cls.fixture.setUpClass()
 
@@ -101,3 +102,12 @@ class ProductImport(unittest.TestCase):
                 code,body=self.case.request(self.opener,path)
                 self.assertIn(code,[401,403])
                 self.assertNotIn('Private other project',body)
+
+    def test_upload_rejects_object_instead_of_row_list(self):
+        job=self.call('begin',chunks=1)['job']
+        for rows in [[],{'product':{'sku':'one','name':'Invalid object'}}]:
+            with self.subTest(rows=rows):
+                code,body=self.case.request(self.opener,'/panel/product_import.php',headers={'Content-Type':'application/json','X-CSRF-Token':self.token},raw=json.dumps(dict(project='p',action='upload',job=job,index=0,rows=rows)).encode())
+                self.assertEqual(code,422,body)
+                self.assertIn('بخش ارسالی معتبر نیست',json.loads(body)['error'])
+        self.assertEqual(self.call('status',job=job)['uploaded'],0)
