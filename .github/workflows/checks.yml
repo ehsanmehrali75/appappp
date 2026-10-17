@@ -64,6 +64,7 @@ jobs:
         run: |
           python app/verify_size_guide.py
           python app/verify_media.py
+          python app/verify_color.py
       - name: Desktop settings reach the scraper
         env:
           QT_QPA_PLATFORM: offscreen

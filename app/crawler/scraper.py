@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError, async_playwright
 
 OUTPUT = 'output/products.json'
-SCRAPER_VERSION = '2.2.0'
+SCRAPER_VERSION = '2.2.1'
 DEFAULT_SIZE_GUIDE_WAIT_MS = 8000
 CHROME_PATHS = [
     r'C:\Program Files\Google\Chrome\Application\chrome.exe',
@@ -27,7 +27,7 @@ CHROME_PATHS = [
 ]
 SELECTORS = {
     'name': 'h1.product-name, h1.product_title, h1[itemprop="name"]', 'price': '#sale-price',
-    'sizes': 'a[name="size-variant"]', 'color': '#coloe-des',
+    'sizes': 'a[name="size-variant"]', 'color': '#coloe-des, .product-color > label:not(:first-child), .product-color a[data-tooltip]:has(.color-active), .product-color a.color-active[data-tooltip]',
     'category': '.breadcrumb a', 'description': '#product-tab-description',
     'size_guide': '#a-size-guide, .container-sizeguide a[data-link], a.size-guide, a.size-guide-btn, .size-guide img, .size-chart img, a[href*="chartsize/"]',
     'gallery': '#dv-product-gallery-main .product-single-carousel img, .woocommerce-product-gallery__image img, .product-gallery .product-single-carousel img, .product-images .product-image img, [itemprop="image"]',
@@ -373,6 +373,35 @@ def product_images(soup, url, schema):
     return list(dict.fromkeys(images))
 
 
+def product_color(soup, code=None):
+    def clean(value):
+        value = ' '.join(str(value or '').split()).strip(' :：')
+        caption = value.replace(' ', '').replace('\u200c', '')
+        return value if caption not in ('', 'رنگ', 'رنگها') else None
+
+    legacy = soup.select_one('#coloe-des')
+    if legacy and (value := clean(legacy.get_text(' ', strip=True))):
+        return value
+    for block in soup.select('.product-form.product-color'):
+        # Explicit page color is stronger evidence than links to sibling products.
+        labels = block.find_all('label', recursive=False)
+        for label in labels:
+            if value := clean(label.get_text(' ', strip=True)):
+                return value
+        swatches = block.select('a[data-tooltip]')
+        selected = [node for node in swatches if
+                    'color-active' in node.get('class', []) or node.select_one('.color-active') or
+                    node.get('aria-current') == 'true' or node.get('aria-selected') == 'true']
+        if not selected and code:
+            selected = [node for node in swatches if node.get('data-src') == str(code)]
+        if not selected:
+            selected = [node for node in swatches if not node.get('href') or node.get('href') == '#']
+        values = list(dict.fromkeys(value for node in selected if (value := clean(node.get('data-tooltip')))))
+        if len(values) == 1:
+            return values[0]
+    return None
+
+
 def parse_html(html, url, fields):
     soup = soup_from(html)
 
@@ -389,7 +418,9 @@ def parse_html(html, url, fields):
     data = {'url': url, 'product_code': code}
     for field in fields:
         selector = SELECTORS[field]
-        if field in ('name', 'price', 'color'):
+        if field == 'color':
+            data[field] = product_color(soup, code)
+        elif field in ('name', 'price'):
             data[field] = text(selector)
             if field == 'name' and not data[field]:
                 data[field] = schema.get('name')
@@ -436,7 +467,7 @@ async def parse_product_page(page, url, fields, controller, log, timeout_ms, dyn
     # later request on this site: wait for their URL, not just an empty anchor.
     # Both waits start together, so unrelated missing fields do not add delays.
     async def wait_optional_fields():
-        requested = [{'selector': SELECTORS[field], 'gallery': field == 'gallery'}
+        requested = [{'selector': SELECTORS[field], 'gallery': field == 'gallery', 'color': field == 'color'}
                      for field in fields if field != 'size_guide']
         if not dynamic_wait_ms or not requested:
             return
@@ -446,7 +477,7 @@ async def parse_product_page(page, url, fields, controller, log, timeout_ms, dyn
                     Array.from(document.querySelectorAll(field.selector)).some(element =>
                         field.gallery
                             ? ['data-zoom-image', 'data-src', 'src'].some(name => element.getAttribute(name)?.trim())
-                            : element.textContent.trim()
+                            : field.color ? (element.getAttribute('data-tooltip')?.trim() || element.textContent.trim()) : element.textContent.trim()
                     )
                 )''',
                 arg=requested, timeout=dynamic_wait_ms, polling=100,
