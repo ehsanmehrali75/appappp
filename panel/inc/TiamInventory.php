@@ -2,6 +2,7 @@
 /** Outbound SQL Server bridge for shared hosting. No VPN commands run in PHP. */
 require_once __DIR__.'/ERPInventoryContract.php';
 class TiamJobBusy extends RuntimeException {}
+class TiamStateBusy extends RuntimeException {}
 class TiamInventory {
     public static function directory() {
         $dir = getenv('TIAM_STATE_DIR') ?: sys_get_temp_dir() . '/maarksho-tiam-' . substr(hash('sha256', __DIR__), 0, 16);
@@ -17,7 +18,11 @@ class TiamInventory {
     }
     public static function locked($id, $fn) {
         $f = fopen(self::path($id, 'lock'), 'c'); chmod(self::path($id, 'lock'), 0600);
-        if (!$f || !flock($f, LOCK_EX | LOCK_NB)) throw new RuntimeException('همگام‌سازی دیگری برای این پروژه در حال اجرا است.');
+        if (!$f) throw new RuntimeException('باز کردن قفل همگام‌سازی ناموفق بود.');
+        if (!flock($f, LOCK_EX | LOCK_NB)) {
+            fclose($f);
+            throw new TiamStateBusy('همگام‌سازی دیگری برای این پروژه در حال اجرا است.');
+        }
         try { return $fn(); } finally { flock($f, LOCK_UN); fclose($f); }
     }
     public static function fingerprint($cfg) {

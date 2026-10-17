@@ -7,10 +7,10 @@ $img=imagecreatetruecolor(1800,2400);imagefill($img,0,0,imagecolorallocate($img,
 $chart=imagecreatetruecolor(400,600);imagefill($chart,0,0,imagecolorallocate($chart,255,255,255));imagepng($chart,$dir.'/chart.png');imagedestroy($chart);
 $hash=hash_file('sha256',$dir.'/one/photo.png');
 $p=['id'=>'one','sku'=>'A1','name'=>'پیراهن باکیفیت','color'=>'آبی','stock_total'=>3,'status'=>'active','image'=>'uploads/one/photo.png','gallery'=>['uploads/two/photo.png'],'size_chart'=>'uploads/chart.png','description'=>'توضیحات اصلی','images_list'=>[['url'=>'uploads/one/photo.png','source'=>'manual','approved'=>true],['url'=>'uploads/two/photo.png','source'=>'manual','approved'=>true]],'website_sync'=>['presence'=>'missing','has_size_chart'=>false,'has_description'=>false]];
-$archive=array_replace($p,['id'=>'zero','sku'=>'ZERO','stock_total'=>0,'stock_online'=>0]);$pending=array_replace($p,['id'=>'pending','sku'=>'PENDING','status'=>'pending','images_list'=>[['url'=>'uploads/one/photo.png','source'=>'manual','approved'=>false]]]);$broken=array_replace($p,['id'=>'broken','sku'=>'BROKEN','image'=>'uploads/missing.png']);
+$archive=array_replace($p,['id'=>'zero','sku'=>'ZERO','stock_total'=>0,'stock_online'=>7]);$pending=array_replace($p,['id'=>'pending','sku'=>'PENDING','status'=>'pending','images_list'=>[['url'=>'uploads/one/photo.png','source'=>'manual','approved'=>false]]]);$broken=array_replace($p,['id'=>'broken','sku'=>'BROKEN','image'=>'uploads/missing.png']);
 $project=['id'=>'project','settings'=>[],'products'=>[$p,$archive,$pending,$broken]];
 $export=(new WebsiteExportPackage($dir))->build($project,['one','zero','pending','broken']);
-weCheck($export['exported_ids']===['one'],'only complete readable approved in-stock products acknowledged');
+weCheck($export['exported_ids']===['one'],'only complete readable approved products with central stock exported; stale online stock cannot override zero total');
 weCheck(count($export['warnings'])===3,'archive, pending approval and broken file reported');
 $zip=new ZipArchive();weCheck($zip->open($dir.'/'.basename($export['zip_url']))===true,'valid zip');
 $manifest=json_decode($zip->getFromName('manifest.json'),true);$folder=$manifest['products'][0]['folder'];

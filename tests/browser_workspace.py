@@ -1,7 +1,7 @@
 """Optional Chromium interaction regression: install playwright and set CHROMIUM_PATH if needed.
 Uses the same disposable synthetic fixture as test_http_security.py.
 """
-import json, os, sqlite3, sys, tempfile, mimetypes
+import json, os, sqlite3, sys, tempfile, mimetypes, shutil
 from urllib.parse import urlparse, unquote
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -28,7 +28,7 @@ def route(r):
     return r.fulfill(status=200, content_type='image/svg+xml' if r.request.resource_type=='image' else 'text/plain', body='<svg xmlns="http://www.w3.org/2000/svg"/>' if r.request.resource_type=='image' else '')
 try:
  with sync_playwright() as p:
-    browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH','/usr/bin/chromium'),headless=True,args=['--no-sandbox'])
+    browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH') or shutil.which('chromium'),headless=True,args=['--no-sandbox'])
     context=browser.new_context(viewport={'width':1440,'height':1000},device_scale_factor=1)
     context.route('**/*',route)
     page=context.new_page();page.on('pageerror',lambda error:errors.append(str(error)));page.on('dialog',lambda d:d.accept())

@@ -79,7 +79,11 @@ try {
             if (empty($cfg['vpn_enabled'])) foreach (['vpn_server','vpn_username','vpn_password','vpn_secret','vpn_service'] as $field) unset($cfg[$field]);
             return ['status' => 'job', 'job' => $job['id'], 'kind' => $job['kind'], 'config' => $cfg];
         } elseif ($action === 'agent_result') {
-            if (!hash_equals($job['id'] ?? '', $body['job'] ?? '') || ($job['state'] ?? '') !== 'running' || ($job['expires'] ?? 0) <= time()) throw new RuntimeException('نتیجهٔ تکراری یا منقضی دریافت شد.');
+            if (!hash_equals($job['id'] ?? '', $body['job'] ?? '')) throw new RuntimeException('نتیجهٔ تکراری یا منقضی دریافت شد.');
+            // A response can be lost after the result is committed. Acknowledge
+            // retries of that same job without revalidating rows or applying again.
+            if (in_array($job['state'] ?? '', ['done', 'error', 'preview', 'applied'], true)) return ['status' => 'received', 'state' => $job['state']];
+            if (($job['state'] ?? '') !== 'running' || ($job['expires'] ?? 0) <= time()) throw new RuntimeException('نتیجهٔ تکراری یا منقضی دریافت شد.');
             $logs = [];
             foreach (array_slice($body['logs'] ?? [], 0, 30) as $log) {
                 $message = substr((string)($log['message'] ?? ''), 0, 1500);
@@ -118,5 +122,5 @@ try {
     tiamReply($response);
 } catch (Throwable $e) {
     // Detailed driver messages stay on the agent; responses contain no connection strings.
-    tiamReply(['code' => $e instanceof TiamJobBusy ? 'TIAM_JOB_BUSY' : 'TIAM_ERROR', 'error' => $e instanceof RuntimeException ? $e->getMessage() : 'خطای داخلی همگام‌سازی؛ تنظیمات و لاگ مراحل را بررسی کنید.'], 400);
+    tiamReply(['code' => $e instanceof TiamStateBusy ? 'TIAM_STATE_BUSY' : ($e instanceof TiamJobBusy ? 'TIAM_JOB_BUSY' : 'TIAM_ERROR'), 'error' => $e instanceof RuntimeException ? $e->getMessage() : 'خطای داخلی همگام‌سازی؛ تنظیمات و لاگ مراحل را بررسی کنید.'], $e instanceof TiamStateBusy ? 503 : 400);
 }

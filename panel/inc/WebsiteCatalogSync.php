@@ -130,8 +130,15 @@ class WebsiteCatalogSync {
     }
     public static function inventory($product) {
         if(($product['status']??'')==='out_of_stock')return 'out_of_stock';
+        // A known central total is authoritative; website/legacy stock can be stale.
+        $total=$product['stock_total']??null;
+        if(is_scalar($total)&&!is_bool($total)&&trim((string)$total)!=='') {
+            if(mb_strpos(self::code($total),'ناموجود')!==false)return 'out_of_stock';
+            try {return self::number($total,true)>0?'in_stock':'out_of_stock';}
+            catch (RuntimeException $e) {}
+        }
         $known=false;$positive=false;
-        foreach(['stock_total','stock_online','stock'] as $key) {
+        foreach(['stock_online','stock'] as $key) {
             $value=$product[$key]??null;if(!is_scalar($value)||trim((string)$value)==='')continue;
             $value=self::code($value);
             if(mb_strpos($value,'ناموجود')!==false)return 'out_of_stock';
@@ -230,6 +237,20 @@ class WebsiteCatalogSync {
         foreach($groups as $index=>$group) {
             $product=&$project['products'][$index];$id=(string)$product['id'];
             $meta=self::metadata($product);$product['website_sync']=$meta;
+            // Website presence cannot acknowledge edits made locally since the last check.
+            $localBefore=[
+                'local_image_fingerprint'=>self::photoFingerprint($product),
+                'local_chart_fingerprint'=>self::chartFingerprint(ProductSizeChartCatalog::forProduct($project,$product)),
+                'local_description_fingerprint'=>hash('sha256',trim((string)($product['description']??''))),
+            ];
+            $receiptFields=['local_image_fingerprint'=>['images','image_fingerprint'],'local_chart_fingerprint'=>['chart','chart_fingerprint'],'local_description_fingerprint'=>['description','description_fingerprint']];
+            $receipt=$meta['manual_upload_receipt']??[];$unconfirmed=[];
+            foreach($localBefore as $field=>$fingerprint) {
+                if(!isset($meta[$field])||hash_equals($meta[$field],$fingerprint))continue;
+                [$asset,$receiptField]=$receiptFields[$field];
+                if(in_array($asset,$receipt['assets']??[],true)&&hash_equals($receipt[$receiptField]??'',$fingerprint))continue;
+                $unconfirmed[$field]=$meta[$field];
+            }
             $meta=array_replace($meta,['presence'=>'seen','origin'=>$origin,'checked_at'=>$now,'publication'=>'uploaded']);
             $siteImages=[];$descriptions=[];$charts=[];$prices=[];$descriptionObserved=false;$chartObserved=false;$imageObserved=false;
             foreach($group as $row) {
@@ -285,9 +306,9 @@ class WebsiteCatalogSync {
             // Keep the original primary image, gallery, social image and reference gallery.
             if(empty($product['link']))$product['link']=$group[0]['url'];
             $product['website_sync']=$meta;
-            if($descriptionObserved)$meta['local_description_fingerprint']=hash('sha256',trim((string)($product['description']??'')));
-            $meta['local_chart_fingerprint']=self::chartFingerprint(ProductSizeChartCatalog::forProduct($project,$product));
-            $meta['local_image_fingerprint']=self::photoFingerprint($product);
+            if($descriptionObserved)$meta['local_description_fingerprint']=$unconfirmed['local_description_fingerprint']??hash('sha256',trim((string)($product['description']??'')));
+            $meta['local_chart_fingerprint']=$unconfirmed['local_chart_fingerprint']??self::chartFingerprint(ProductSizeChartCatalog::forProduct($project,$product));
+            $meta['local_image_fingerprint']=$unconfirmed['local_image_fingerprint']??self::photoFingerprint($product);
             $product['website_sync']=$meta;
             $changes[]=['id'=>$id,'name'=>$product['name']??$id,'action'=>'تکمیل اطلاعات سایت'];unset($product);
         }
@@ -297,7 +318,11 @@ class WebsiteCatalogSync {
             $id=(string)$product['id'];$meta=self::metadata($product);$product['website_sync']=$meta;
             $hasImage=(bool)self::photos($product);
             if(self::inventory($product)==='out_of_stock'){
-                $product['website_sync']=array_replace($meta,['presence'=>'missing','origin'=>$origin,'checked_at'=>$now,'has_description'=>false,'has_size_chart'=>false]);
+                $meta=array_replace($meta,['presence'=>'missing','origin'=>$origin,'checked_at'=>$now,'has_description'=>false,'has_size_chart'=>false]);
+                unset($meta['resolved_at'],$meta['resolved_by'],$meta['manual_upload_receipt']);
+                $product['website_sync']=$meta;
+                // Keep archived assets, but do not resurrect obsolete receipts on restock.
+                $product['uploaded_to_site']=0;$product['size_chart_uploaded']=0;$product['size_chart_uploaded_at']=null;
                 continue;
             }
             $publication=$hasImage&&(!empty($product['uploaded_to_site'])||($meta['publication']??'')==='technical_pending')?'technical_pending':($hasImage?'pending_upload':'pending_image');

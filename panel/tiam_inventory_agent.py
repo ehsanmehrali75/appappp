@@ -23,6 +23,14 @@ MAX_ROWS = 50000
 MAX_BYTES = 8 * 1024 * 1024
 
 
+class PayloadError(ValueError):
+    """The local result cannot be sent within the endpoint's JSON contract."""
+
+
+class InvalidPanelResponse(RuntimeError):
+    pass
+
+
 def dsn_value(value):
     return '{' + str(value).replace('}', '}}') + '}'
 
@@ -157,15 +165,48 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def request(url, project, token, action, **data):
-    payload = json.dumps(dict(data, project=project, action=action), ensure_ascii=False, allow_nan=False).encode('utf-8')
+    try:
+        payload = json.dumps(dict(data, project=project, action=action), ensure_ascii=False, allow_nan=False).encode('utf-8')
+    except (TypeError, ValueError) as exc:
+        raise PayloadError('Result is not valid JSON') from exc
     if len(payload) > MAX_BYTES:
-        raise ValueError('Payload exceeds server limit')
+        raise PayloadError('Payload exceeds server limit')
     req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json', 'X-Tiam-Token': token})
     with urllib.request.build_opener(NoRedirect()).open(req, timeout=45) as response:
-        result = json.load(response)
+        try:
+            result = json.load(response)
+        except (ValueError, UnicodeDecodeError) as exc:
+            raise InvalidPanelResponse('Panel returned invalid JSON') from exc
+    if not isinstance(result, dict):
+        raise InvalidPanelResponse('Panel returned an unexpected response')
     if result.get('error'):
         raise RuntimeError('Panel rejected request')
     return result
+
+
+def submit_result(url, project, token, job_id, result):
+    """Retry the same result, never another SQL SELECT, after transport failures."""
+    payload = result
+    for attempt in range(3):
+        try:
+            try:
+                reply = request(url, project, token, 'agent_result', job=job_id, **payload)
+            except PayloadError:
+                payload = {'success': False, 'logs': [{'stage': 'upload', 'status': 'error',
+                    'message': 'Result exceeds JSON/server limits; no changes applied'}]}
+                reply = request(url, project, token, 'agent_result', job=job_id, **payload)
+            if reply.get('status') != 'received' or reply.get('state') not in ('done', 'error', 'preview', 'applied'):
+                raise InvalidPanelResponse('Panel did not acknowledge the result')
+            return reply
+        except urllib.error.HTTPError as exc:
+            if exc.code < 500 and exc.code not in (408, 429):
+                raise
+            if attempt == 2:
+                raise
+        except (OSError, InvalidPanelResponse):
+            if attempt == 2:
+                raise
+        time.sleep(2 ** (attempt + 1))
 
 
 def main():
@@ -178,32 +219,41 @@ def main():
         raise SystemExit('Configure an HTTPS TIAM_PANEL_URL, TIAM_PROJECT_ID and TIAM_AGENT_TOKEN in the service environment')
     print('Agent started; checking panel connection...', flush=True)
     last_idle_log = None
+    pending = None
     while True:
         try:
-            job = request(url, project, token, 'agent_poll')
-            if job.get('status') == 'job':
-                print(time.strftime('%Y-%m-%d %H:%M:%S'), 'job received; executing', flush=True)
-                last_idle_log = None
-                result = execute_job(job, project)
-                try:
-                    reply = request(url, project, token, 'agent_result', job=job['job'], **result)
-                except ValueError:
-                    reply = request(url, project, token, 'agent_result', job=job['job'], success=False,
-                            logs=[{'stage': 'upload', 'status': 'error', 'message': 'Payload too large; no changes applied'}])
-                print(time.strftime('%Y-%m-%d %H:%M:%S'), 'job finished:', 'ok' if result['success'] and reply.get('state') != 'error' else 'failed', flush=True)
-            elif job.get('status') == 'idle':
-                now = time.monotonic()
-                if last_idle_log is None or now-last_idle_log >= 300:
-                    print(time.strftime('%Y-%m-%d %H:%M:%S'), 'panel connected; waiting for a queued job', flush=True)
-                    last_idle_log = now
-            else:
-                print('Panel returned an unexpected status; check endpoint configuration', flush=True)
+            if pending is None:
+                job = request(url, project, token, 'agent_poll')
+                if job.get('status') == 'job':
+                    print(time.strftime('%Y-%m-%d %H:%M:%S'), 'job received; executing', flush=True)
+                    last_idle_log = None
+                    pending = (job['job'], execute_job(job, project), time.monotonic() + 900)
+                elif job.get('status') == 'idle':
+                    now = time.monotonic()
+                    if last_idle_log is None or now-last_idle_log >= 300:
+                        print(time.strftime('%Y-%m-%d %H:%M:%S'), 'panel connected; waiting for a queued job', flush=True)
+                        last_idle_log = now
+                else:
+                    print('Panel returned an unexpected status; check endpoint configuration', flush=True)
+            if pending is not None:
+                job_id, result, deadline = pending
+                if time.monotonic() >= deadline:
+                    print('Result delivery expired; create a new job in the panel', flush=True)
+                    pending = None
+                else:
+                    reply = submit_result(url, project, token, job_id, result)
+                    print(time.strftime('%Y-%m-%d %H:%M:%S'), 'job finished:', 'ok' if result['success'] and reply.get('state') != 'error' else 'failed', flush=True)
+                    pending = None
         except urllib.error.HTTPError as exc:
+            if exc.code < 500 and exc.code not in (408, 429):
+                pending = None  # Cancelled/expired jobs and invalid credentials are not retried.
             hints = {401: 'check saved agent token', 404: 'check endpoint and project ID', 405: 'check endpoint URL', 403: 'check host firewall or access rules'}
             print(time.strftime('%Y-%m-%d %H:%M:%S'), 'panel HTTP', exc.code, hints.get(exc.code, 'check panel/server status'), flush=True)
         except Exception as exc:
             # Printing exception text may leak headers, credentials or driver details.
             print(time.strftime('%Y-%m-%d %H:%M:%S'), 'connection failed:', type(exc).__name__, flush=True)
+        if pending is not None:
+            print('Result delivery pending; retrying the saved result without querying SQL again', flush=True)
         if args.once:
             break
         time.sleep(30)

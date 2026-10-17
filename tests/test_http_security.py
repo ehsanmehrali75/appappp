@@ -292,6 +292,26 @@ class HttpSecurity(unittest.TestCase):
         code, _ = self.request(opener, '/panel/admin.php?tab=extract', {'ajax_action': 'save_reference_photos_fast', 'pid': 'one', 'existing_images': '[]'}, {'X-CSRF-Token': token})
         self.assertEqual(code, 400)
 
+    def test_reference_request_permission_is_checked_before_file_deletion(self):
+        self.production_fixture()
+        reference = self.app / 'panel/uploads/operator-reference.png'
+        reference.write_bytes(PNG)
+        try:
+            with sqlite3.connect(self.database) as db:
+                db.execute('UPDATE products SET reference_gallery=? WHERE id="manual"', (json.dumps(['uploads/operator-reference.png']),))
+            opener, token = self.login('operator')
+            before = self.record('manual')
+            fields = {'ajax_action': 'save_reference_photos_fast', 'pid': 'manual', 'existing_images': '[]', 'priority': '0'}
+            code, _ = self.request(opener, '/panel/admin.php?tab=extract', fields, {'X-CSRF-Token': token})
+            self.assertEqual(code, 403)
+            self.assertTrue(reference.exists(), 'Denied request must not delete an existing reference file')
+            self.assertEqual(reference.read_bytes(), PNG)
+            after = self.record('manual')
+            self.assertEqual(after['reference_gallery'], before['reference_gallery'])
+            self.assertEqual(after['content_gen_requested'], before['content_gen_requested'])
+        finally:
+            reference.unlink(missing_ok=True)
+
     def test_reference_completion_and_optional_reference_queues(self):
         self.production_fixture()
         opener, token = self.login('operator')

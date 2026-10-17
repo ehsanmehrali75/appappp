@@ -17,6 +17,20 @@ $copy['images_list'][]=['url'=>'uploads/final.jpg','type'=>'gallery'];$copy['sta
 $copy['status']='active';$copy['stock_total']=0;$copy['stock_online']=0;wfCheck(WebsiteCatalogSync::state($project,$copy)['low_priority'],'zero stock lowers priority without erasing work');
 unset($copy['stock_total'],$copy['stock_online']);wfCheck(WebsiteCatalogSync::state($project,$copy)['inventory']==='unknown','unknown inventory is not zero');
 $copy['stock_total']='۵';wfCheck(WebsiteCatalogSync::state($project,$copy)['inventory']==='in_stock','Persian stock supported');
+foreach([
+    [['stock_total'=>0,'stock_online'=>5],'out_of_stock'],
+    [['stock_total'=>-2,'stock_online'=>5],'out_of_stock'],
+    [['stock_total'=>'۰','stock_online'=>'۷'],'out_of_stock'],
+    [['stock_total'=>10,'stock_online'=>'ناموجود'],'in_stock'],
+    [['stock_total'=>10,'stock'=>-1],'in_stock'],
+    [['stock_total'=>'ناموجود','stock_online'=>10],'out_of_stock'],
+    [['stock_total'=>'invalid','stock_online'=>3],'in_stock'],
+    [['stock_total'=>'','stock_online'=>0],'out_of_stock'],
+    [['stock_online'=>4],'in_stock'],
+    [['stock_total'=>10,'status'=>'out_of_stock'],'out_of_stock'],
+] as [$stock,$expectedInventory])wfCheck(WebsiteCatalogSync::inventory($stock)===$expectedInventory,'known central total takes precedence; legacy and explicit archive behavior retained');
+$conflictingStock=$p;$conflictingStock['stock_total']=0;$conflictingStock['stock_online']=9;$stockState=WebsiteCatalogSync::state($project,$conflictingStock);
+wfCheck($stockState['archived']&&!$stockState['needs_image']&&!$stockState['needs_size_chart']&&!$stockState['size_chart_upload_pending']&&!$stockState['needs_description'],'stale positive website stock cannot return zero central stock to execution queues');
 $copy['website_sync']=['presence'=>'seen','has_size_chart'=>true,'size_guide_urls'=>['https://shop.example/chart.jpg'],'image_urls'=>['https://shop.example/photo.jpg']];$copy['image']='uploads/final.jpg';$copy['uploaded_to_site']=1;$s=WebsiteCatalogSync::state($project,$copy);wfCheck($s['comparison_available']&&count($s['local_image_urls'])===1&&count($s['site_image_urls'])===1,'both sources available separately without asserting visual equality');
 $copy['has_new_manual_image']=1;wfCheck(WebsiteCatalogSync::state($project,$copy)['publication']==='pending_upload','new local upload is pending even when old site images exist');
 $rows=[['url'=>'https://shop.example/product/123/test','product_code'=>'123','gallery'=>['https://shop.example/photo.jpg'],'size_guide'=>'/content/media/chartsize/Chart_31543.jpg','description'=>'متن سایت']];
@@ -36,6 +50,27 @@ wfCheck($prod['size_chart_uploaded']===1,'website chart observation updates exis
 wfCheck($r['project']['products'][1]['size_chart_uploaded']===0,'full absence clears studio upload flag');
 $beforeEdit=WebsiteCatalogSync::reconcile($project,$rows,['update_price'=>false]);$edited=$beforeEdit['project'];$edited['settings']['size_charts'][0]['rows'][0][1]='100';wfCheck(WebsiteCatalogSync::state($edited,$edited['products'][0])['size_chart_upload_pending'],'editing studio content after website observation reopens upload work');
 $edited=$beforeEdit['project'];$edited['products'][0]['image']='uploads/new-final.jpg';wfCheck(WebsiteCatalogSync::state($edited,$edited['products'][0])['publication']==='pending_upload','new photo after snapshot detected without volatile manual flag');
+$awaiting=$beforeEdit['project'];$awaiting['products'][0]['image']='uploads/new-final.jpg';$awaiting['products'][0]['description']='توضیحات ویرایش‌شده در پنل';$awaiting['settings']['size_charts'][0]['rows'][0][1]='120';
+$unselected=$rows;unset($unselected[0]['gallery'],$unselected[0]['size_guide'],$unselected[0]['description']);
+foreach([$rows,$unselected] as $snapshot) {
+    $refreshed=WebsiteCatalogSync::reconcile($awaiting,$snapshot,['update_price'=>false]);$state=WebsiteCatalogSync::state($refreshed['project'],$refreshed['project']['products'][0]);
+    wfCheck($state['publication']==='pending_upload'&&$state['size_chart_upload_pending']&&$state['description_upload_pending'],'another snapshot cannot acknowledge local edits without upload confirmation, including unselected fields');
+}
+$receiptState=WebsiteCatalogSync::state($awaiting,$awaiting['products'][0]);
+$receipt=['assets'=>['images','chart','description'],'all_image_fingerprint'=>hash('sha256',json_encode(WebsiteCatalogSync::photos($awaiting['products'][0]))),'chart_fingerprint'=>WebsiteCatalogSync::chartFingerprint($receiptState['chart']),'description_fingerprint'=>hash('sha256',trim($awaiting['products'][0]['description']))];
+WebsiteCatalogSync::resolve($awaiting,'p','operator',$receipt);
+foreach([$rows,$unselected] as $snapshot) {
+    $refreshed=WebsiteCatalogSync::reconcile($awaiting,$snapshot,['update_price'=>false]);$state=WebsiteCatalogSync::state($refreshed['project'],$refreshed['project']['products'][0]);
+    wfCheck($state['publication']==='uploaded'&&!$state['size_chart_upload_pending']&&!$state['description_upload_pending'],'valid explicit upload receipt accepts the edited local version across later positive or unselected observations');
+}
+$archivedReceipt=$awaiting;$archivedReceipt['products'][0]['stock_total']=0;$archivedReceipt['products'][0]['stock_online']=7;
+$archivedReceipt['products'][]=['id'=>'other','sku'=>'OTHER','stock_total'=>3];
+$archiveSnapshot=[['url'=>'https://shop.example/product/OTHER/name','product_code'=>'OTHER','gallery'=>[]]];
+$archivedReceipt=WebsiteCatalogSync::reconcile($archivedReceipt,$archiveSnapshot,['complete'=>true,'update_price'=>false]);$absentArchive=$archivedReceipt['project']['products'][0];
+wfCheck(WebsiteCatalogSync::state($archivedReceipt['project'],$absentArchive)['archived']&&$archivedReceipt['counts']['missing']===0,'missing archived product retains assets and stays outside execution counts');
+wfCheck(!$absentArchive['uploaded_to_site']&&!$absentArchive['size_chart_uploaded']&&empty($absentArchive['website_sync']['manual_upload_receipt']),'observed absence invalidates old upload evidence even while archived');
+$archivedReceipt['project']['products'][0]['stock_total']=5;$restocked=WebsiteCatalogSync::state($archivedReceipt['project'],$archivedReceipt['project']['products'][0]);
+wfCheck($restocked['publication']==='pending_upload'&&$restocked['size_chart_upload_pending']&&$restocked['description_upload_pending'],'restocking cannot reuse upload confirmation invalidated by a later complete website snapshot');
 $seenNoImage=$project;$seenNoImage['products'][0]['image']='uploads/local.jpg';$seenNoImage['products'][0]['website_sync']=['presence'=>'seen','image_urls'=>[]];WebsiteCatalogSync::resolve($seenNoImage,'p','operator');wfCheck(WebsiteCatalogSync::state($seenNoImage,$seenNoImage['products'][0])['publication']==='resolved','manual receipt also applies when product was seen but site gallery was empty');
 $seenNoImage['products'][0]['image']='uploads/newer.jpg';wfCheck(WebsiteCatalogSync::state($seenNoImage,$seenNoImage['products'][0])['publication']==='pending_upload','new photo after receipt returns to upload queue');
 $legacy=['id'=>'legacy','stock_total'=>5,'status'=>'pending','image'=>'https://shop.example/photo.jpg','size_chart'=>'https://shop.example/chart.jpg','description'=>'متن ثبت شده','uploaded_to_site'=>1,'images_list'=>[['url'=>'https://shop.example/photo.jpg','approved'=>false]]];

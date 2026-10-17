@@ -3077,6 +3077,8 @@ $sections_json
         $usersToImport = [];
 
         if (isset($items['project_id']) && isset($items['products']) && is_array($items['products'])) {
+            // A complete backup also replaces project users and access settings.
+            if (!isMainAdmin()) AccessControl::deny();
             $isBackup = true;
             $productsToImport = $items['products'];
             if (isset($items['schedules']) && is_array($items['schedules'])) {
@@ -3381,6 +3383,13 @@ if ($project) {
         if(WebsiteCatalogSync::state($project,$p)['image_production']['needs_image_request']) {
             http_response_code(400);echo json_encode(['status'=>'error','msg'=>'ابتدا درخواست تولید تصویر این محصول را ثبت کنید.'],JSON_UNESCAPED_UNICODE);exit;
         }
+        // Validate request-stage changes before deleting or replacing any reference file.
+        if (isset($_POST['priority']) || isset($_POST['content_gen_requested'])) {
+            $val = $_POST['priority'] ?? $_POST['content_gen_requested'];
+            $nextRequested=in_array($val,['1','true',true],true);
+            if($nextRequested!==!empty($p['content_gen_requested'])&&!ImageProduction::canRequest($project))AccessControl::deny();
+            $p['content_gen_requested'] = $nextRequested;
+        }
         if (!isset($p['reference_gallery']) || !is_array($p['reference_gallery'])) {
             $p['reference_gallery'] = [];
         }
@@ -3444,13 +3453,6 @@ if ($project) {
                 }
             }
             $p['reference_gallery'] = array_values(array_slice($p['reference_gallery'], 0, 3));
-        }
-
-        if (isset($_POST['priority']) || isset($_POST['content_gen_requested'])) {
-            $val = $_POST['priority'] ?? $_POST['content_gen_requested'];
-            $nextRequested=in_array($val,['1','true',true],true);
-            if($nextRequested!==!empty($p['content_gen_requested'])&&!ImageProduction::canRequest($project))AccessControl::deny();
-            $p['content_gen_requested'] = ($val === '1' || $val === 'true' || $val === true);
         }
 
         if (!empty($p['reference_gallery'])) {
@@ -5632,6 +5634,7 @@ if ($project) {
         }
         $db = getDB();
         foreach ($db['projects'] as &$p) {
+            if (!isMainAdmin() && $p['id'] !== $project['id']) continue;
             if (!isset($p['users']) || !is_array($p['users'])) {
                 $p['users'] = [];
             }

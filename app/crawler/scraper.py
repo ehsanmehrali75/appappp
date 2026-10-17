@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError, async_playwright
 
 OUTPUT = 'output/products.json'
-SCRAPER_VERSION = '2.1.0'
+SCRAPER_VERSION = '2.1.1'
 DEFAULT_SIZE_GUIDE_WAIT_MS = 8000
 CHROME_PATHS = [
     r'C:\Program Files\Google\Chrome\Application\chrome.exe',
@@ -367,13 +367,20 @@ async def parse_product_page(page, url, fields, controller, log, timeout_ms, dyn
     # later request on this site: wait for their URL, not just an empty anchor.
     # Both waits start together, so unrelated missing fields do not add delays.
     async def wait_optional_fields():
-        selectors = [SELECTORS[field] for field in fields if field != 'size_guide']
-        if not dynamic_wait_ms or not selectors:
+        requested = [{'selector': SELECTORS[field], 'gallery': field == 'gallery'}
+                     for field in fields if field != 'size_guide']
+        if not dynamic_wait_ms or not requested:
             return
         try:
             await page.wait_for_function(
-                'selectors => selectors.every(s => document.querySelector(s))',
-                arg=selectors, timeout=dynamic_wait_ms,
+                '''fields => fields.every(field =>
+                    Array.from(document.querySelectorAll(field.selector)).some(element =>
+                        field.gallery
+                            ? ['data-zoom-image', 'data-src', 'src'].some(name => element.getAttribute(name)?.trim())
+                            : element.textContent.trim()
+                    )
+                )''',
+                arg=requested, timeout=dynamic_wait_ms, polling=100,
             )
         except PlaywrightTimeoutError:
             pass

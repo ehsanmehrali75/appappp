@@ -144,6 +144,11 @@ if (isSuperAdmin()) {
 $studioProjectId = $_GET['project'] ?? ($_SESSION['project_id'] ?? null);
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'td_scs_save_branding_settings') {
     $studioProjectId = $_POST['project_id'] ?? ($_GET['project'] ?? null);
+    // The access gate authorizes the project in the page URL. A different
+    // posted target must not reuse that authorization to edit another project.
+    if (isset($_GET['project']) && $studioProjectId !== $_GET['project']) {
+        AccessControl::deny();
+    }
 }
 $allowedProjectIds = array_column($allProjects, 'id');
 if (!is_string($studioProjectId) || !in_array($studioProjectId, $allowedProjectIds, true)) {
@@ -2086,7 +2091,7 @@ if (empty($active_presets)) {
         .scs-dynamic-table-card:not(.hidden) {
             display: block !important;
             box-sizing: border-box !important;
-            border-radius: 1.25rem !important;
+            border-radius: 1.25rem;
             box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03) !important;
             transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
         }
@@ -2155,7 +2160,7 @@ if (empty($active_presets)) {
         #scs-batch-canvas thead th {
             display: table-cell !important;
             vertical-align: middle !important;
-            text-align: center !important;
+            text-align: center;
             box-sizing: border-box !important;
             font-weight: 800 !important;
             word-break: keep-all !important;
@@ -2180,7 +2185,7 @@ if (empty($active_presets)) {
         #scs-batch-canvas tbody td {
             display: table-cell !important;
             vertical-align: middle !important;
-            text-align: center !important;
+            text-align: center;
             box-sizing: border-box !important;
             font-weight: 700 !important;
             word-break: keep-all !important;
@@ -2204,7 +2209,7 @@ if (empty($active_presets)) {
         #preview-table-card tbody tr:nth-child(even),
         #preview-table-container tbody tr:nth-child(even),
         #scs-batch-canvas tbody tr:nth-child(even) {
-            background-color: rgba(248, 250, 252, 0.85) !important;
+            background-color: rgba(248, 250, 252, 0.85);
         }
 
         /* 2-Column Split Layout Engine & Grid Wrappers */
@@ -4990,6 +4995,11 @@ if (empty($active_presets)) {
 
         // --- Branding & Styling Engine ---
 
+        function readIntegerSetting(selector, fallback) {
+            var value = parseInt($(selector).val(), 10);
+            return Number.isFinite(value) ? value : fallback;
+        }
+
         // Compatibility for callers using the former branding mode name.
         function getIndividualRowColor(rowIndex) {
             var color = (scs_settings.table_row_colors || {})[rowIndex];
@@ -6561,9 +6571,9 @@ if (empty($active_presets)) {
             scs_settings.custom_font_url = $('#setting-custom-font-url').val() || '';
             scs_settings.custom_font_name = $('#setting-custom-font-name').val() || '';
 
-            scs_settings.content_padding_top = parseInt($('#setting-padding-top').val()) || 36;
-            scs_settings.content_padding_bottom = parseInt($('#setting-padding-bottom').val()) || 28;
-            scs_settings.content_padding_x = parseInt($('#setting-padding-x').val()) || 36;
+            scs_settings.content_padding_top = readIntegerSetting('#setting-padding-top', 36);
+            scs_settings.content_padding_bottom = readIntegerSetting('#setting-padding-bottom', 28);
+            scs_settings.content_padding_x = readIntegerSetting('#setting-padding-x', 36);
             scs_settings.content_gap = parseInt($('#setting-content-gap').val()) || 24;
 
             if ($('#setting-show-header-brand').length) scs_settings.show_header_brand = $('#setting-show-header-brand').is(':checked') ? 1 : 0;
@@ -6577,7 +6587,7 @@ if (empty($active_presets)) {
             scs_settings.card_bg_color = $('#setting-card-bg-color').val();
             scs_settings.card_bg_opacity = parseInt($('#setting-card-bg-opacity').val()) ?? 100;
             scs_settings.card_border_color = $('#setting-card-border-color').val();
-            scs_settings.card_border_radius = parseInt($('#setting-card-border-radius').val()) || 16;
+            scs_settings.card_border_radius = readIntegerSetting('#setting-card-border-radius', 16);
             scs_settings.text_primary_color = $('#setting-text-primary-color').val();
             scs_settings.text_muted_color = $('#setting-text-muted-color').val();
             scs_settings.accent_color = $('#setting-accent-color').val();
@@ -7027,8 +7037,8 @@ if (empty($active_presets)) {
             }
             var pos = scs_settings.block_positions[key];
             var canvasW = scs_settings.canvas_width || 800;
-            var padX = scs_settings.content_padding_x || 36;
-            var padTop = scs_settings.content_padding_top || 36;
+            var padX = scs_settings.content_padding_x ?? 36;
+            var padTop = scs_settings.content_padding_top ?? 36;
             var blockW = (pos.width === 'auto' || pos.width === '100%') ? (canvasW - (padX * 2)) : (parseInt(pos.width) || 300);
 
             if (alignment === 'left') {
@@ -7527,7 +7537,7 @@ if (empty($active_presets)) {
             // 7. Styling Engine (Cards, Borders, Radius, Colors & Size Chart Styling)
             var cardBg = isCustom ? hexToRgba(scs_settings.card_bg_color || '#ffffff', scs_settings.card_bg_opacity ?? 100) : '#ffffff';
             var cardBorder = isCustom ? (scs_settings.card_border_color || '#e2e8f0') : '#e2e8f0';
-            var cardRadius = isCustom ? (scs_settings.card_border_radius || 16) + 'px' : '16px';
+            var cardRadius = isCustom ? (scs_settings.card_border_radius ?? 16) + 'px' : '16px';
             var textPrimary = isCustom ? (scs_settings.text_primary_color || '#0f172a') : '#0f172a';
             var textMuted = isCustom ? (scs_settings.text_muted_color || '#64748b') : '#64748b';
             var accent = isCustom ? (scs_settings.accent_color || '#4f46e5') : '#4f46e5';
@@ -8953,9 +8963,9 @@ if (empty($active_presets)) {
                 custom_font_url: $('#setting-custom-font-url').val() || '',
                 custom_font_name: $('#setting-custom-font-name').val() || '',
 
-                content_padding_top: parseInt($('#setting-padding-top').val()) || 36,
-                content_padding_bottom: parseInt($('#setting-padding-bottom').val()) || 28,
-                content_padding_x: parseInt($('#setting-padding-x').val()) || 36,
+                content_padding_top: readIntegerSetting('#setting-padding-top', 36),
+                content_padding_bottom: readIntegerSetting('#setting-padding-bottom', 28),
+                content_padding_x: readIntegerSetting('#setting-padding-x', 36),
                 content_gap: parseInt($('#setting-content-gap').val()) || 24,
                 show_header_brand: (scs_settings.show_header_brand !== undefined && scs_settings.show_header_brand !== null) ? scs_settings.show_header_brand : 1,
                 show_meta_pills: (scs_settings.show_meta_pills !== undefined && scs_settings.show_meta_pills !== null) ? scs_settings.show_meta_pills : 1,
@@ -8971,7 +8981,7 @@ if (empty($active_presets)) {
                 card_bg_opacity: parseInt($('#setting-card-bg-opacity').val()) ?? 100,
                 card_border_color: $('#setting-card-border-color').val(),
                 card_border_width: 1,
-                card_border_radius: parseInt($('#setting-card-border-radius').val()) || 16,
+                card_border_radius: readIntegerSetting('#setting-card-border-radius', 16),
                 card_shadow: 'sm',
                 text_primary_color: $('#setting-text-primary-color').val(),
                 text_muted_color: $('#setting-text-muted-color').val(),

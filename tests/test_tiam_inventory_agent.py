@@ -15,6 +15,47 @@ spec.loader.exec_module(agent)
 
 
 class AgentTests(unittest.TestCase):
+    result = {'success': True, 'rows': [{'Code': 'A', 'Qty': 3}], 'columns': ['Code', 'Qty'], 'logs': []}
+
+    def test_result_transport_failure_retries_identical_payload_without_sql(self):
+        with patch.object(agent, 'request', side_effect=[urllib.error.URLError('private transport detail'), {'status': 'received', 'state': 'preview'}]) as request, patch.object(agent.time, 'sleep') as sleep, patch.object(agent, 'execute_job') as execute:
+            reply = agent.submit_result('https://example.test', 'p1', 'a'*64, 'job1', self.result)
+        self.assertEqual(reply['state'], 'preview')
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(request.call_args_list[0], request.call_args_list[1])
+        sleep.assert_called_once_with(2)
+        execute.assert_not_called()
+
+    def test_result_retries_server_errors_but_not_cancelled_job(self):
+        for code, attempts in [(503, 3), (429, 3), (400, 1), (401, 1)]:
+            with self.subTest(code=code), patch.object(agent, 'request', side_effect=urllib.error.HTTPError('https://example.test', code, 'private response', None, None)) as request, patch.object(agent.time, 'sleep'), self.assertRaises(urllib.error.HTTPError):
+                agent.submit_result('https://example.test', 'p1', 'a'*64, 'job1', self.result)
+            self.assertEqual(request.call_count, attempts)
+
+    def test_unsent_result_survives_poll_loop_without_querying_again(self):
+        output = io.StringIO()
+        responses = [{'status': 'job', 'job': 'job1'}, *[urllib.error.URLError('private response') for _ in range(3)], {'status': 'received', 'state': 'preview'}]
+        with patch.dict(agent.os.environ, {'TIAM_PANEL_URL': 'https://example.test/tiam_inventory.php', 'TIAM_PROJECT_ID': 'p1', 'TIAM_AGENT_TOKEN': 'a'*64}), patch.object(sys, 'argv', ['agent']), patch.object(agent, 'request', side_effect=responses) as request, patch.object(agent, 'execute_job', return_value=self.result) as execute, patch.object(agent.time, 'sleep', side_effect=[None, None, None, KeyboardInterrupt]), contextlib.redirect_stdout(output), self.assertRaises(KeyboardInterrupt):
+            agent.main()
+        execute.assert_called_once()
+        self.assertEqual([call.args[3] for call in request.call_args_list], ['agent_poll', *['agent_result']*4])
+        self.assertIn('Result delivery pending', output.getvalue())
+        self.assertIn('job finished: ok', output.getvalue())
+        self.assertNotIn('private response', output.getvalue())
+        self.assertNotIn('a'*64, output.getvalue())
+
+    def test_invalid_panel_json_never_replaces_sql_result_with_error(self):
+        with patch.object(agent, 'request', side_effect=[agent.InvalidPanelResponse('invalid JSON'), {'status': 'received', 'state': 'preview'}]) as request, patch.object(agent.time, 'sleep'):
+            agent.submit_result('https://example.test', 'p1', 'a'*64, 'job1', self.result)
+        self.assertEqual(request.call_args_list[1].kwargs['rows'], self.result['rows'])
+        self.assertTrue(request.call_args_list[1].kwargs['success'])
+
+    def test_oversized_local_payload_reports_failure_instead_of_stalling_job(self):
+        with patch.object(agent, 'request', side_effect=[agent.PayloadError('too large'), {'status': 'received', 'state': 'error'}]) as request:
+            agent.submit_result('https://example.test', 'p1', 'a'*64, 'job1', self.result)
+        self.assertFalse(request.call_args_list[1].kwargs['success'])
+        self.assertNotIn('rows', request.call_args_list[1].kwargs)
+
     def test_idle_connection_is_visible_without_secrets(self):
         output = io.StringIO()
         with patch.dict(agent.os.environ, {'TIAM_PANEL_URL':'https://example.test/tiam_inventory.php','TIAM_PROJECT_ID':'p1','TIAM_AGENT_TOKEN':'a'*64}), patch.object(sys,'argv',['agent','--once']), patch.object(agent,'request',return_value={'status':'idle'}), contextlib.redirect_stdout(output):

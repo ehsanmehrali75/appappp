@@ -1,4 +1,4 @@
-"""Controlled browser regression for deferred size guides; no production requests."""
+"""Controlled browser regression for deferred product fields; no production requests."""
 import asyncio
 import html
 import json
@@ -32,6 +32,20 @@ class Handler(BaseHTTPRequestHandler):
                 f'<div class="product-wrap"><div class="product-name">'
                 f'<a href="/{name}">{name}</a></div></div>' for name in products
             )
+        elif path == '/deferred-fields':
+            body = '''<h1 class="product-name">Deferred</h1><span id="product-code">D1</span>
+                <span id="sale-price"></span><a name="size-variant"></a>
+                <div id="coloe-des"></div><nav class="breadcrumb"><a></a></nav>
+                <div id="product-tab-description"></div>
+                <div id="dv-product-gallery-main"><div class="product-single-carousel"><img></div></div>
+                <script>setTimeout(() => {
+                    document.querySelector('#sale-price').textContent = '250000';
+                    document.querySelector('[name="size-variant"]').textContent = 'M';
+                    document.querySelector('#coloe-des').textContent = 'Blue';
+                    document.querySelector('.breadcrumb a').textContent = 'Clothing';
+                    document.querySelector('#product-tab-description').textContent = 'Deferred description';
+                    document.querySelector('.product-single-carousel img').setAttribute('data-zoom-image', '/deferred.jpg');
+                }, 700)</script>'''
         elif path.lstrip('/') in PRODUCTS:
             name = path.lstrip('/')
             body = (f'<h1 class="product-name">{name}</h1>'
@@ -113,6 +127,26 @@ async def main(base, root):
 
     playwright, browser, page = await scraper.create_browser(False)
     try:
+        started = time.monotonic()
+        result = await scraper.parse_product_page(
+            page, base + '/deferred-fields',
+            ['name', 'price', 'sizes', 'color', 'category', 'description', 'gallery'],
+            scraper.scraper_controller, logs.append, 10000, 1500,
+        )
+        assert result['description'] == 'Deferred description', result
+        assert result['price'] == '250000' and result['sizes'] == ['M'], result
+        assert result['color'] == 'Blue' and result['category'] == ['Clothing'], result
+        assert result['gallery'] == [base + '/deferred.jpg'], result
+        assert time.monotonic() - started < 2.5, 'Optional field wait exceeded its budget'
+        checks.append('empty placeholders wait for deferred field contents')
+        started = time.monotonic()
+        result = await scraper.parse_product_page(
+            page, base + '/absent', ['price', 'gallery'], scraper.scraper_controller,
+            logs.append, 10000, 250, size_guide_wait_ms=5000,
+        )
+        assert result['price'] is None and result['gallery'] == [], result
+        assert time.monotonic() - started < 1.5, 'Absent optional fields did not respect their budget'
+        checks.append('absent optional fields keep a bounded wait')
         started = time.monotonic()
         result = await scraper.parse_product_page(
             page, base + '/absent', ['name'], scraper.scraper_controller,
