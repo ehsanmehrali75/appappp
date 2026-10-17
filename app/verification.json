@@ -1,7 +1,7 @@
 {
-  "original_seconds": 13.864,
-  "optimized_seconds": 3.1,
-  "ratio_local_only": 4.47,
+  "original_seconds": 11.621,
+  "optimized_seconds": 1.4,
+  "ratio_local_only": 8.3,
   "products": 12,
   "peak_requests": 4,
   "checks": [

@@ -13,7 +13,7 @@ class WebsiteCatalogSync {
     }
     private static function metadata($product) {
         $meta=self::metadataArray($product['website_sync']??[]);
-        foreach(['image_urls','size_guide_urls'] as $field) {
+        foreach(['image_urls','size_guide_urls','page_urls'] as $field) {
             $urls=[];
             foreach(self::metadataArray($meta[$field]??[],true) as $url) {
                 $url=ProductSizeChartCatalog::mediaUrl($url);
@@ -184,6 +184,9 @@ class WebsiteCatalogSync {
         $production=ImageProduction::state($project,$product,$hasImage,$archived);
         if(!$hasImage&&!$archived)$pub=$production['stage'];
         return array_replace($meta,[
+            'site_visible_with_images'=>($meta['presence']??'')==='seen'&&(bool)$sitePhotos,
+            'site_main_image_url'=>in_array($meta['main_image_url']??'', $sitePhotos,true)?$meta['main_image_url']:($sitePhotos[0]??null),
+            'site_page_urls'=>($meta['presence']??'')==='seen'?($meta['page_urls']??[]):[],
             'archived'=>$archived,
             'image_production'=>$production,
             'publication'=>$archived?'archived':$pub,'inventory'=>self::inventory($product),
@@ -252,9 +255,11 @@ class WebsiteCatalogSync {
                 $unconfirmed[$field]=$meta[$field];
             }
             $meta=array_replace($meta,['presence'=>'seen','origin'=>$origin,'checked_at'=>$now,'publication'=>'uploaded']);
-            $siteImages=[];$descriptions=[];$charts=[];$prices=[];$descriptionObserved=false;$chartObserved=false;$imageObserved=false;
+            $siteImages=[];$pageUrls=[];$mainImages=[];$descriptions=[];$charts=[];$prices=[];$descriptionObserved=false;$chartObserved=false;$imageObserved=false;
             foreach($group as $row) {
                 $code=self::code($row['product_code']);
+                $pageUrls[self::url($row['url'])]=true;
+                if(self::url($row['main_image']??'')!=='')$mainImages[self::url($row['main_image'])]=true;
                 if($options['update_price']&&array_key_exists('price',$row)&&$row['price']!==null&&$row['price']!=='')$prices[] = self::price($row,$options['price_unit']);
                 if($options['update_stock'])foreach(['stock_online','stock_total'] as $field)if(array_key_exists($field,$row)&&$row[$field]!==null&&$row[$field]!=='') {
                     $stock=self::number($row[$field],true);
@@ -286,6 +291,8 @@ class WebsiteCatalogSync {
             if(!$imageObserved)$siteImages=array_fill_keys($meta['image_urls']??[],true);
             if($imageObserved)$meta['image_checked_at']=$now;
             $meta['image_urls']=array_keys($siteImages);
+            $meta['page_urls']=array_keys($pageUrls);
+            if($imageObserved)$meta['main_image_url']=key($mainImages)?:key($siteImages)?:null;
             if(isset($meta['manual_upload_receipt']['assets'])){
                 $observedAssets=array_merge($imageObserved?['images']:[],$descriptionObserved?['description']:[],$chartObserved?['chart']:[]);
                 $meta['manual_upload_receipt']['assets']=array_values(array_diff($meta['manual_upload_receipt']['assets'],$observedAssets));

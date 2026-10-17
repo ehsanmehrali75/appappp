@@ -9,7 +9,7 @@ PACKAGE = APP / 'tanedorost-fast.zip'
 FILES = (
     'app.py', 'crawler/__init__.py', 'crawler/scraper.py', 'requirements.txt',
     'README.md', 'README-fa.md', 'verify_local.py', 'verify_size_guide.py',
-    'verify_ui.py', 'verification.json', 'reference/original_scraper.py',
+    'verify_ui.py', 'verify_media.py', 'fixtures/sportland-gallery.html', 'verification.json', 'reference/original_scraper.py',
 )
 PREFIX = 'tanedorost-fast/'
 

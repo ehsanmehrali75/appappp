@@ -50,4 +50,19 @@ $tiam=TiamInventory::merge($r['project'],TiamInventory::normalize([['Code'=>'591
 $tiamProduct=array_values(array_filter($tiam['products'],fn($p)=>$p['id']==='one'))[0];
 wcCheck($tiamProduct['website_sync']===$r['project']['products'][0]['website_sync'],'later Tiam sync preserves website metadata');
 wcCheck($tiamProduct['image']==='uploads/local.png'&&count($tiamProduct['images_list'])===2,'later Tiam sync preserves local and website images');
+// Presence/photo evidence is independent from missing descriptions and size charts.
+$mediaBase=['id'=>'sportland','settings'=>[],'products'=>[['id'=>'sp','sku'=>'88273','name'=>'ON Stride U','stock_total'=>12,'image'=>'uploads/high-resolution-original.png','description'=>'']]];
+$mediaRow=['url'=>'https://www.sportland.ir/product/88273/on-stride-u','product_code'=>'88273','main_image'=>'https://www.sportland.ir/content/media/product/88273/pro_68419.webp','gallery'=>['https://www.sportland.ir/content/media/product/88273/pro_68419.webp','https://www.sportland.ir/content/media/product/88273/pro_68420.webp','https://www.sportland.ir/content/media/product/88273/pro_68421.webp','https://www.sportland.ir/content/media/product/88273/pro_68422.webp'],'description'=>'','size_guide'=>null];
+$mediaResult=WebsiteCatalogSync::reconcile($mediaBase,[$mediaRow]);$mediaProduct=$mediaResult['project']['products'][0];$mediaState=WebsiteCatalogSync::state($mediaResult['project'],$mediaProduct);
+wcCheck($mediaState['site_visible_with_images'],'site presence and photo evidence survive missing chart and description');
+wcCheck($mediaState['site_main_image_url']===$mediaRow['main_image']&&count($mediaState['site_image_urls'])===4,'original main and complete gallery available for comparison');
+wcCheck($mediaState['site_page_urls']===[$mediaRow['url']],'website product link separate from panel link');
+wcCheck($mediaState['needs_size_chart']&&$mediaState['needs_description'],'missing content tasks coexist with site photo presence');
+wcCheck($mediaProduct['image']===$mediaBase['products'][0]['image']&&$mediaProduct['stock_total']===12,'original image and ERP stock preserved');
+$mediaRow['size_guide']='https://www.sportland.ir/content/media/chartsize/Chart_88273.jpg';
+$mediaWithChart=WebsiteCatalogSync::reconcile($mediaResult['project'],[$mediaRow]);$mediaChartState=WebsiteCatalogSync::state($mediaWithChart['project'],$mediaWithChart['project']['products'][0]);
+wcCheck($mediaChartState['site_chart_urls']===[$mediaRow['size_guide']]&&!$mediaChartState['needs_size_chart'],'site chart shown independently and fills a missing primary chart');
+$mediaRow['main_image']=null;$mediaRow['gallery']=[];
+$mediaEmpty=WebsiteCatalogSync::reconcile($mediaWithChart['project'],[$mediaRow]);$mediaEmptyState=WebsiteCatalogSync::state($mediaEmpty['project'],$mediaEmpty['project']['products'][0]);
+wcCheck(!$mediaEmptyState['site_visible_with_images']&&$mediaEmptyState['site_main_image_url']===null,'seen page without current images must not be called visually present');
 echo "$n website catalog checks passed\n";

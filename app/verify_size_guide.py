@@ -145,7 +145,7 @@ async def main(base, root):
             logs.append, 10000, 250, size_guide_wait_ms=5000,
         )
         assert result['price'] is None and result['gallery'] == [], result
-        assert time.monotonic() - started < 1.5, 'Absent optional fields did not respect their budget'
+        assert time.monotonic() - started < 4, 'Absent gallery exceeded its 3-second budget'
         checks.append('absent optional fields keep a bounded wait')
         started = time.monotonic()
         result = await scraper.parse_product_page(

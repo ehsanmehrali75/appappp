@@ -61,7 +61,9 @@ jobs:
           python -m pip install -r app/requirements.txt
           python -m playwright install --with-deps chromium
       - name: Deferred size guides and refresh
-        run: python app/verify_size_guide.py
+        run: |
+          python app/verify_size_guide.py
+          python app/verify_media.py
       - name: Desktop settings reach the scraper
         env:
           QT_QPA_PLATFORM: offscreen

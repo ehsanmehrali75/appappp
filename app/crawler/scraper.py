@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError, async_playwright
 
 OUTPUT = 'output/products.json'
-SCRAPER_VERSION = '2.1.1'
+SCRAPER_VERSION = '2.2.0'
 DEFAULT_SIZE_GUIDE_WAIT_MS = 8000
 CHROME_PATHS = [
     r'C:\Program Files\Google\Chrome\Application\chrome.exe',
@@ -26,11 +26,11 @@ CHROME_PATHS = [
     r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe',
 ]
 SELECTORS = {
-    'name': 'h1.product-name', 'price': '#sale-price',
+    'name': 'h1.product-name, h1.product_title, h1[itemprop="name"]', 'price': '#sale-price',
     'sizes': 'a[name="size-variant"]', 'color': '#coloe-des',
     'category': '.breadcrumb a', 'description': '#product-tab-description',
-    'size_guide': '#a-size-guide, .container-sizeguide a[data-link]',
-    'gallery': '#dv-product-gallery-main .product-single-carousel img',
+    'size_guide': '#a-size-guide, .container-sizeguide a[data-link], a.size-guide, a.size-guide-btn, .size-guide img, .size-chart img, a[href*="chartsize/"]',
+    'gallery': '#dv-product-gallery-main .product-single-carousel img, .woocommerce-product-gallery__image img, .product-gallery .product-single-carousel img, .product-images .product-image img, [itemprop="image"]',
 }
 
 
@@ -305,6 +305,74 @@ async def detect_pages(page, url, log, controller=None, timeout_ms=20000):
     return category_urls(url, total)
 
 
+def product_schema(soup):
+    """Use the page's Product entity, never arbitrary images from the whole document."""
+    for script in soup.select('script[type="application/ld+json"]'):
+        try:
+            document = json.loads(script.string or script.get_text())
+        except (ValueError, TypeError):
+            continue
+        nodes = document if isinstance(document, list) else [document]
+        for node in nodes:
+            if isinstance(node, dict) and isinstance(node.get('@graph'), list):
+                nodes = [*nodes, *node['@graph']]
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            kinds = node.get('@type', [])
+            kinds = [kinds] if isinstance(kinds, str) else kinds
+            if isinstance(kinds, list) and 'Product' in kinds:
+                return node
+    return {}
+
+
+def media_url(source, page_url):
+    resolved = size_guide_url(source, page_url)
+    if not resolved:
+        return None
+    path = urlparse(resolved).path.lower()
+    if any(marker in path for marker in ('placeholder', 'no-image', 'noimage', 'loading.', 'transparent.')):
+        return None
+    return resolved
+
+
+def product_images(soup, url, schema):
+    images = []
+    for element in soup.select(SELECTORS['gallery']):
+        if element.find_parent(class_=['cloned', 'product-thumbs', 'product-thumbs-wrap']):
+            continue
+        sources = [element.get(key) for key in ('data-zoom-image', 'data-large_image', 'data-full', 'data-original', 'data-src')]
+        parent = element.find_parent('a', href=True)
+        if parent and urlparse(parent['href']).path.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.avif')):
+            sources.insert(0, parent['href'])
+        srcset = element.get('data-srcset') or element.get('srcset')
+        if srcset:
+            candidates = []
+            for entry in srcset.split(','):
+                parts = entry.strip().split()
+                if parts:
+                    try:
+                        rank = float(parts[1].rstrip('wx')) if len(parts) > 1 else 0
+                    except ValueError:
+                        rank = 0
+                    candidates.append((rank, parts[0]))
+            sources.extend(source for _, source in sorted(candidates, reverse=True))
+        sources.extend([element.get('src'), element.get('content')])
+        source = next((safe for raw in sources if (safe := media_url(raw, url))), None)
+        if source:
+            images.append(source)
+    structured = schema.get('image', [])
+    for item in structured if isinstance(structured, list) else [structured]:
+        source = item.get('contentUrl') or item.get('url') if isinstance(item, dict) else item
+        if safe := media_url(source, url):
+            images.append(safe)
+    if not images:
+        meta = soup.select_one('meta[property="og:image"]')
+        if meta and (safe := media_url(meta.get('content'), url)):
+            images.append(safe)
+    return list(dict.fromkeys(images))
+
+
 def parse_html(html, url, fields):
     soup = soup_from(html)
 
@@ -312,14 +380,19 @@ def parse_html(html, url, fields):
         element = soup.select_one(selector)
         return element.get_text(strip=True) if element else None
 
-    code = text('#product-code')
-    if not code and not text('h1.product-name'):
+    schema = product_schema(soup)
+    code = text('#product-code, .product_meta .sku, [itemprop="sku"]') or schema.get('sku') or schema.get('productID')
+    if code is not None:
+        code = str(code)
+    if not code and not text(SELECTORS['name']) and not schema.get('name'):
         raise ValueError('Product markers missing; refusing to save a blank/challenge page')
     data = {'url': url, 'product_code': code}
     for field in fields:
         selector = SELECTORS[field]
         if field in ('name', 'price', 'color'):
             data[field] = text(selector)
+            if field == 'name' and not data[field]:
+                data[field] = schema.get('name')
         elif field in ('sizes', 'category'):
             data[field] = [node.get_text(strip=True) for node in soup.select(selector)]
         elif field == 'description':
@@ -327,15 +400,10 @@ def parse_html(html, url, fields):
             data[field] = element.get_text(' ', strip=True) if element else ''
         elif field == 'size_guide':
             data[field] = next((resolved for element in soup.select(selector)
-                                if (resolved := size_guide_url(element.get('data-link'), url))), None)
+                                if (resolved := next((safe for attr in ('data-link', 'data-src', 'href', 'src') if (safe := size_guide_url(element.get(attr), url))), None))), None)
         elif field == 'gallery':
-            gallery = []
-            for image in soup.select(selector):
-                source = image.get('data-zoom-image') or image.get('data-src') or image.get('src')
-                if source:
-                    gallery.append(urljoin(url, source))
-            data['gallery'] = list(dict.fromkeys(gallery))
-            data['main_image'] = data['gallery'][0] if gallery else None
+            data['gallery'] = product_images(soup, url, schema)
+            data['main_image'] = data['gallery'][0] if data['gallery'] else None
     return data
 
 
@@ -358,9 +426,10 @@ def size_guide_url(source, page_url):
 
 async def parse_product_page(page, url, fields, controller, log, timeout_ms, dynamic_wait_ms,
                              size_guide_wait_ms=DEFAULT_SIZE_GUIDE_WAIT_MS):
-    await navigate(page, url, 'h1.product-name, #product-code', controller, log, timeout_ms)
+    await navigate(page, url, SELECTORS['name'] + ', #product-code', controller, log, timeout_ms)
     await page.wait_for_function(
-        "() => ['h1.product-name','#product-code'].some(s => document.querySelector(s)?.textContent.trim())",
+        "selectors => selectors.some(s => document.querySelector(s)?.textContent.trim())",
+        arg=[SELECTORS['name'], '#product-code'],
         timeout=timeout_ms,
     )
     # Optional fields share bounded waits. Size-guide links are populated by a
@@ -391,7 +460,7 @@ async def parse_product_page(page, url, fields, controller, log, timeout_ms, dyn
         try:
             await page.wait_for_function(
                 r'''selector => Array.from(document.querySelectorAll(selector)).some(element => {
-                    const source = element.getAttribute('data-link')?.trim();
+                    const source = ['data-link','data-src','href','src'].map(key => element.getAttribute(key)?.trim()).find(value => value && !value.startsWith('#') && !value.startsWith('javascript:'));
                     if (!source || source.startsWith('#') || ['null','undefined','false'].includes(source.toLowerCase()) || /[\s\\]/.test(source)) return false;
                     try {
                         const parsed = new URL(source, location.href);
@@ -403,7 +472,27 @@ async def parse_product_page(page, url, fields, controller, log, timeout_ms, dyn
         except PlaywrightTimeoutError:
             log(f'SIZE GUIDE => no valid link within {size_guide_wait_ms}ms: {url}')
 
-    await asyncio.gather(wait_optional_fields(), wait_size_guide())
+    async def wait_gallery():
+        if 'gallery' not in fields:
+            return
+        if parse_html(await page.content(), url, ['gallery'])['gallery']:
+            return
+        try:
+            await page.wait_for_function(
+                r'''selector => Array.from(document.querySelectorAll(selector)).some(element =>
+                    ['data-zoom-image','data-large_image','data-full','data-original','data-src','src','content'].some(attr => {
+                        const source = element.getAttribute(attr)?.trim();
+                        if (!source || /placeholder|no-image|noimage|loading\.|transparent\./i.test(source)) return false;
+                        try {const parsed = new URL(source,location.href);return ['http:','https:'].includes(parsed.protocol) && !parsed.username && !parsed.password;}
+                        catch (_) {return false;}
+                    })
+                )''',
+                arg=SELECTORS['gallery'], timeout=max(dynamic_wait_ms, 3000), polling=100,
+            )
+        except PlaywrightTimeoutError:
+            log(f'GALLERY => no usable product image within {max(dynamic_wait_ms, 3000)}ms: {url}')
+
+    await asyncio.gather(wait_optional_fields(), wait_size_guide(), wait_gallery())
     data = parse_html(await page.content(), url, fields)
     if 'size_guide' in fields and data.get('size_guide'):
         log(f'SIZE GUIDE => found: {data["size_guide"]} | product: {url}')

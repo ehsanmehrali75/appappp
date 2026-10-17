@@ -73,6 +73,24 @@ try:
       form.evaluate('(form,marker)=>{const h=document.createElement("input");h.name=marker;h.value="1";form.append(h);form.submit()}',marker)
     with sqlite3.connect(case.database) as db:settings=json.loads(db.execute('SELECT settings FROM projects WHERE id="p"').fetchone()[0])
     check(not settings['prod_require_reference'] and settings['prod_require_image_request'],'real project settings persist independent prerequisites')
+    # Website photo presence is independent of incomplete descriptions/charts.
+    media_main='https://www.sportland.ir/content/media/product/88273/pro_68419.webp'
+    media_gallery='https://www.sportland.ir/content/media/product/88273/pro_68420.webp'
+    media_page='https://www.sportland.ir/product/88273/on-stride-u'
+    media=dict(presence='seen',publication='uploaded',page_urls=[media_page],main_image_url=media_main,image_urls=[media_main,media_gallery],has_description=False,has_size_chart=False)
+    with sqlite3.connect(case.database) as db:
+      db.execute('UPDATE products SET website_sync=?,images_list=?,uploaded_to_site=1 WHERE id="one"',(json.dumps(media),json.dumps([dict(url=url,source='site',approved=True) for url in [media_main,media_gallery]])))
+    for width in [1440,375]:
+      page.set_viewport_size({'width':width,'height':950})
+      page.goto(base+'/panel/admin.php?tab=website_export&we_view=work&wc_queue=site_visible');page.wait_for_load_state()
+      row=page.locator('.website-catalog-row[data-product-id="one"]')
+      check(row.count()==1,f'{width} site image presence filter works')
+      check('در سایت موجود؛ تصویر ثبت شده' in row.inner_text(),f'{width} presence badge independent of content tasks')
+      row.locator('.wc-compare>summary').click()
+      for url in [media_main,media_gallery,media_page]:
+        check(row.locator('a[href="'+url+'"]').count()>=1,f'{width} original website link available: '+url.rsplit('/',1)[-1])
+      check(page.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),f'{width} website comparison no overflow')
+      page.screenshot(path=str(out/f'site-media-{width}.png'),full_page=True)
     # Production-size payload: verify actual DOM and JavaScript, including the bare URL.
     case.seed_large_catalog()
     for width,tab in [(1440,None),(375,'library')]:
