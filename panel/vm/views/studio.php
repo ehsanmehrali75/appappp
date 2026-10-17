@@ -110,10 +110,10 @@ $allProducts = VmDB::getProductsByProject($projectId);
             </button>
 
             <!-- Save Layout Button (Always Visible & Protected from clipping) -->
-            <button onclick="saveCurrentLayout()" id="btn-save-layout" class="px-3 sm:px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition flex items-center gap-1.5 shrink-0">
+            <?php if (ModuleProjectAccess::allowed('vm_studio', 'vm', 'vm_layout', 'use')): ?><button onclick="saveCurrentLayout()" id="btn-save-layout" class="px-3 sm:px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition flex items-center gap-1.5 shrink-0">
                 <span>💾</span>
                 <span class="whitespace-nowrap">ذخیره چیدمان</span>
-            </button>
+            </button><?php endif; ?>
         </div>
     </div>
 
@@ -1011,6 +1011,7 @@ function saveCurrentLayout() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+            project_id: <?php echo json_encode($project['id']); ?>,
             store_id: window.currentStoreId,
             layout: window.currentLayout
         })

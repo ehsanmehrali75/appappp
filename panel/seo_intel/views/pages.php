@@ -46,9 +46,9 @@ $issuesCount = count(SeoDB::getPages($currentBusiness['id'], 'issues'));
         </div>
 
         <div class="flex items-center gap-2">
-            <button onclick="triggerSync('google_search_console')" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
+            <?php if (ModuleProjectAccess::allowed('seo_intel', 'analysis', 'seo_intel_integrations', 'use')): ?><button onclick="triggerSync('google_search_console')" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
                 <span>🔄</span> بروزرسانی آمار صفحات
-            </button>
+            </button><?php endif; ?>
         </div>
     </div>
 

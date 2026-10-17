@@ -1,6 +1,6 @@
 <?php
-require_once 'inc/cors.php';
-require_once 'inc/functions.php';
+require_once __DIR__.'/inc/cors.php';
+require_once __DIR__.'/inc/functions.php';
 header('Content-Type: application/json');
 
 // Global error handler for JSON responses
@@ -70,10 +70,7 @@ if ($actionFeature !== null) {
         RequestSecurity::enforce();
     }
     if (isUser() && !isMainAdmin()) {
-        $member = null;
-        foreach (($project['users'] ?? []) as $candidate) {
-            if (($candidate['username'] ?? '') === ($_SESSION['user']['username'] ?? '')) { $member = $candidate; break; }
-        }
+        $member = SessionIdentity::member($project);
         if (!$member) AccessControl::deny();
         $_SESSION['project_id'] = $pid;
         $_SESSION['user'] = $member;

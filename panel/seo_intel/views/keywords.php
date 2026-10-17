@@ -22,9 +22,9 @@ $keywordsList = SeoDB::getKeywords($currentBusiness['id'], $filter, $search);
             <button onclick="openAddKeywordModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-200 cursor-pointer">
                 <span>➕</span> افزودن کلمه به ردیاب
             </button>
-            <button onclick="triggerSync('google_search_console')" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
+            <?php if (ModuleProjectAccess::allowed('seo_intel', 'analysis', 'seo_intel_integrations', 'use')): ?><button onclick="triggerSync('google_search_console')" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
                 <span>🔄</span> بروزرسانی از سرچ کنسول
-            </button>
+            </button><?php endif; ?>
         </div>
     </div>
 

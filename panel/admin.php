@@ -2,6 +2,7 @@
 require_once __DIR__.'/inc/OutputBuffer.php';
 OutputBuffer::start();
 require_once 'inc/functions.php';
+require_once __DIR__.'/inc/ProjectPermissions.php';
 require_once 'inc/cors.php';
 
 // Authentication (Standard UI access)
@@ -29,22 +30,8 @@ if (isset($_GET['switch_project'])) {
     $target_pid = $_GET['switch_project'];
     $allowed = false;
     
-    if (isSuperAdmin()) {
-        $allowed = true;
-    } else if (isset($_SESSION['user']['username'])) {
-        $u_username = $_SESSION['user']['username'];
-        // Search in all projects to see if this user belongs to the target project
-        foreach ($db['projects'] as $p_item) {
-            if ($p_item['id'] === $target_pid && isset($p_item['users']) && is_array($p_item['users'])) {
-                foreach ($p_item['users'] as $pu) {
-                    if ($pu['username'] === $u_username) {
-                        $_SESSION['user'] = $pu; // update permissions/role to target project's profile!
-                        $allowed = true;
-                        break 2;
-                    }
-                }
-            }
-        }
+    foreach ($db['projects'] as $p_item) {
+        if ($p_item['id'] === $target_pid) { $allowed = SessionIdentity::select($p_item); break; }
     }
     
     if ($allowed) {
@@ -5605,6 +5592,34 @@ if ($project) {
         redirect("admin.php?tab=products&msg=$msg");
     }
 
+    if (isset($_POST['add_user']) || isset($_POST['edit_user']) || isset($_POST['delete_user'])) {
+        if (!hasPermission('users', 'use')) AccessControl::deny();
+        // A permitted users screen does not grant control over stronger peers.
+        // Reload users rather than authorizing a potentially cached member row.
+        $freshMembers = getCurrentProject($project['id'], true)['users'] ?? [];
+        $project['users'] = $freshMembers;
+        if (isset($_POST['edit_user']) || isset($_POST['delete_user'])) {
+            $index = $_POST['user_idx'] ?? null;
+            if (!is_string($index) || !preg_match('/^[0-9]+$/D', $index) || !isset($freshMembers[(int)$index]) || !ProjectPermissions::canManageMember($freshMembers[(int)$index])) AccessControl::deny();
+        }
+        if (!isset($_POST['delete_user'])) {
+            foreach (['username', 'role', 'password', 'mobile', 'telegram_chat_id', 'bale_chat_id'] as $field) {
+                if (isset($_POST[$field]) && !is_string($_POST[$field])) AccessControl::deny();
+            }
+            $candidateUsername = trim($_POST['username'] ?? '');
+            if ($candidateUsername === '' || mb_strlen($candidateUsername) > 50 || preg_match('/[\x00-\x1f\x7f]/', $candidateUsername)) AccessControl::deny();
+            if (isset($_POST['add_user']) && ($_POST['password'] ?? '') === '') AccessControl::deny();
+            if (!is_array($_POST['perms'] ?? []) || !is_array($_POST['assigned_projects'] ?? [])) AccessControl::deny();
+            foreach ($_POST['perms'] ?? [] as $permission) if (!is_string($permission) || $permission === '') AccessControl::deny();
+            foreach ($_POST['assigned_projects'] ?? [] as $assignedPid) if (!is_string($assignedPid)) AccessControl::deny();
+            foreach ($freshMembers as $member) {
+                if (($member['username'] ?? '') !== $candidateUsername) continue;
+                if (!ProjectPermissions::canManageMember($member)) AccessControl::deny();
+                if (isset($_POST['edit_user']) && $candidateUsername !== ($freshMembers[(int)$_POST['user_idx']]['username'] ?? '')) AccessControl::deny();
+            }
+        }
+    }
+
     if (isset($_POST['add_user'])) {
         if (!hasPermission('users')) {
             redirect('admin.php?tab=users&msg=دسترسی غیرمجاز');
@@ -5658,7 +5673,7 @@ if ($project) {
                     'permissions' => $u_perms
                 ];
                 
-                if ($exists_idx !== -1 && !isMainAdmin() && !isProjectAdmin() && ($p['users'][$exists_idx]['role'] ?? '') === 'project_admin') AccessControl::deny();
+                if ($exists_idx !== -1 && !ProjectPermissions::canManageMember($p['users'][$exists_idx])) AccessControl::deny();
                 if ($exists_idx !== -1) {
                     $p['users'][$exists_idx] = $user_data;
                 } else {
@@ -5694,7 +5709,7 @@ if ($project) {
         }
         $uidx = (int)($_POST['user_idx'] ?? -1);
         if (isset($project['users'][$uidx])) {
-            if (!isMainAdmin() && !isProjectAdmin() && ($project['users'][$uidx]['role'] ?? '') === 'project_admin') AccessControl::deny();
+            if (!ProjectPermissions::canManageMember($project['users'][$uidx])) AccessControl::deny();
             $orig_username = $project['users'][$uidx]['username'];
             
             $u_username = trim($_POST['username']);
@@ -5788,7 +5803,7 @@ if ($project) {
         }
         $uidx = (int)($_POST['user_idx'] ?? -1);
         if (isset($project['users'][$uidx])) {
-            if (!isMainAdmin() && !isProjectAdmin() && ($project['users'][$uidx]['role'] ?? '') === 'project_admin') AccessControl::deny();
+            if (!ProjectPermissions::canManageMember($project['users'][$uidx])) AccessControl::deny();
             unset($project['users'][$uidx]);
             $project['users'] = array_values($project['users']);
             saveProject($project);
@@ -6268,6 +6283,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
 ?>
 <?php if ($neoShell): ?>
     <link rel="stylesheet" href="/panel/assets/neo-tokens.css?v=1">
+    <script src="/panel/assets/worker-heartbeat.js?v=1"></script>
     <link rel="stylesheet" href="/panel/assets/neo-app-shell.css?v=<?php echo filemtime(__DIR__.'/assets/neo-app-shell.css'); ?>">
     <?php if ($neoWorkspace): ?><link rel="stylesheet" href="/panel/assets/neo-workspace.css?v=<?php echo filemtime(__DIR__.'/assets/neo-workspace.css'); ?>"><?php endif; ?>
     <?php if ($neoPilot): ?><link rel="stylesheet" href="/panel/assets/neo-dashboard.css?v=<?php echo filemtime(__DIR__.'/assets/neo-dashboard.css'); ?>"><?php endif; ?>
@@ -6294,13 +6310,13 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
             </div>
             <div class="flex items-center gap-2">
                 <?php if ($project): ?>
-                    <?php if (isModuleActive('sale')): ?>
+                    <?php if (canAccessFeature('sale_analysis')): ?>
                     <a href="sale.php<?php echo isSuperAdmin() ? '?project='.$project['id'] : ''; ?>" class="px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-700 text-xs font-black rounded-xl transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-550/5">
                         <span>💰</span>
                         <span class="hidden md:inline">تحلیل فروش و شعب</span>
                     </a>
                     <?php endif; ?>
-                    <?php if (isModuleActive('seo')): ?>
+                    <?php if (canAccessFeature('seo_classic')): ?>
                     <a href="seo.php<?php echo isSuperAdmin() ? '?project='.$project['id'] : ''; ?>" class="px-3.5 py-2.5 bg-sky-50 hover:bg-sky-100 border border-sky-100 text-sky-700 text-xs font-black rounded-xl transition-all flex items-center gap-1.5 shadow-sm shadow-sky-550/5">
                         <span>🔍</span>
                         <span class="hidden md:inline">آنالیز و سئو</span>
@@ -6425,17 +6441,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     foreach ($db['projects'] as $p_item) {
                         if (isSuperAdmin()) {
                             $user_allowed_projects[] = $p_item;
-                        } else if (isset($_SESSION['user']['username'])) {
-                            $u_username = $_SESSION['user']['username'];
-                            if (isset($p_item['users']) && is_array($p_item['users'])) {
-                                foreach ($p_item['users'] as $pu) {
-                                    if ($pu['username'] === $u_username) {
-                                        $user_allowed_projects[] = $p_item;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
+                        } else if (SessionIdentity::member($p_item)) $user_allowed_projects[] = $p_item;
                     }
                     if (count($user_allowed_projects) > 1): ?>
                         <div class="px-2 mb-4">
@@ -6458,11 +6464,11 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     <div class="nav-category-group mb-3">
                         <div class="px-3 mb-1.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">📊 اصلی و عمومی</div>
                         
-                        <?php if(isFeatureAvailable('dashboard') && isModuleActive('dashboard') && hasPermission('dashboard')): ?>
+                        <?php if(canAccessFeature('dashboard')): ?>
                         <a href="?tab=dashboard" class="nav-link <?php echo $tab=='dashboard'?'active':''; ?>"><span>📈</span> <span>میز کار (Insight)</span><?php echo getModuleVisibilityBadge('dashboard', $project); ?></a>
                         <?php endif; ?>
 
-                        <?php if(isFeatureAvailable('chat') && isModuleActive('chat')): ?>
+                        <?php if(canAccessFeature('chat')): ?>
                         <a href="chat.php<?php echo isSuperAdmin() ? '?project='.$project['id'] : ''; ?>" class="nav-link"><span>💬</span> <span>پاسخگویی و چت</span> <span class="mr-auto px-1.5 py-0.5 text-[8px] bg-indigo-600 text-white rounded-md font-black animate-pulse">زنده</span><?php echo getModuleVisibilityBadge('chat', $project); ?></a>
                         <?php endif; ?>
                     </div>
@@ -6471,23 +6477,23 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     <div class="nav-category-group mb-3">
                         <div class="px-3 mb-1.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">💎 مدیریت محتوا و کالا</div>
 
-                        <?php if(isFeatureAvailable('products') && isModuleActive('products') && (hasPermission('library') || hasPermission('products'))): ?>
+                        <?php if(canAccessFeature('products')): ?>
                         <a href="?tab=products" class="nav-link <?php echo $tab=='products'?'active':''; ?>"><span>💎</span> <span>کتابخانه محتوا</span><?php echo getModuleVisibilityBadge('products', $project); ?></a>
                         <?php endif; ?>
 
-                        <?php if(isFeatureAvailable('extract') && isModuleActive('extract') && hasPermission('extract')): ?>
+                        <?php if(canAccessFeature('extract')): ?>
                         <a href="?tab=extract" class="nav-link <?php echo $tab=='extract'?'active':''; ?>"><span>✨</span> <span>اتوماسیون استخراج</span><?php echo getModuleVisibilityBadge('extract', $project); ?></a>
                         <?php endif; ?>
 
-                        <?php if(isFeatureAvailable('excel') && isModuleActive('excel') && hasPermission('products')): ?>
+                        <?php if(canAccessFeature('excel')): ?>
                         <a href="?tab=excel" class="nav-link <?php echo $tab=='excel'?'active':''; ?>"><span>📊</span> <span>مدیریت اکسل</span><?php echo getModuleVisibilityBadge('excel', $project); ?></a>
                         <?php endif; ?>
                         
-                        <?php if(isFeatureAvailable('website_export') && isModuleActive('website_export') && hasPermission('products')): ?>
+                        <?php if(canAccessFeature('website_export')): ?>
                         <a href="?tab=website_export" class="nav-link <?php echo $tab=='website_export'?'active':''; ?>"><span>🌐</span> <span>خروجی وب‌سایت</span><?php echo getModuleVisibilityBadge('website_export', $project); ?></a>
                         <?php endif; ?>
 
-                        <?php if(isFeatureAvailable('wp_crm') && isModuleActive('wp_crm')): ?>
+                        <?php if(canAccessFeature('wp_crm')): ?>
                         <a href="wp-crm.php<?php echo isSuperAdmin() && isset($project['id']) ? '?project='.$project['id'] : ''; ?>" class="nav-link"><span>🛒</span> <span>سینک وردپرس CRM</span><?php echo getModuleVisibilityBadge('wp_crm', $project); ?></a>
                         <?php endif; ?>
                     </div>
@@ -6496,39 +6502,39 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     <div class="nav-category-group mb-3">
                         <div class="px-3 mb-1.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">🗓️ تقویم و ابزارهای تولید</div>
 
-                        <?php if(isFeatureAvailable('calendar') && isModuleActive('calendar') && hasPermission('calendar')): ?>
+                        <?php if(canAccessFeature('calendar')): ?>
                         <a href="?tab=calendar" class="nav-link <?php echo $tab=='calendar'?'active':''; ?>"><span>📅</span> <span>تقویم انتشار</span><?php echo getModuleVisibilityBadge('calendar', $project); ?></a>
                         <?php endif; ?>
 
-                        <?php if(isFeatureAvailable('occasions') && isModuleActive('occasions') && hasPermission('calendar')): ?>
+                        <?php if(canAccessFeature('occasions')): ?>
                         <a href="?tab=occasions" class="nav-link <?php echo $tab=='occasions'?'active':''; ?>"><span>🏮</span> <span>تقویم مناسبتی</span><?php echo getModuleVisibilityBadge('occasions', $project); ?></a>
                         <?php endif; ?>
 
-                        <?php if(isFeatureAvailable('adv_plan') && isModuleActive('adv_plan') && hasPermission('calendar')): ?>
+                        <?php if(canAccessFeature('adv_plan')): ?>
                         <a href="?tab=adv_plan" class="nav-link <?php echo $tab=='adv_plan'?'active':''; ?>"><span>📢</span> <span>پلن تبلیغاتی</span><?php echo getModuleVisibilityBadge('adv_plan', $project); ?></a>
                         <?php endif; ?>
 
-                        <?php if(isFeatureAvailable('auto_admin') && isModuleActive('auto_admin') && hasPermission('calendar')): ?>
+                        <?php if(canAccessFeature('auto_admin')): ?>
                         <a href="?tab=auto_admin" class="nav-link <?php echo ($tab=='auto_admin' || $tab=='auto_admin_logs')?'active':''; ?>"><span>🤖</span> <span>ادمین خودکار (Auto)</span><?php echo getModuleVisibilityBadge('auto_admin', $project); ?></a>
                         <?php endif; ?>
 
-                        <?php if(isFeatureAvailable('prompthub') && isModuleActive('prompthub')): ?>
+                        <?php if(canAccessFeature('prompthub')): ?>
                         <a href="prompthub.php<?php echo isSuperAdmin() && isset($project['id']) ? '?project='.$project['id'] : ''; ?>" class="nav-link"><span>🧠</span> <span>پرامپت هاب</span><?php echo getModuleVisibilityBadge('prompthub', $project); ?></a>
                         <?php endif; ?>
 
-                        <?php if(isFeatureAvailable('landing_builder') && isModuleActive('landing_builder')): ?>
+                        <?php if(canAccessFeature('landing_builder')): ?>
                         <a href="?tab=landing_builder" class="nav-link <?php echo $tab=='landing_builder'?'active':''; ?>"><span>🚀</span> <span>سازنده لندینگ AI</span><?php echo getModuleVisibilityBadge('landing_builder', $project); ?></a>
                         <?php endif; ?>
 
-                        <?php if(isFeatureAvailable('size_studio') && isModuleActive('size_studio') && (hasPermission('size_chart') || hasPermission('settings') || hasPermission('products'))): ?>
+                        <?php if(canAccessFeature('size_studio')): ?>
                         <a href="size/?project=<?php echo htmlspecialchars($project['id'] ?? ''); ?>" target="_blank" class="nav-link"><span>📐</span> <span>استودیو سایز</span><?php echo getModuleVisibilityBadge('size_studio', $project); ?></a>
                         <?php endif; ?>
 
-                        <?php if(isFeatureAvailable('catalog') && isModuleActive('catalog') && (hasPermission('catalog') || hasPermission('settings') || hasPermission('products'))): ?>
+                        <?php if(canAccessFeature('catalog')): ?>
                         <a href="catalog/?project=<?php echo htmlspecialchars($project['id'] ?? ''); ?>" target="_blank" class="nav-link"><span>📖</span> <span>کاتالوگ آنلاین</span><?php echo getModuleVisibilityBadge('catalog', $project); ?></a>
                         <?php endif; ?>
 
-                        <?php if(isFeatureAvailable('proposals') && isModuleActive('proposals') && (hasPermission('catalog') || hasPermission('settings') || hasPermission('products'))): ?>
+                        <?php if(canAccessFeature('proposals')): ?>
                         <a href="pro/?project=<?php echo htmlspecialchars($project['id'] ?? ''); ?>" target="_blank" class="nav-link"><span>📋</span> <span>پروپوزال و برنامه‌ریزی</span><?php echo getModuleVisibilityBadge('proposals', $project); ?></a>
                         <?php endif; ?>
                     </div>
@@ -6537,11 +6543,11 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     <div class="nav-category-group mb-3">
                         <div class="px-3 mb-1.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">📈 تحلیل و هوش تجاری</div>
 
-                        <?php if(isFeatureAvailable('seo_classic') && isModuleActive('seo_classic') && isModuleActive('seo') && (isSuperAdmin() || isProjectAdmin() || hasPermission('analysis'))): ?>
+                        <?php if(canAccessFeature('seo_classic')): ?>
                         <a href="seo.php<?php echo isSuperAdmin() ? '?project='.$project['id'] : ''; ?>" class="nav-link"><span>📊</span> <span>آنالیز و سئو کلاسیک</span><?php echo getModuleVisibilityBadge('seo_classic', $project); ?></a>
                         <?php endif; ?>
 
-                        <?php if(isFeatureAvailable('sale_analysis') && isModuleActive('sale_analysis') && isModuleActive('sale') && (isSuperAdmin() || isProjectAdmin() || hasPermission('analysis'))): ?>
+                        <?php if(canAccessFeature('sale_analysis')): ?>
                         <a href="sale.php<?php echo isSuperAdmin() ? '?project='.$project['id'] : ''; ?>" class="nav-link"><span>💰</span> <span>تحلیل مبالغ و شعب</span><?php echo getModuleVisibilityBadge('sale_analysis', $project); ?></a>
                         <?php endif; ?>
                     </div>
@@ -6552,7 +6558,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         $seoBaseUrl = '/admin/business/' . urlencode($seoBizSlug) . '/seo';
                         $seoDirectUrl = '/panel/seo_intel/?business=' . urlencode($seoBizSlug);
                     ?>
-                    <?php if(isFeatureAvailable('seo_intel') && isModuleActive('seo_intel')): ?>
+                    <?php if(canAccessFeature('seo_intel')): ?>
                     <div class="nav-category-group mb-3">
                         <div class="px-3 mb-1.5 flex items-center justify-between text-[10px] font-black text-indigo-400 uppercase tracking-wider">
                             <span>🚀 سئو و آنالیتیکس سازمانی</span>
@@ -6562,47 +6568,47 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         <a href="<?php echo $seoBaseUrl; ?>" target="_blank" class="nav-link font-bold text-indigo-700 bg-indigo-50/60 hover:bg-indigo-100">
                             <span>⚡</span> <span>داشبورد سئو و هوش داده</span><?php echo getModuleVisibilityBadge('seo_intel', $project); ?>
                         </a>
-                        <?php if(isFeatureAvailable('seo_intel_keywords')): ?>
+                        <?php if(canAccessFeature('seo_intel_keywords')): ?>
                         <a href="<?php echo $seoBaseUrl; ?>/keywords" target="_blank" class="nav-link text-xs">
                             <span class="mr-1">🎯</span> <span>۱. هوش کلمات کلیدی (Keywords)</span><?php echo getFeatureBadge('seo_intel_keywords'); ?>
                         </a>
                         <?php endif; ?>
-                        <?php if(isFeatureAvailable('seo_intel_pages')): ?>
+                        <?php if(canAccessFeature('seo_intel_pages')): ?>
                         <a href="<?php echo $seoBaseUrl; ?>/pages" target="_blank" class="nav-link text-xs">
                             <span class="mr-1">📑</span> <span>۲. تحلیل صفحات (Pages)</span><?php echo getFeatureBadge('seo_intel_pages'); ?>
                         </a>
                         <?php endif; ?>
-                        <?php if(isFeatureAvailable('seo_intel_technical')): ?>
+                        <?php if(canAccessFeature('seo_intel_technical')): ?>
                         <a href="<?php echo $seoBaseUrl; ?>/technical" target="_blank" class="nav-link text-xs">
                             <span class="mr-1">⚙️</span> <span>۳. سئو تکنیکال (Technical)</span><?php echo getFeatureBadge('seo_intel_technical'); ?>
                         </a>
                         <?php endif; ?>
-                        <?php if(isFeatureAvailable('seo_intel_traffic')): ?>
+                        <?php if(canAccessFeature('seo_intel_traffic')): ?>
                         <a href="<?php echo $seoBaseUrl; ?>/traffic" target="_blank" class="nav-link text-xs">
                             <span class="mr-1">📈</span> <span>۴. ترافیک و آنالیتیکس (GA4)</span><?php echo getFeatureBadge('seo_intel_traffic'); ?>
                         </a>
                         <?php endif; ?>
-                        <?php if(isFeatureAvailable('seo_intel_content')): ?>
+                        <?php if(canAccessFeature('seo_intel_content')): ?>
                         <a href="<?php echo $seoBaseUrl; ?>/content" target="_blank" class="nav-link text-xs">
                             <span class="mr-1">📝</span> <span>۵. محتوا و درآمد (Content)</span><?php echo getFeatureBadge('seo_intel_content'); ?>
                         </a>
                         <?php endif; ?>
-                        <?php if(isFeatureAvailable('seo_intel_social')): ?>
+                        <?php if(canAccessFeature('seo_intel_social')): ?>
                         <a href="<?php echo $seoBaseUrl; ?>/social" target="_blank" class="nav-link text-xs">
                             <span class="mr-1">📸</span> <span>۶. شبکه‌های اجتماعی (Social)</span><?php echo getFeatureBadge('seo_intel_social'); ?>
                         </a>
                         <?php endif; ?>
-                        <?php if(isFeatureAvailable('seo_intel_recommendations')): ?>
+                        <?php if(canAccessFeature('seo_intel_recommendations')): ?>
                         <a href="<?php echo $seoBaseUrl; ?>/recommendations" target="_blank" class="nav-link text-xs">
                             <span class="mr-1">🧠</span> <span>۷. هوش مصنوعی و پیشنهادات (AI)</span><?php echo getFeatureBadge('seo_intel_recommendations'); ?>
                         </a>
                         <?php endif; ?>
-                        <?php if(isFeatureAvailable('seo_intel_integrations')): ?>
+                        <?php if(canAccessFeature('seo_intel_integrations')): ?>
                         <a href="<?php echo $seoBaseUrl; ?>/integrations" target="_blank" class="nav-link text-xs">
                             <span class="mr-1">🔗</span> <span>۸. یکپارچه‌سازی و کانکشن‌ها</span><?php echo getFeatureBadge('seo_intel_integrations'); ?>
                         </a>
                         <?php endif; ?>
-                        <?php if(isFeatureAvailable('seo_intel_reports')): ?>
+                        <?php if(canAccessFeature('seo_intel_reports')): ?>
                         <a href="<?php echo $seoBaseUrl; ?>/reports" target="_blank" class="nav-link text-xs">
                             <span class="mr-1">📊</span> <span>۹. گزارش جامع بیزنس</span><?php echo getFeatureBadge('seo_intel_reports'); ?>
                         </a>
@@ -6611,7 +6617,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     <?php endif; ?>
 
                     <!-- Category: Visual Merchandising Intelligence (VM) -->
-                    <?php if (isFeatureAvailable('vm_studio') && isModuleActive('vm_studio') && (isSuperAdmin() || isProjectAdmin() || hasPermission('vm') || hasPermission('layout'))): ?>
+                    <?php if(canAccessFeature('vm_studio')): ?>
                     <?php 
                         $vmProjectSlug = !empty($project['slug']) ? $project['slug'] : (!empty($project['id']) ? $project['id'] : 'red-style');
                         $vmBaseUrl = '/admin/projects/' . urlencode($vmProjectSlug) . '/vm';
@@ -6626,32 +6632,32 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         <a href="<?php echo $vmBaseUrl; ?>" target="_blank" class="nav-link font-bold text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100">
                             <span>✨</span> <span>ورود به استودیو VM</span><?php echo getModuleVisibilityBadge('vm_studio', $project); ?>
                         </a>
-                        <?php if(isFeatureAvailable('vm_stores')): ?>
+                        <?php if(canAccessFeature('vm_stores')): ?>
                         <a href="<?php echo $vmBaseUrl; ?>/stores" target="_blank" class="nav-link text-xs">
                             <span class="mr-1">🏪</span> <span>۱. مدیریت شعب (Stores)</span><?php echo getFeatureBadge('vm_stores'); ?>
                         </a>
                         <?php endif; ?>
-                        <?php if(isFeatureAvailable('vm_layout')): ?>
+                        <?php if(canAccessFeature('vm_layout')): ?>
                         <a href="<?php echo $vmBaseUrl; ?>/studio" target="_blank" class="nav-link text-xs">
                             <span class="mr-1">📐</span> <span>۲. استودیو چیدمان (Studio)</span><?php echo getFeatureBadge('vm_layout'); ?>
                         </a>
                         <?php endif; ?>
-                        <?php if(isFeatureAvailable('vm_analytics')): ?>
+                        <?php if(canAccessFeature('vm_analytics')): ?>
                         <a href="<?php echo $vmBaseUrl; ?>/analytics" target="_blank" class="nav-link text-xs">
                             <span class="mr-1">📊</span> <span>۳. آنالیز چیدمان (Analytics)</span><?php echo getFeatureBadge('vm_analytics'); ?>
                         </a>
                         <?php endif; ?>
-                        <?php if(isFeatureAvailable('vm_scores')): ?>
+                        <?php if(canAccessFeature('vm_scores')): ?>
                         <a href="<?php echo $vmBaseUrl; ?>/scores" target="_blank" class="nav-link text-xs">
                             <span class="mr-1">🏆</span> <span>۴. امتیاز فروشگاه (Score)</span><?php echo getFeatureBadge('vm_scores'); ?>
                         </a>
                         <?php endif; ?>
-                        <?php if(isFeatureAvailable('vm_ai')): ?>
+                        <?php if(canAccessFeature('vm_ai')): ?>
                         <a href="<?php echo $vmBaseUrl; ?>/recommendations" target="_blank" class="nav-link text-xs">
                             <span class="mr-1">🧠</span> <span>۵. هوش مصنوعی (AI)</span><?php echo getFeatureBadge('vm_ai'); ?>
                         </a>
                         <?php endif; ?>
-                        <?php if(isFeatureAvailable('vm_reports')): ?>
+                        <?php if(canAccessFeature('vm_reports')): ?>
                         <a href="<?php echo $vmBaseUrl; ?>/reports" target="_blank" class="nav-link text-xs">
                             <span class="mr-1">📑</span> <span>۶. گزارشات جامع (Reports)</span><?php echo getFeatureBadge('vm_reports'); ?>
                         </a>
@@ -6666,25 +6672,17 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     <div class="nav-category-group mb-2">
                         <div class="px-3 mb-1.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">⚙️ مدیریت و دسترسی‌ها</div>
 
-                        <?php if(isModuleActive('users') && hasPermission('users')): ?>
-                            <?php if(isFeatureAvailable('users')): ?>
+                        <?php if(canAccessFeature('users')): ?>
                             <a href="?tab=users" class="nav-link <?php echo $tab=='users'?'active':''; ?>"><span>🛡️</span> <span>دسترسی کاربران</span><?php echo getModuleVisibilityBadge('users', $project); ?></a>
-                            <?php endif; ?>
-                            <?php if(isFeatureAvailable('users_performance') && isModuleActive('users_performance')): ?>
-                            <a href="?tab=users_performance" class="nav-link <?php echo $tab=='users_performance'?'active':''; ?>"><span>👥</span> <span>عملکرد پرسنل</span><?php echo getModuleVisibilityBadge('users_performance', $project); ?></a>
-                            <?php endif; ?>
-                            <?php if(isFeatureAvailable('logs') && isModuleActive('logs')): ?>
-                            <a href="?tab=logs" class="nav-link <?php echo $tab=='logs'?'active':''; ?>"><span>📜</span> <span>گزارشات سیستم</span><?php echo getModuleVisibilityBadge('logs', $project); ?></a>
-                            <?php endif; ?>
                         <?php endif; ?>
-
-                        <?php if(hasPermission('settings')): ?>
-                            <?php if(isFeatureAvailable('settings')): ?>
+                        <?php if(canAccessFeature('users_performance')): ?>
+                            <a href="?tab=users_performance" class="nav-link <?php echo $tab=='users_performance'?'active':''; ?>"><span>👥</span> <span>عملکرد پرسنل</span><?php echo getModuleVisibilityBadge('users_performance', $project); ?></a>
+                        <?php endif; ?>
+                        <?php if(canAccessFeature('logs')): ?>
+                            <a href="?tab=logs" class="nav-link <?php echo $tab=='logs'?'active':''; ?>"><span>📜</span> <span>گزارشات سیستم</span><?php echo getModuleVisibilityBadge('logs', $project); ?></a>
+                        <?php endif; ?>
+                        <?php if(canAccessFeature('settings')): ?>
                             <a href="?tab=settings" class="nav-link <?php echo $tab=='settings'?'active':''; ?>"><span>⚙️</span> <span>پیکربندی پروژه</span><?php echo getFeatureBadge('settings'); ?></a>
-                            <?php endif; ?>
-                            <?php if(isFeatureAvailable('seo_intel_integrations')): ?>
-                            <a href="<?php echo $seoBaseUrl; ?>/integrations" target="_blank" class="nav-link text-xs"><span>🔗</span> <span>یکپارچه‌سازی‌ها (Integrations)</span></a>
-                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
 
@@ -10533,6 +10531,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         </div>
                     </div>
 
+                    <script src="assets/product-import.js?v=1"></script>
                     <script>
                     function handleERPFileSelect(input) {
                         if (!input.files || !input.files[0]) return;
@@ -10888,25 +10887,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             };
                         });
                         
-                        fetch('admin.php', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                            body: 'ajax_action=import_json&erp_mode=' + encodeURIComponent(erpMode) + '&data=' + encodeURIComponent(JSON.stringify(items))
-                        })
-                        .then(r => r.json())
-                        .then(res => {
-                            hideFullLoader();
-                            if (res.status === 'success') {
-                                alert('همگام‌سازی ERP با موفقیت انجام شد:\n' + res.msg);
-                                location.reload();
-                            } else {
-                                alert('خطا در انجام ثبت: ' + res.msg);
-                            }
-                        })
-                        .catch(err => {
-                            hideFullLoader();
-                            alert('خطا در برقراری ارتباط با پورتال');
-                        });
+                        importERPInBatches(<?php echo json_encode((string)$project['id'], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>, items, erpMode);
                     }
                     </script>
 
@@ -10962,6 +10943,10 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                         try {
                                             const data = JSON.parse(e.target.result);
                                             if (Array.isArray(data) && data.length && data.every(row => row.url && row.product_code && !row._erp_contract && !row.ProCode)) { websiteCatalogLoad(data); document.getElementById('website-catalog-panel').scrollIntoView({block:'start'}); return; }
+                                            if (Array.isArray(data) && data.length && data.every(row => row && typeof row === 'object' && !Array.isArray(row) && !row.id)) {
+                                                importERPInBatches(<?php echo json_encode((string)$project['id'], JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT); ?>, data, 'standard');
+                                                return;
+                                            }
                                             showFullLoader('درحال تحلیل و واردسازی هوشمند محصولات...');
                                             
                                             fetch('admin.php', {
@@ -10991,6 +10976,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                 }
                                 
                                 function showFullLoader(text) {
+                                    hideFullLoader();
                                     const loader = document.createElement('div');
                                     loader.id = 'full-page-loader';
                                     loader.className = 'fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center text-white p-6 text-center';
@@ -11000,9 +10986,10 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                             <div class="absolute inset-0 border-4 border-amber-500 rounded-full border-t-transparent animate-spin"></div>
                                             <div class="absolute inset-0 flex items-center justify-center text-3xl animate-pulse">📦</div>
                                         </div>
-                                        <div class="text-xl font-black mb-2">${text}</div>
+                                        <div class="text-xl font-black mb-2" data-loader-message></div>
                                         <div class="text-sm text-slate-400">لطفا صبور باشید، این عملیات ممکن است کمی طول بکشد</div>
                                     `;
+                                    loader.querySelector('[data-loader-message]').textContent = text;
                                     document.body.appendChild(loader);
                                 }
                                 
@@ -11207,20 +11194,19 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     if (!<?php echo isMainAdmin()?'true':'false'; ?> || isHeartbeatRunning) return;
                     isHeartbeatRunning = true;
 
-                    fetch('cron.php?trigger=1&ajax=1', {method:'POST'})
-                        .then(r => r.text())
+                    window.workerHeartbeat()
                         .then(data => {
                             const badge = document.getElementById('worker-status-badge');
                             if (badge) {
                                 const dot = badge.querySelector('div');
                                 const text = badge.querySelector('span');
                                 
-                                if (data.includes('Pure PHP Mode Active')) {
+                                if (data.status === 'accepted' || data.status === 'busy') {
                                     dot.className = 'w-3 h-3 rounded-full bg-emerald-500 animate-pulse shadow-lg shadow-emerald-200';
-                                    text.innerText = 'سیستم فعال (PHP Engine Active)';
+                                    text.innerText = data.status === 'busy' ? 'worker در حال اجرا است' : 'اجرای worker پذیرفته شد';
                                 } else {
                                     dot.className = 'w-3 h-3 rounded-full bg-slate-300';
-                                    text.innerText = 'وضعیت نامشخص';
+                                    text.innerText = data.status === 'cron_required' ? 'اجرای خودکار با Cron هاست؛ جزئیات در لاگ‌ها' : 'پاسخ دیرهنگام؛ وضعیت اجرا نامشخص، تلاش مجدد زمان‌بندی شد';
                                 }
                             }
                             fetchLogs();
@@ -13917,12 +13903,18 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
             <?php endif; ?>
 
             <?php if ($tab === 'users'): ?>
+                <?php
+                $perms = ProjectPermissions::catalog($project['users'] ?? []);
+                $assignablePermissions = ProjectPermissions::assignable($perms);
+                $memberProjects = isMainAdmin() ? $db['projects'] : [$project];
+                $canManageUsers = hasPermission('users', 'use');
+                ?>
                 <div class="mb-12 flex between items-center">
                     <div>
                         <h2 class="font-black text-4xl text-slate-900 mb-2 tracking-tight">👥 مدیریت تیم و دسترسی‌ها</h2>
                         <p class="text-sm text-slate-500 font-medium tracking-wide">تعیین سطوح دسترسی و مدیریت اعضای پروژه در پلتفرم Maarksho</p>
                     </div>
-                    <?php if(isSuperAdmin() || isProjectAdmin()): ?>
+                    <?php if($canManageUsers): ?>
                     <button onclick="document.getElementById('add-user-box').classList.toggle('hidden')" class="btn btn-primary px-10 py-4 shadow-xl shadow-primary/20 flex items-center gap-2">
                         <span class="text-xl">✨</span>
                         <span>افزودن عضو جدید</span>
@@ -13930,6 +13922,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     <?php endif; ?>
                 </div>
 
+                <?php if ($canManageUsers): ?>
                 <div id="add-user-box" class="premium-card overflow-hidden border-0 mb-16 animate-in fade-in slide-in-from-top-4 duration-500 hidden">
                     <div class="bg-gradient-to-r from-slate-900 to-indigo-950 p-10 text-white flex between items-center">
                         <div>
@@ -13961,7 +13954,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                     <option value="manager">مدیر با دسترسی انتخابی</option>
                                     <option value="editor">ویرایشگر محتوا (Editor)</option>
                                     <option value="viewer">ناظر سیستم (Viewer)</option>
-                                    <option value="project_admin">ادمین پروژه</option>
+                                    <?php if(isMainAdmin() || isProjectAdmin()): ?><option value="project_admin">ادمین پروژه</option><?php endif; ?>
                                 </select>
                             </div>
                         </div>
@@ -13988,26 +13981,11 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                 </div>
                                 <div class="grid grid-2 md:grid-4 gap-8">
                                     <?php 
-                                    $perms = [
-                                         'prompthub_manage' => '🧠 مدیریت پرامپت هاب',
-                                        'dashboard' => '📊 داشبورد و آمار',
-                                        'approve' => '✈️ ارسال به سوشیال',
-                                        'approve_content' => '📸 تایید تصویر محتوا',
-                                        'reference_photo' => '📸 دسترسی به عکس رفرنس (محیط ساده)',
-                                        'library' => '📚 کتابخانه محتوا',
-                                        'products' => '📦 مدیریت محصولات',
-                                        'catalog' => '📖 سازنده کاتالوگ آنلاین',
-                                        'size_chart' => '📐 مدیریت و استودیو جدول سایز',
-                                        'vm' => '🛍️ چیدمان و استودیو VM',
-                                        'calendar' => '📅 تقویم و زمان‌بندی',
-                                        'extract' => '✨ اتوماسیون استخراج',
-                                        'settings' => '⚙️ پیکربندی پروژه'
-                                    ];
-                                    foreach($perms as $pval => $plabel):
+                                    foreach($assignablePermissions as $pval => $plabel):
                                     ?>
                                         <label class="flex items-center gap-4 p-5 bg-white rounded-3xl cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-300 group border border-transparent hover:border-indigo-100">
-                                            <input type="checkbox" name="perms[]" value="<?php echo $pval; ?>" class="w-6 h-6 rounded-xl border-slate-200 text-primary focus:ring-primary/20">
-                                            <span class="text-xs font-black text-slate-700 group-hover:text-primary transition-colors"><?php echo $plabel; ?></span>
+                                            <input type="checkbox" name="perms[]" value="<?php echo htmlspecialchars($pval, ENT_QUOTES, 'UTF-8'); ?>" class="w-6 h-6 rounded-xl border-slate-200 text-primary focus:ring-primary/20">
+                                            <span class="text-xs font-black text-slate-700 group-hover:text-primary transition-colors"><?php echo htmlspecialchars($plabel, ENT_QUOTES, 'UTF-8'); ?></span>
                                         </label>
                                     <?php endforeach; ?>
                                 </div>
@@ -14019,10 +13997,10 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                              <div class="relative">
                                 <div class="flex items-center gap-4 mb-10">
                                     <div class="w-10 h-1 bg-primary rounded-full"></div>
-                                    <label class="text-[10px] font-black text-primary uppercase tracking-[0.2em]">پروژه‌های مجاز برای این کاربر (Assigned Projects)</label>
+                                    <label class="text-[10px] font-black text-primary uppercase tracking-[0.2em]">پروژه‌های این عضویت</label>
                                 </div>
                                 <div class="grid grid-2 md:grid-4 gap-8">
-                                    <?php foreach($db['projects'] as $p_item): ?>
+                                    <?php foreach($memberProjects as $p_item): ?>
                                         <label class="flex items-center gap-4 p-5 bg-white rounded-3xl cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-300 group border border-transparent hover:border-indigo-100">
                                             <input type="checkbox" name="assigned_projects[]" value="<?php echo $p_item['id']; ?>" <?php echo $p_item['id'] === $project['id'] ? 'checked' : ''; ?> class="w-6 h-6 rounded-xl border-slate-200 text-primary focus:ring-primary/20">
                                             <span class="text-xs font-black text-slate-700 group-hover:text-primary transition-colors"><?php echo htmlspecialchars($p_item['name']); ?></span>
@@ -14032,12 +14010,15 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                              </div>
                         </div>
 
+                        <p class="text-xs text-slate-500">مجوزها برای پروژه‌های انتخابی اعمال می‌شوند. نقش کاربر پنل فقط مشاهده دارد؛ عملیات آن با سیاست صریح استفاده فعال می‌شود. محدودیت‌های ادمین اصلی بر این مجوزها اولویت دارند.</p>
                         <button name="add_user" class="btn btn-primary w-full py-6 text-xl rounded-[2.5rem] shadow-2xl shadow-primary/30 group">
                             <span class="inline-block transition-transform group-hover:rotate-12 group-hover:scale-125 ml-3">✅</span>
-                            ثبت عضو جدید و فعال‌سازی حساب کاربری
+                            ثبت عضو در پروژه‌های انتخابی
                         </button>
                     </form>
                 </div>
+
+                <?php endif; ?>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     <?php if(empty($project['users'])): ?>
@@ -14060,11 +14041,12 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                 }
                             }
                         }
-                        $u['assigned_projects'] = $user_assigned_pids;
+                        $u['assigned_projects'] = isMainAdmin() ? $user_assigned_pids : [$project['id']];
+                        $canManageMember = $canManageUsers && ProjectPermissions::canManageMember($u);
                         ?>
                         <script>
                         if(!window.projectUsers) window.projectUsers = {};
-                        window.projectUsers['<?php echo $idx; ?>'] = <?php echo json_encode($u, JSON_UNESCAPED_UNICODE); ?>;
+                        window.projectUsers['<?php echo $idx; ?>'] = <?php echo json_encode(ProjectPermissions::publicMember($u), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
                         </script>
                         <div class="premium-card p-0 overflow-hidden group hover:shadow-xl transition-all duration-300 border border-slate-100 bg-white">
                             <div class="p-8">
@@ -14110,7 +14092,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                                 $pLabel = str_replace(['📊 ', '✈️ ', '📸 ', '📚 ', '📦 ', '📅 ', '✨ ', '⚙️ '], '', $perms[$p] ?? strtoupper($p));
                                          ?>
                                             <span class="px-3 py-1.5 bg-slate-50 border border-slate-100 text-slate-600 text-[10px] font-bold rounded-xl whitespace-nowrap">
-                                                <?php echo $pLabel; ?>
+                                                <?php echo htmlspecialchars($pLabel, ENT_QUOTES, 'UTF-8'); ?>
                                             </span>
                                          <?php endforeach; ?>
                                     </div>
@@ -14118,11 +14100,13 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             </div>
                             
                             <div class="p-6 bg-slate-50/85 flex between items-center border-t border-slate-100 group-hover:bg-indigo-50/40 transition-colors duration-300">
+                                <?php if($canManageMember): ?>
                                 <button type="button" onclick="openEditUser('<?php echo $idx; ?>')" class="px-5 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:border-indigo-500 hover:text-indigo-600 transition-all flex items-center gap-1.5 text-xs font-black shadow-sm group/btn">
                                     <span class="text-xs transition-transform group-hover/btn:rotate-12">✏️</span>
                                     <span>اصلاح اطلاعات</span>
                                 </button>
-                                <?php if(isSuperAdmin() || isProjectAdmin()): ?>
+                                <?php endif; ?>
+                                <?php if($canManageMember): ?>
                                  <form method="POST" onsubmit="return confirm('⚠️ ایا از لغو کامل دسترسی این کاربر اطمینان دارید؟\nاین عملیات غیرقابل بازگشت است.')" class="inline">
                                      <input type="hidden" name="user_idx" value="<?php echo $idx; ?>">
                                      <input type="hidden" name="delete_user" value="1">
@@ -21106,6 +21090,7 @@ async function handleRequest(request) {
         </main>
     </div>
 
+    <?php if ($tab === 'users' && $canManageUsers): ?>
     <!-- Edit User Modal -->
     <div id="editUserModal" class="edit-modal">
         <div class="edit-modal-content card max-w-xl !p-8">
@@ -21118,7 +21103,7 @@ async function handleRequest(request) {
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                         <label class="label text-[10px] font-black text-slate-500 mb-1 block">نام کاربری (شناسه ورود)</label>
-                        <input type="text" name="username" id="edit-user-username" class="input text-xs" required placeholder="User..." style="direction: ltr;">
+                        <input type="text" name="username" id="edit-user-username" class="input text-xs" <?php echo isMainAdmin() ? '' : 'readonly'; ?> required placeholder="User..." style="direction: ltr;">
                     </div>
                     <div>
                         <label class="label text-[10px] font-black text-indigo-600 mb-1 block">شماره همراه (جهت دریافت پیامک ورود OTP)</label>
@@ -21146,7 +21131,7 @@ async function handleRequest(request) {
                             <option value="manager">مدیر با دسترسی انتخابی</option>
                                     <option value="editor">ویرایشگر محتوا (Editor)</option>
                             <option value="viewer">ناظر سیستم (Viewer)</option>
-                            <option value="project_admin">ادمین پروژه</option>
+                            <?php if(isMainAdmin() || isProjectAdmin()): ?><option value="project_admin">ادمین پروژه</option><?php endif; ?>
                         </select>
                     </div>
                 </div>
@@ -21154,32 +21139,18 @@ async function handleRequest(request) {
                 <h3 class="text-xs font-black text-slate-500 mt-6 mb-3 border-b border-slate-100 pb-2">📂 سطوح دسترسی تفکیکی</h3>
                 <div class="grid grid-cols-2 gap-3 mb-6">
                     <?php 
-                    $modalPerms = [
-                        'dashboard' => '📊 داشبورد آماری پروژه',
-                        'schedule' => '✈️ تقویم ابری زمان‌بندی',
-                        'instagram' => '📸 اتوماسیون اینستاگرام',
-                        'learning' => '📚 کتابخانه آموزشی اعضا',
-                        'reference_photo' => '📸 دسترسی به عکس رفرنس (محیط ساده)',
-                        'view_items' => '📦 مدیریت کالاها و لیست',
-                        'catalog' => '📖 سازنده کاتالوگ آنلاین',
-                        'size_chart' => '📐 مدیریت و استودیو جدول سایز',
-                        'vm' => '🛍️ چیدمان و استودیو VM',
-                        'calendar' => '📅 تقویم انتشار کارهای دستی',
-                        'extract' => '✨ اتوماسیون استخراج',
-                        'settings' => '⚙️ پیکربندی پروژه'
-                    ];
-                    foreach($modalPerms as $pval => $plabel): 
+                    foreach($assignablePermissions as $pval => $plabel):
                     ?>
                         <label class="flex items-center gap-3 p-3 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-transparent">
-                            <input type="checkbox" name="perms[]" value="<?php echo $pval; ?>" class="edit-user-perm w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500/20">
-                            <span class="text-xs font-bold text-slate-700"><?php echo $plabel; ?></span>
+                            <input type="checkbox" name="perms[]" value="<?php echo htmlspecialchars($pval, ENT_QUOTES, 'UTF-8'); ?>" class="edit-user-perm w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500/20">
+                            <span class="text-xs font-bold text-slate-700"><?php echo htmlspecialchars($plabel, ENT_QUOTES, 'UTF-8'); ?></span>
                         </label>
                     <?php endforeach; ?>
                 </div>
 
                 <h3 class="text-xs font-black text-slate-500 mt-6 mb-3 border-b border-slate-100 pb-2">🏢 انتساب و سوییچ پروژه‌ها</h3>
                 <div class="grid grid-cols-2 gap-3 mb-6">
-                    <?php foreach($db['projects'] as $p_item): ?>
+                    <?php foreach($memberProjects as $p_item): ?>
                         <label class="flex items-center gap-3 p-3 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition-all border border-transparent">
                             <input type="checkbox" name="assigned_projects[]" value="<?php echo htmlspecialchars($p_item['id']); ?>" class="edit-user-project w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500/20">
                             <span class="text-xs font-bold text-slate-700"><?php echo htmlspecialchars($p_item['name']); ?></span>
@@ -21194,13 +21165,14 @@ async function handleRequest(request) {
             </form>
         </div>
     </div>
-    
+    <?php endif; ?>
     <script>
-    window.projectSettings = <?php echo json_encode($project['settings'] ?? [], JSON_UNESCAPED_UNICODE); ?>;
+    window.projectSettings = <?php echo json_encode(ProjectPermissions::publicSettings($project['settings'] ?? []), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.currentUser = <?php echo json_encode($_SESSION['user']['username'] ?? $_SESSION['display_name'] ?? '', JSON_UNESCAPED_UNICODE); ?>;
     window.isSuperOrAdmin = <?php echo (isSuperAdmin() || isProjectAdmin()) ? 'true' : 'false'; ?>;
     window.hasApprovePermission = <?php echo hasPermission('approve_content') ? 'true' : 'false'; ?>;
 
+    <?php if ($tab === 'users' && $canManageUsers): ?>
     function openEditUser(idx) {
         var u = window.projectUsers[idx];
         if(!u) {
@@ -21231,6 +21203,7 @@ async function handleRequest(request) {
         
         document.getElementById('editUserModal').style.display = 'flex';
     }
+    <?php endif; ?>
     </script>
 
     <!-- Modal for Schedule on Content Library (Add Program / Campaign) -->
@@ -26489,9 +26462,7 @@ ${desc2}
         function triggerGlobalWorker() {
             if (!<?php echo isMainAdmin()?'true':'false'; ?> || document.hidden || isGlobalHeartbeatRunning) return;
             isGlobalHeartbeatRunning = true;
-            fetch('cron.php?trigger=1&ajax=1', {method:'POST'})
-                .then(r => r.text())
-                .catch(e => console.error('Global Heartbeat Error:', e))
+            window.workerHeartbeat()
                 .finally(() => {
                     isGlobalHeartbeatRunning = false;
                 });

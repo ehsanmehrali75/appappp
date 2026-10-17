@@ -112,9 +112,7 @@ if (!$project && !empty($db['projects'])) {
 }
 
 // Check permissions
-if (!isSuperAdmin() && !isProjectAdmin() && !hasPermission('analysis')) {
-    redirect('portal.php');
-}
+if (!canAccessFeature('chat', in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true) ? 'view' : 'use')) AccessControl::deny();
 
 // Fetch Approved products list at top to make it globally available for all POST actions, Gemini prompts, and template routers
 $products_list = [];

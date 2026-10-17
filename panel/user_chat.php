@@ -51,6 +51,10 @@ if (!$project) {
     die('خطای سیستم: پروژه‌ای تعریف نشده یا دسترسی به آن امکان‌پذیر نیست.');
 }
 
+if (!SessionIdentity::select($project)) AccessControl::deny();
+$currentUser = $_SESSION['user'];
+$currentUsername = $currentUser['username'] ?? '';
+
 // حل مشکل آدرس روت آپلودها برای لود زنده در دامنه اصلی و ساب‌فولدر پانل
 $baseUrl = getFullUrl('dummy_file.png');
 $baseUrl = substr($baseUrl, 0, -strlen('dummy_file.png'));

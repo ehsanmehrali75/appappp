@@ -9,31 +9,38 @@ require_once __DIR__ . '/vm_db.php';
 require_once __DIR__ . '/vm_mflow.php';
 require_once __DIR__ . '/vm_ai.php';
 
-// Check access permission
-$isSuper = function_exists('isSuperAdmin') ? isSuperAdmin() : false;
-$isProjAdmin = function_exists('isProjectAdmin') ? isProjectAdmin() : false;
-$hasVmPermission = function_exists('hasPermission') ? (hasPermission('vm') || hasPermission('layout')) : false;
-
-if (!$isSuper && !$isProjAdmin && !$hasVmPermission) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'دسترسی شما به ماژول چیدمان (VM) مسدود است.']);
-    exit;
+require_once __DIR__ . '/../inc/ModuleProjectAccess.php';
+$raw = file_get_contents('php://input');
+$payload = json_decode($raw, true);
+if (!is_array($payload)) $payload = [];
+$input = array_replace($_GET, $_POST, $payload);
+$action = $input['action'] ?? '';
+if (!is_string($action)) AccessControl::deny();
+$mutable = in_array($action, ['save_layout', 'apply_recommendation', 'generate_ai_recommendations', 'mflow_sync'], true);
+if ($mutable) ModuleProjectAccess::mutation();
+$projectId = $input['project_id'] ?? ($input['project'] ?? ($_SESSION['project_id'] ?? null));
+$project = ModuleProjectAccess::select($projectId);
+$projectId = $project['id'];
+$actionFeature = ['save_layout'=>'vm_layout', 'apply_recommendation'=>'vm_ai', 'generate_ai_recommendations'=>'vm_ai',
+    'mflow_sync'=>'vm_studio', 'get_store_data'=>'vm_stores', 'get_score'=>'vm_scores', 'get_stores'=>'vm_stores', 'get_products'=>'vm_studio'][$action] ?? 'vm_studio';
+ModuleProjectAccess::enforce('vm_studio', 'vm', $actionFeature, $mutable ? 'use' : 'view');
+$storeId = $input['store_id'] ?? '';
+if (in_array($action, ['save_layout', 'apply_recommendation', 'generate_ai_recommendations', 'get_store_data', 'get_score'], true)) {
+    if ($action === 'generate_ai_recommendations' && $storeId === '') {
+        $stores = VmDB::getStoresByProject($projectId);
+        $storeId = $stores[0]['id'] ?? '';
+    }
+    if (!is_string($storeId) || $storeId === '') AccessControl::deny();
+    $store = VmDB::getStore($storeId, $projectId);
+    if (!$store) AccessControl::deny();
+    $storeId = $store['id'];
 }
-
-$action = $_REQUEST['action'] ?? '';
 
 switch ($action) {
     case 'save_layout':
-        $raw = file_get_contents('php://input');
-        $payload = json_decode($raw, true);
-        if (!$payload) {
-            $payload = $_POST;
-        }
+        $layoutData = $input['layout'] ?? [];
 
-        $storeId = $payload['store_id'] ?? '';
-        $layoutData = $payload['layout'] ?? [];
-
-        if (empty($storeId) || empty($layoutData)) {
+        if (empty($storeId) || !is_array($layoutData) || empty($layoutData)) {
             echo json_encode(['success' => false, 'message' => 'شناسه فروشگاه یا اطلاعات چیدمان ارسال نشده است.']);
             exit;
         }
@@ -43,40 +50,26 @@ switch ($action) {
         break;
 
     case 'apply_recommendation':
-        $storeId = $_REQUEST['store_id'] ?? '';
-        $recId = $_REQUEST['rec_id'] ?? '';
+        $recId = $input['rec_id'] ?? '';
         $res = VmAI::applyRecommendation($storeId, $recId);
         echo json_encode($res);
         break;
 
     case 'generate_ai_recommendations':
-        $storeId = $_REQUEST['store_id'] ?? '';
-        if (empty($storeId)) {
-            $allP = VmDB::getAllProjects();
-            $pId = !empty($allP) ? $allP[0]['id'] : '';
-            $stList = VmDB::getStoresByProject($pId);
-            $storeId = !empty($stList) ? $stList[0]['id'] : '';
-        }
         $res = VmAI::generateSmartRecommendations($storeId);
         echo json_encode($res);
         break;
 
     case 'mflow_sync':
-        $projectId = $_REQUEST['project_id'] ?? '';
-        if (empty($projectId)) {
-            $allP = VmDB::getAllProjects();
-            $projectId = !empty($allP) ? $allP[0]['id'] : '';
-        }
         $res = VmMflow::triggerSync($projectId);
         echo json_encode($res);
         break;
 
     case 'get_store_data':
-        $storeId = $_REQUEST['store_id'] ?? '';
-        $store = VmDB::getStore($storeId);
-        $layout = VmDB::getStoreLayout($storeId);
-        $scores = VmDB::calculateStoreScore($storeId);
-        $recs = VmAI::getRecommendations($storeId);
+        $store = VmDB::getStore($storeId, $projectId);
+        $layout = ModuleProjectAccess::allowed('vm_studio', 'vm', 'vm_layout') ? VmDB::getStoreLayout($storeId) : null;
+        $scores = ModuleProjectAccess::allowed('vm_studio', 'vm', 'vm_scores') ? VmDB::calculateStoreScore($storeId) : [];
+        $recs = ModuleProjectAccess::allowed('vm_studio', 'vm', 'vm_ai') ? VmAI::getRecommendations($storeId) : [];
 
         echo json_encode([
             'success' => true,
@@ -88,27 +81,16 @@ switch ($action) {
         break;
 
     case 'get_score':
-        $storeId = $_REQUEST['store_id'] ?? '';
         $scores = VmDB::calculateStoreScore($storeId);
         echo json_encode(['success' => true, 'data' => $scores]);
         break;
 
     case 'get_stores':
-        $projectId = $_REQUEST['project_id'] ?? '';
-        if (empty($projectId)) {
-            $allP = VmDB::getAllProjects();
-            $projectId = !empty($allP) ? $allP[0]['id'] : '';
-        }
         $stores = VmDB::getStoresByProject($projectId);
         echo json_encode(['success' => true, 'data' => $stores]);
         break;
 
     case 'get_products':
-        $projectId = $_REQUEST['project_id'] ?? '';
-        if (empty($projectId)) {
-            $allP = VmDB::getAllProjects();
-            $projectId = !empty($allP) ? $allP[0]['id'] : '';
-        }
         $products = VmDB::getProductsByProject($projectId);
         echo json_encode(['success' => true, 'data' => $products]);
         break;

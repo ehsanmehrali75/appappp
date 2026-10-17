@@ -51,47 +51,13 @@ if (!$project) {
     die('خطای سیستم: پروژه‌ای تعریف نشده یا دسترسی به آن امکان‌پذیر نیست.');
 }
 
-// STRICT PROJECT ACCESS CHECK FOR SECURITY
-$allowed = false;
-if (isSuperAdmin()) {
-    $allowed = true;
-} else {
-    $u_username = $currentUser['username'] ?? '';
-    $u_mobile = $_SESSION['portal_user'] ?? '';
-    
-    // Check if the current project lists this user
-    if ($project && isset($project['users']) && is_array($project['users'])) {
-        foreach ($project['users'] as $pu) {
-            if (($u_username && $pu['username'] === $u_username) || ($u_mobile && isset($pu['mobile']) && trim($pu['mobile']) === $u_mobile)) {
-                $allowed = true;
-                break;
-            }
-        }
-    }
-}
-
-if (!$allowed) {
-    die('خطای دسترسی: شما مجاز به مشاهده مأموریت‌های این پروژه نیستید.');
-}
-
-// Pre-load all allowed projects for quick switching dropdown
-$user_allowed_projects = [];
-foreach ($db['projects'] as $p_item) {
-    if (isSuperAdmin()) {
-        $user_allowed_projects[] = $p_item;
-    } else {
-        $u_username = $currentUser['username'] ?? '';
-        $u_mobile = $_SESSION['portal_user'] ?? '';
-        if (isset($p_item['users']) && is_array($p_item['users'])) {
-            foreach ($p_item['users'] as $pu) {
-                if (($u_username && $pu['username'] === $u_username) || ($u_mobile && isset($pu['mobile']) && trim($pu['mobile']) === $u_mobile)) {
-                    $user_allowed_projects[] = $p_item;
-                    break;
-                }
-            }
-        }
-    }
-}
+// Project membership comes from the verified login, never username equality.
+if (!SessionIdentity::select($project)) AccessControl::deny();
+$currentUser = $_SESSION['user'];
+$currentUsername = $currentUser['username'] ?? '';
+$user_allowed_projects = array_values(array_filter($db['projects'], static function($candidate) {
+    return isMainAdmin() || SessionIdentity::member($candidate);
+}));
 
 // ساخت خانه ملزومات تسک‌ها در تنظیمات اختصاصی پروژه اگر وجود نداشته باشد
 if (!isset($project['settings']['task_manager_v3'])) {

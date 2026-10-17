@@ -4,8 +4,8 @@
  * Route: /pro
  */
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+ini_set('display_errors', getenv('MAARKSHO_DEBUG') === '1' ? '1' : '0');
+ini_set('display_startup_errors', getenv('MAARKSHO_DEBUG') === '1' ? '1' : '0');
 error_reporting(E_ALL);
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -27,6 +27,7 @@ if (!file_exists($functionsPath)) {
     die('خطای سیستم: فایل توابع یافت نشد.');
 }
 require_once $functionsPath;
+require_once __DIR__.'/../inc/ModuleProjectAccess.php';
 
 $conn = getConn();
 
@@ -50,7 +51,7 @@ $publicId = $_GET['public_id'] ?? $_GET['id'] ?? '';
 $isPublicView = false;
 $proposalData = null;
 
-if (!empty($publicId)) {
+if (is_string($publicId) && $publicId !== '' && in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true)) {
     // Attempt fetching the proposal bypass auth
     if ($conn) {
         $stmt = $conn->prepare("SELECT * FROM proposals WHERE id = ?");
@@ -64,12 +65,33 @@ if (!empty($publicId)) {
     }
 }
 
+$proposalTarget = $_GET['project'] ?? ($_POST['project_id'] ?? ($_SESSION['project_id'] ?? null));
+if (isset($_POST['ajax_action']) && in_array($_POST['ajax_action'], ['save', 'delete'], true) && !empty($_POST['id'])) {
+    $existing = $conn->prepare('SELECT project_id FROM proposals WHERE id = ?');
+    $existing->bind_param('s', $_POST['id']);
+    $existing->execute();
+    $document = $existing->get_result()->fetch_assoc();
+    if (!$document || (isset($_POST['project_id']) && $_POST['project_id'] !== $document['project_id'])) AccessControl::deny();
+    $proposalTarget = $document['project_id'];
+}
+if ($isPublicView) {
+    $project = ModuleProjectAccess::findProject($proposalData['project_id']);
+    if (!$project || !FeatureFlags::isAvailable('proposals') || !AccessControl::allowed('proposals', 'view')
+        || !checkModuleSettingAccess('proposals', $project['settings'] ?? [])) AccessControl::deny();
+} else {
+    if (!isUser()) { redirect('/index.php'); exit; }
+    if ($proposalTarget === null && isMainAdmin()) $proposalTarget = getDB()['projects'][0]['id'] ?? null;
+    $project = ModuleProjectAccess::select($proposalTarget);
+    if (!canAccessFeature('proposals', ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' ? 'use' : 'view')) AccessControl::deny();
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') RequestSecurity::enforce();
+}
+
 // User authentication check for non-public workspace
 if (!$isPublicView) {
     if (!isUser()) {
         redirect('../index.php');
     }
-    if (!hasPermission('catalog') && !hasPermission('settings') && !hasPermission('products')) {
+    if (!hasPermission('proposals')) {
         die('<div style="font-family:Tahoma; text-align:center; padding: 100px; direction: rtl; background-color: #f8fafc; height: 100vh;">
             <div style="background: white; max-width: 500px; margin: auto; padding: 40px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); border: 1px solid #e2e8f0;">
                 <h2 style="color:#ef4444; font-size: 24px; margin-bottom: 16px;">⚠️ عدم دسترسی کافی</h2>
@@ -194,7 +216,7 @@ if (isset($_POST['ajax_action'])) {
     
     if ($ajax === 'save') {
         $id = trim($_POST['id'] ?? '');
-        $pid = trim($_POST['project_id'] ?? '');
+        $pid = $project['id'];
         $type = $_POST['type'] ?? 'proposal';
         $title = trim($_POST['title'] ?? '');
         $logo_url = trim($_POST['logo_url'] ?? '');
@@ -210,11 +232,11 @@ if (isset($_POST['ajax_action'])) {
             $id = uniqid('pr_');
             $now = time();
             $stmt = $conn->prepare("INSERT INTO proposals (id, project_id, type, title, logo_url, status, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("ssssssiii", $id, $pid, $type, $title, $logo_url, $status, $content, $now, $now);
+            $stmt->bind_param("sssssssii", $id, $pid, $type, $title, $logo_url, $status, $content, $now, $now);
         } else {
             $now = time();
             $stmt = $conn->prepare("UPDATE proposals SET title = ?, logo_url = ?, status = ?, content = ?, updated_at = ? WHERE id = ?");
-            $stmt->bind_param("sssisi", $title, $logo_url, $status, $content, $now, $id);
+            $stmt->bind_param("ssssis", $title, $logo_url, $status, $content, $now, $id);
         }
         
         if ($stmt->execute()) {
@@ -263,49 +285,8 @@ if (isset($_POST['ajax_action'])) {
     }
 }
 
-// Manage project contexts
-if (isset($_GET['project'])) {
-    $swPid = $_GET['project'];
-    $_SESSION['project_id'] = $swPid;
-} else {
-    $current_pid = $_SESSION['project_id'] ?? null;
-    if (!$current_pid) {
-        $db = getDB();
-        if (!empty($db['projects'])) {
-            $first_p = reset($db['projects']);
-            $current_pid = $first_p['id'] ?? null;
-        }
-    }
-    if ($current_pid) {
-        $_SESSION['project_id'] = $current_pid;
-        redirect('index.php?project=' . urlencode($current_pid));
-    }
-}
-
-$allProjects = [];
-$db = getDB();
-if (isSuperAdmin()) {
-    $allProjects = $db['projects'] ?? [];
-} else {
-    $username = $_SESSION['user']['username'] ?? '';
-    foreach (($db['projects'] ?? []) as $p) {
-        $users = $p['users'] ?? [];
-        foreach ($users as $u) {
-            if ($u['username'] === $username) {
-                $allProjects[] = $p;
-                break;
-            }
-        }
-    }
-}
-
-$project = getCurrentProject();
-if (!$project) {
-    die('پروژه فعال یافت نشد.');
-}
-if (empty($allProjects)) {
-    $allProjects[] = $project;
-}
+// Project selectors expose only verified memberships with proposal visibility.
+$allProjects = $isPublicView ? [$project] : ModuleProjectAccess::visibleProjects(getDB()['projects'] ?? [], 'proposals', 'proposals');
 
 // Fetch existing documents for the active project
 $allDocs = [];

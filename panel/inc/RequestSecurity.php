@@ -39,7 +39,7 @@ class RequestSecurity {
         if(PHP_SAPI==='cli')return;
         $path=str_replace('\\','/',$_SERVER['SCRIPT_FILENAME']??'');
         if(!in_array(basename($path),['admin.php','portal.php','task_manager.php','prompthub.php','system-admin-setup.php','support.php','sale.php','seo.php','wp-crm.php','chat.php','user_chat.php'],true)
-            &&!preg_match('~/(?:size|vm|seo_intel)/index\.php$~',$path))return;
+            &&!preg_match('~/(?:size|vm|seo_intel|pro)/index\.php$~',$path))return;
         self::token();self::enforce();
         if(!empty($_FILES)) {
             require_once __DIR__.'/MediaUploads.php';

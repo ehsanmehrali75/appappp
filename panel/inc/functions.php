@@ -1212,27 +1212,39 @@ function isProjectAdmin() {
     return isset($_SESSION['user']) && ($_SESSION['user']['role'] ?? '') === 'project_admin';
 }
 
-function hasPermission($perm) {
+function hasPermission($perm, $mode = null) {
+    $mode = $mode ?? (in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true) ? 'view' : 'use');
+    if (!in_array($mode, ['view', 'use'], true)) return false;
     if (isMainAdmin()) return true;
     $key = AccessControl::featureKey($perm);
     if (!FeatureFlags::isAvailable($key)) return false;
-    if (isMainAdmin()) return true;
     $user = $_SESSION['user'] ?? null;
     if (!$user) return false;
     // Read the current project's record: another tab may have switched the session.
     $project = getCurrentProject();
-    $member = null;
-    foreach (($project['users'] ?? []) as $candidate) {
-        if (($candidate['username'] ?? '') === ($user['username'] ?? '')) { $member = $candidate; break; }
-    }
+    $member = SessionIdentity::member($project);
     if (!$member) return false;
-    $mode = in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true) ? 'view' : 'use';
+    if (!checkModuleSettingAccess($key, $project['settings'] ?? [])) return false;
     if (!AccessControl::allowed($key, $mode)) return false;
-    if (AccessControl::audience($key, $mode, $member, $project['id']) === true) return true;
-    if ($mode === 'use' && ($member['role'] ?? '') === 'viewer') return false;
     $permissions = array_map([AccessControl::class, 'featureKey'], $member['permissions'] ?? []);
     $legacyPermission = ['seo_intel' => 'analysis', 'seo_classic' => 'analysis', 'sale_analysis' => 'analysis'][$key] ?? $key;
-    return ($member['role'] ?? '') === 'project_admin' || in_array($key, $permissions, true) || in_array($legacyPermission, $permissions, true);
+    $base = ($member['role'] ?? '') === 'project_admin' || in_array($key, $permissions, true) || in_array($legacyPermission, $permissions, true);
+    // An operation grant does not by itself create visibility when view inherits
+    // the member's normal permissions. Both levels must be granted.
+    $view = AccessControl::audience($key, 'view', $member, $project['id']);
+    if ($view === false || ($view !== true && !$base)) return false;
+    if ($mode === 'view') return true;
+    if (AccessControl::audience($key, 'use', $member, $project['id']) === true) return true;
+    for ($parent = AccessControl::parentFeature($key); $parent !== null; $parent = AccessControl::parentFeature($parent)) {
+        if ($base && AccessControl::audience($parent, 'use', $member, $project['id']) === true) return true;
+    }
+    if (($member['role'] ?? '') === 'viewer') return false;
+    return $base;
+}
+
+function canAccessFeature($key, $mode = 'view') {
+    if (AccessControl::featureKey($key) === 'prompthub' && hasPermission('prompthub_manage', $mode) && isModuleActive('prompthub')) return true;
+    return hasPermission($key, $mode) && isModuleActive(AccessControl::featureKey($key));
 }
 
 /** Transparently retire plaintext legacy passwords after a successful authentication. */
@@ -1259,43 +1271,15 @@ function canAccessManagement() {
 
 function checkModuleSettingAccess($module, $settings) {
     if (FeatureFlags::isUnrestrictedAdmin()) return true;
-    if (empty($settings) || !is_array($settings)) {
-        return true;
-    }
-    // Granular 3-state control: 'active', 'admin_only', 'disabled'
-    if (isset($settings['module_visibility']) && is_array($settings['module_visibility'])) {
-        $vis = $settings['module_visibility'][$module] ?? null;
-        if ($vis !== null) {
-            if ($vis === 'disabled') {
-                return false;
-            }
-            if ($vis === 'admin_only' || $vis === 'maintenance') {
-                return isMainAdmin();
-            }
-            if ($vis === 'active') {
-                return true;
-            }
-        }
-    }
-    // Backwards compatibility with active_modules array
-    if (isset($settings['active_modules']) && is_array($settings['active_modules'])) {
-        return in_array($module, $settings['active_modules']);
-    }
-    return true;
+    $visibility = AccessControl::moduleVisibility($module, $settings);
+    return $visibility === 'active' || ($visibility === 'admin_only' && isMainAdmin());
 }
 
 function getModuleVisibility($module, $project = null) {
     if (!$project) {
         $project = getCurrentProject();
     }
-    $settings = $project['settings'] ?? [];
-    if (isset($settings['module_visibility'][$module])) {
-        return $settings['module_visibility'][$module];
-    }
-    if (isset($settings['active_modules']) && is_array($settings['active_modules'])) {
-        return in_array($module, $settings['active_modules']) ? 'active' : 'disabled';
-    }
-    return 'active';
+    return AccessControl::moduleVisibility($module, $project['settings'] ?? []);
 }
 
 function getModuleVisibilityBadge($module, $project = null) {
@@ -1315,6 +1299,7 @@ function getModuleVisibilityBadge($module, $project = null) {
 }
 
 function isModuleActive($module) {
+    $module = AccessControl::featureKey($module);
     if (FeatureFlags::isUnrestrictedAdmin() || ($module === 'settings' && isMainAdmin())) return true;
     // Check global feature flag first
     if (!FeatureFlags::isAvailable($module)) {
@@ -5157,7 +5142,7 @@ function processAndSyncProducts(&$project, $incomingItems, $source = 'json', $er
         }
         
         if ($idx !== null) {
-            $matchedIndices[] = $idx;
+            $matchedIndices[$idx] = true;
             $existing_p = $project['products'][$idx];
             
             // Priority Fields are ALWAYS updated (Sync is fully dynamic)
@@ -5338,7 +5323,7 @@ function processAndSyncProducts(&$project, $incomingItems, $source = 'json', $er
             }
             
             $newProduct = [
-                'id' => $parentSku ?: uniqid(),
+                'id' => 'prod_'.substr(hash('sha256', (string)$project['id']."\0".$groupKey), 0, 24),
                 'sku' => $parentSku,
                 'name' => $productTitle,
                 'color' => formatPersianColor($group['color']),
@@ -5370,7 +5355,7 @@ function processAndSyncProducts(&$project, $incomingItems, $source = 'json', $er
             
             $project['products'][] = $newProduct;
             $newProductIndex = count($project['products']) - 1;
-            $matchedIndices[] = $newProductIndex;
+            $matchedIndices[$newProductIndex] = true;
             $touchedProducts[] = $newProduct;
             $newCount++;
         }
@@ -5379,7 +5364,7 @@ function processAndSyncProducts(&$project, $incomingItems, $source = 'json', $er
     // Mark products not present in the incoming sync as Out of Stock (unavailable)
     if ($source === 'json' || $source === 'crawl' || $source === 'excel' || $source === 'scraper') {
         foreach ($project['products'] as $idx => &$p) {
-            if (!in_array($idx, $matchedIndices)) {
+            if (!isset($matchedIndices[$idx])) {
                 if (($p['status'] ?? '') !== 'out_of_stock') {
                     $p['prev_status'] = $p['status'] ?? 'active';
                     $p['status'] = 'out_of_stock';
@@ -7467,6 +7452,12 @@ function updateProjectStorageQuota($projectId, $newQuotaMb) {
 /** Enforce the same feature restrictions for direct URLs and POST requests. */
 function enforceFeatureRequestAccess() {
     if (PHP_SAPI === 'cli') return;
+    // These controllers resolve business/store resources to their real project
+    // before applying ModuleProjectAccess, including every direct/pretty alias.
+    $controller = str_replace('\\', '/', realpath($_SERVER['SCRIPT_FILENAME'] ?? '') ?: '');
+    if (in_array($controller, [realpath(__DIR__.'/../vm/index.php'), realpath(__DIR__.'/../vm/api.php'),
+        realpath(__DIR__.'/../seo_intel/index.php'), realpath(__DIR__.'/../seo_intel/api.php'),
+        realpath(__DIR__.'/../pro/index.php')], true)) return;
     $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
     $relative = preg_replace('#^/panel/#', '/', $path);
     $key = null;
@@ -7498,10 +7489,7 @@ function enforceFeatureRequestAccess() {
         $pid = $_GET['switch_project'] ?? ($_GET['project'] ?? ($_POST['project_id'] ?? ($_SESSION['project_id'] ?? null)));
         if (!is_string($pid)) AccessControl::deny();
         $project = getCurrentProject($pid, true);
-        $member = null;
-        foreach (($project['users'] ?? []) as $candidate) {
-            if (($candidate['username'] ?? '') === ($_SESSION['user']['username'] ?? '')) { $member = $candidate; break; }
-        }
+        $member = SessionIdentity::member($project);
         if (!$member) AccessControl::deny();
         $_SESSION['project_id'] = $pid;
         $_SESSION['user'] = $member;
@@ -7529,12 +7517,13 @@ function enforceFeatureRequestAccess() {
     }
     if (!isMainAdmin() && preg_match('#/(?:admin(?:\.php)?)/?$#', $relative) && !isset($_GET['tab']) && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && !hasPermission($key)) {
         foreach (array_keys(FeatureFlags::getCatalog()) as $candidate) {
-            if (hasPermission($candidate) && isModuleActive($candidate)) { $key = $candidate; $_GET['tab'] = $candidate; break; }
+            if (canAccessFeature($candidate)) { $key = $candidate; $_GET['tab'] = $candidate; break; }
         }
     }
     $mode = in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD'], true) ? 'view' : 'use';
     if (!FeatureFlags::isAvailable($key) || !AccessControl::allowed($key, $mode) || !isModuleActive($key)) AccessControl::deny();
-    $permission = ['size_studio' => 'size_chart', 'vm_studio' => 'vm', 'seo_intel' => 'analysis', 'seo_classic' => 'analysis', 'sale_analysis' => 'analysis'][$key] ?? $key;
-    if (!hasPermission($permission)) AccessControl::deny();
+    if (!canAccessFeature($key, $mode)) AccessControl::deny();
 }
+require_once __DIR__.'/SessionIdentity.php';
+if (PHP_SAPI !== 'cli') SessionIdentity::refresh();
 enforceFeatureRequestAccess();

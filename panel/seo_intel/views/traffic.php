@@ -49,9 +49,9 @@ $timeline = $traffic['timeline'] ?? [];
                 </h3>
                 <p class="text-xs text-slate-400 mt-0.5">تفکیک سهم سشن‌های ورودی از موتورهای جستجو، شبکه‌های اجتماعی و مستقیم</p>
             </div>
-            <button onclick="triggerSync('google_analytics_4')" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
+            <?php if (ModuleProjectAccess::allowed('seo_intel', 'analysis', 'seo_intel_integrations', 'use')): ?><button onclick="triggerSync('google_analytics_4')" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
                 <span>🔄</span> بروزرسانی GA4
-            </button>
+            </button><?php endif; ?>
         </div>
 
         <div class="space-y-4">

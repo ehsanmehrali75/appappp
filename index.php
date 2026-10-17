@@ -244,6 +244,7 @@ if (isset($_POST['verify_code'])) {
             savePortalUser($mobile, $pUser['display_name'], $pUser['user_icon'] ?? '', '', 0);
             
             session_regenerate_id(true);
+            SessionIdentity::beginOtp($mobile);
             $_SESSION['portal_user'] = $mobile;
             $_SESSION['portal_user_icon'] = $pUser['user_icon'] ?? '';
             $_SESSION['portal_user_display_name'] = $pUser['display_name'] ?? ('کاربر پورتال ' . substr($mobile, -4));
@@ -254,14 +255,11 @@ if (isset($_POST['verify_code'])) {
             
             if (!empty($db['projects'])) {
                 foreach ($db['projects'] as $prj) {
-                    if (isset($prj['users'])) {
-                        foreach ($prj['users'] as $u) {
-                            if (isset($u['mobile']) && trim($u['mobile']) === $mobile) {
-                                $matching_member = $u;
-                                $member_project_id = $prj['id'];
-                                break 2;
-                            }
-                        }
+                    $member = SessionIdentity::member($prj);
+                    if ($member) {
+                        $matching_member = $member;
+                        $member_project_id = $prj['id'];
+                        break;
                     }
                 }
             }
@@ -307,7 +305,7 @@ if(isset($_POST['login'])&&!LoginThrottle::check(trim((string)($_POST['user']??'
     if ($systemAdmin) {
         LoginThrottle::check($u,true);
         session_regenerate_id(true);
-        $_SESSION['user'] = $systemAdmin;
+        SessionIdentity::beginGlobal($u);
         redirect('panel/admin.php');
         exit;
     }
@@ -326,7 +324,7 @@ if(isset($_POST['login'])&&!LoginThrottle::check(trim((string)($_POST['user']??'
                 if(!password_get_info($su['password'])['algo'])upgradeLegacyLoginPassword($u,$p);
                 LoginThrottle::check($u,true);
                 session_regenerate_id(true);
-                $_SESSION['user'] = ['username' => $u, 'role' => 'superadmin'];
+                SessionIdentity::beginGlobal($u, 'global');
                 redirect('panel/admin.php');
             }
         }
@@ -347,8 +345,7 @@ if(isset($_POST['login'])&&!LoginThrottle::check(trim((string)($_POST['user']??'
                     if(!password_get_info($user['password'])['algo'])upgradeLegacyLoginPassword($u,$p,$project['id']);
                     LoginThrottle::check($u,true);
                     session_regenerate_id(true);
-                    $_SESSION['user'] = $user;
-                    $_SESSION['project_id'] = $project['id'];
+                    if (!SessionIdentity::beginPassword($u, $p, $project['id'])) continue;
                     redirect(canAccessManagement() ? 'panel/admin.php' : 'panel/portal.php');
                 }
             }

@@ -254,13 +254,7 @@ class VmDB {
                         $ins->close();
                     }
 
-                    // Also add super admin to project_users
-                    $insU = $conn->prepare("REPLACE INTO project_users (project_id, username, password, role, permissions) VALUES (?, 'admin', '1375', 'project_admin', '[\"all\"]')");
-                    if ($insU) {
-                        $insU->bind_param("s", $pId);
-                        $insU->execute();
-                        $insU->close();
-                    }
+
                 }
             }
         } catch (Exception $e) {
@@ -524,9 +518,7 @@ class VmDB {
                     return $s;
                 }
             }
-            if (!empty($pStores)) {
-                return reset($pStores);
-            }
+            return null;
         }
 
         // 3. Fallback across all project stores
@@ -540,7 +532,7 @@ class VmDB {
             }
         }
 
-        return !empty($data["stores"]) ? reset($data["stores"]) : null;
+        return null;
     }
 
     /**
@@ -597,12 +589,15 @@ class VmDB {
      * Save/update layout
      */
     public static function saveStoreLayout($storeId, $layoutData) {
+        // Nested canvas metadata cannot retarget an authorized save to another store.
+        $layoutData['store_id'] = $storeId;
         $data = self::getData();
         $found = false;
         if (!isset($data["layouts"])) $data["layouts"] = [];
 
         foreach ($data["layouts"] as &$l) {
             if ($l["store_id"] === $storeId && (!empty($l["is_active"]) || $l["id"] === ($layoutData["id"] ?? ""))) {
+                $layoutData['id'] = $l['id'];
                 $l = array_merge($l, $layoutData);
                 $l["updated_at"] = date("Y/m/d H:i");
                 $found = true;

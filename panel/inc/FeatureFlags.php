@@ -18,7 +18,7 @@ class FeatureFlags {
     private static $cache = null;
 
     /**
-     * Check if the current user is the primary main admin ('admin')
+     * System administrator authority comes from the role, never the username.
      */
     public static function isMainAdmin() {
         if (session_status() === PHP_SESSION_NONE) {
@@ -600,13 +600,22 @@ class FeatureFlags {
         $content = @file_get_contents($file);
         $data = @json_decode($content, true);
 
+        // Broken configuration must not reopen sections reserved for administrators.
+        // Maintenance keeps administrators able to inspect and repair the settings.
         if (!is_array($data)) {
-            self::$cache = $default;
-            return $default;
+            self::$cache = array_fill_keys(array_keys($catalog), self::STATUS_MAINTENANCE);
+            return self::$cache;
         }
 
-        // Merge with catalog to guarantee all keys exist
-        $merged = array_merge($default, $data);
+        $merged = $default;
+        foreach ($data as $key => $status) {
+            $key = AccessControl::featureKey($key);
+            if (!isset($catalog[$key])) continue;
+            if (!in_array($status, [self::STATUS_ACTIVE, self::STATUS_MAINTENANCE, self::STATUS_DISABLED], true)) $status = self::STATUS_MAINTENANCE;
+            // If a legacy and canonical name coexist, retain the stricter setting.
+            $rank = [self::STATUS_ACTIVE => 0, self::STATUS_MAINTENANCE => 1, self::STATUS_DISABLED => 2];
+            if ($rank[$status] > $rank[$merged[$key]]) $merged[$key] = $status;
+        }
         self::$cache = $merged;
         return $merged;
     }
@@ -615,27 +624,21 @@ class FeatureFlags {
      * Save configuration to JSON storage
      */
     public static function saveConfig($flags) {
+        if (!self::isMainAdmin() || !is_array($flags)) return false;
         $catalog = self::getCatalog();
         $clean = [];
 
         foreach ($catalog as $k => $item) {
             $val = $flags[$k] ?? self::STATUS_ACTIVE;
             if (!in_array($val, [self::STATUS_ACTIVE, self::STATUS_MAINTENANCE, self::STATUS_DISABLED], true)) {
-                $val = self::STATUS_ACTIVE;
+                return false;
             }
             $clean[$k] = $val;
         }
 
-        $file = FEATURE_FLAGS_FILE;
-        $dir = dirname($file);
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
-        }
-
-        $json = json_encode($clean, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        $ok = @file_put_contents($file, $json, LOCK_EX);
+        if (!AccessControl::writeJson(FEATURE_FLAGS_FILE, $clean)) return false;
         self::$cache = $clean;
-        return ($ok !== false);
+        return true;
     }
 
     /**
@@ -643,6 +646,7 @@ class FeatureFlags {
      * Returns: 'active' | 'maintenance' | 'disabled'
      */
     public static function getStatus($featureKey) {
+        $featureKey = AccessControl::featureKey($featureKey);
         $config = self::getConfig();
         return $config[$featureKey] ?? self::STATUS_ACTIVE;
     }
@@ -657,10 +661,10 @@ class FeatureFlags {
      * @return bool True if the feature should be shown and accessible to the current user
      */
     public static function isAvailable($featureKey) {
+        $featureKey = AccessControl::featureKey($featureKey);
         if (self::isUnrestrictedAdmin()) return true;
         if ($featureKey === 'settings' && self::isMainAdmin()) return true;
-        $parent = strpos($featureKey, 'seo_intel_') === 0 ? 'seo_intel' :
-            (strpos($featureKey, 'vm_') === 0 && $featureKey !== 'vm_studio' ? 'vm_studio' : null);
+        $parent = AccessControl::parentFeature($featureKey);
         if ($parent !== null && !self::isAvailable($parent)) return false;
         $status = self::getStatus($featureKey);
 

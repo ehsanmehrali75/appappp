@@ -36,9 +36,9 @@ $recs = SeoDB::getRecommendations($currentBusiness['id'], 'pending');
         <button onclick="window.print()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
             <span>🖨️</span> چاپ / ذخیره رسمی PDF
         </button>
-        <button onclick="triggerSync('all')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer">
+        <?php if (ModuleProjectAccess::allowed('seo_intel', 'analysis', 'seo_intel_integrations', 'use')): ?><button onclick="triggerSync('all')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer">
             <span>🔄</span> بروزرسانی همزمان داده‌ها
-        </button>
+        </button><?php endif; ?>
     </div>
 </div>
 

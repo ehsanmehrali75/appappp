@@ -13,7 +13,7 @@ if (($_SERVER['REQUEST_METHOD']??'GET')==='POST') {
             if (($_POST['password']??'')!==($_POST['confirmation']??'')) throw new RuntimeException('تکرار رمز با رمز ورود یکسان نیست.');
             $verified=SystemAdmins::recoverFirstOwner($_POST['recovery_token']??'',$_POST['username']??'',$_POST['password']??'');
             session_regenerate_id(true);
-            $_SESSION['user']=$verified;
+            SessionIdentity::beginGlobal($verified['username']);
             $_SESSION['system_admin_csrf']=bin2hex(random_bytes(32));
             $success=true; $recovered=true;
         } elseif (!isMainAdmin()) {
@@ -25,7 +25,7 @@ if (($_SERVER['REQUEST_METHOD']??'GET')==='POST') {
             $verified=SystemAdmins::authenticateGlobal($_POST['current_username']??'', $_POST['current_password']??'', getDB()['super_users']??[]);
             if (!$verified) throw new RuntimeException('اطلاعات حساب مدیر سراسری معتبر نیست. حساب مدیر پروژه برای این کار کافی نیست.');
             session_regenerate_id(true);
-            $_SESSION['user']=$verified;
+            SessionIdentity::beginGlobal($verified['username'], ($verified['role']??'')==='superadmin'?'global':'system');
             unset($_SESSION['admin_reauth_limit']);
             $_SESSION['system_admin_csrf']=bin2hex(random_bytes(32));
         } else {

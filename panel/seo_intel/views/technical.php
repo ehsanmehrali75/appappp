@@ -113,9 +113,9 @@ $passed = $techAudit['passed_checks'] ?? [];
         </div>
 
         <div class="mt-4 pt-4 border-t border-slate-100">
-            <button onclick="triggerSync('google_search_console')" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+            <?php if (ModuleProjectAccess::allowed('seo_intel', 'analysis', 'seo_intel_integrations', 'use')): ?><button onclick="triggerSync('google_search_console')" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer">
                 <span>🔄</span> خزش مجدد و استعلام وضعیت GSC
-            </button>
+            </button><?php endif; ?>
         </div>
     </div>
 </div>

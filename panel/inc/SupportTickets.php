@@ -69,6 +69,17 @@ class SupportTickets {
         $this->exec("UPDATE support_tickets SET status='cancelled',cancel_reason='approval_timeout',updated_at=? WHERE status='waiting_approval' AND quote_expires_at<=?",[$now,$now]);
     }
     public function expire() { return $this->locked(function(){ $this->expireLocked(); }); }
+    /** Called only after the session proves every legacy membership with this name. */
+    public function claimLegacyAccount($oldActor, $newActor) {
+        if ($oldActor === '' || $oldActor === $newActor) return;
+        $this->locked(function() use ($oldActor, $newActor) {
+            $tickets = $this->rows('SELECT id FROM support_tickets WHERE project_id=? AND creator=?', ['__support_account__', $oldActor]);
+            foreach ($tickets as $ticket) {
+                $this->exec('UPDATE support_messages SET sender=? WHERE ticket_id=? AND sender=? AND sender_type=?', [$newActor, $ticket['id'], $oldActor, 'user']);
+            }
+            $this->exec('UPDATE support_tickets SET creator=? WHERE project_id=? AND creator=?', [$newActor, '__support_account__', $oldActor]);
+        });
+    }
     private function row($id) { $row=$this->rows('SELECT * FROM support_tickets WHERE id=?',[$id]);if(!$row)throw new RuntimeException('تیکت یافت نشد.');return $row[0]; }
     private function authorize($t,$actor,$admin,$project=null) {
         if(!$admin && ($t['creator']!==$actor || $t['project_id']!==$project))throw new SupportAccessDenied('دسترسی به این تیکت مجاز نیست.');

@@ -17,99 +17,20 @@ require_once __DIR__ . '/vm_db.php';
 require_once __DIR__ . '/vm_mflow.php';
 require_once __DIR__ . '/vm_ai.php';
 
-$allProjects = VmDB::getAllProjects();
-$defaultSlug = !empty($allProjects) ? $allProjects[0]['slug'] : '';
-
-// Detect project slug from URL or GET parameter or session
-$projectSlug = $_GET['project_slug'] ?? ($_GET['project'] ?? ($_SESSION['current_project'] ?? ($_SESSION['project_id'] ?? $defaultSlug)));
-$project = VmDB::getProject($projectSlug);
-if (!$project && !empty($allProjects)) {
-    $project = $allProjects[0];
-    $projectSlug = $project['slug'];
-}
-
-// -------------------------------------------------------------
-// Access Control Enforcement:
-// Check user login, project assignment, and VM module permissions
-// -------------------------------------------------------------
-$isSuper = function_exists('isSuperAdmin') ? isSuperAdmin() : false;
-$isProjAdmin = function_exists('isProjectAdmin') ? isProjectAdmin() : false;
-$currentUser = $_SESSION['user'] ?? null;
-
-// Require login
-if (!$isSuper && empty($currentUser) && function_exists('isUser') && !isUser()) {
-    header('Location: /panel/index.php');
-    exit;
-}
-
-// If not super admin, verify project assignment and VM permission
-if (!$isSuper && $currentUser) {
-    // 1. Verify project assignment (if user is restricted to specific projects)
-    $assignedProjects = $currentUser['assigned_projects'] ?? [];
-    if (!empty($assignedProjects) && is_array($assignedProjects)) {
-        $projId = $project['id'] ?? '';
-        $projSlug = $project['slug'] ?? '';
-        if (!in_array($projId, $assignedProjects) && !in_array($projSlug, $assignedProjects)) {
-            http_response_code(403);
-            ?>
-            <!DOCTYPE html>
-            <html lang="fa" dir="rtl">
-            <head>
-                <meta charset="UTF-8">
-                <title>عدم دسترسی به پروژه | استودیو چیدمان</title>
-                <script src="https://cdn.tailwindcss.com"></script>
-                <link rel="stylesheet" href="/panel/assets/fonts/vazirmatn.css">
-                <style>body { font-family: 'Vazirmatn', Tahoma, sans-serif; }</style>
-            </head>
-            <body class="bg-slate-50 flex items-center justify-center min-h-screen p-6">
-                <div class="bg-white max-w-md w-full rounded-3xl p-8 border border-slate-200 shadow-xl text-center">
-                    <div class="w-16 h-16 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl font-black">⛔</div>
-                    <h2 class="text-xl font-black text-slate-800 mb-2">عدم دسترسی به این پروژه</h2>
-                    <p class="text-xs text-slate-500 leading-relaxed mb-6">حساب کاربری شما (<?php echo htmlspecialchars($currentUser['username'] ?? 'کاربر'); ?>) به پروژه «<?php echo htmlspecialchars($project['name']); ?>» دسترسی ندارد.</p>
-                    <a href="/panel/admin.php" class="inline-block w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-indigo-600/20">بازگشت به پنل مدیریت</a>
-                </div>
-            </body>
-            </html>
-            <?php
-            exit;
-        }
-    }
-
-    // 2. Verify VM permission
-    $hasVmPermission = function_exists('hasPermission') ? (hasPermission('vm') || hasPermission('layout')) : false;
-    if (!$isProjAdmin && !$hasVmPermission) {
-        http_response_code(403);
-        ?>
-        <!DOCTYPE html>
-        <html lang="fa" dir="rtl">
-        <head>
-            <meta charset="UTF-8">
-            <title>عدم دسترسی به چیدمان (VM) | استودیو چیدمان</title>
-            <script src="https://cdn.tailwindcss.com"></script>
-            <link rel="stylesheet" href="/panel/assets/fonts/vazirmatn.css">
-            <style>body { font-family: 'Vazirmatn', Tahoma, sans-serif; }</style>
-        </head>
-        <body class="bg-slate-50 flex items-center justify-center min-h-screen p-6">
-            <div class="bg-white max-w-md w-full rounded-3xl p-8 border border-slate-200 shadow-xl text-center">
-                <div class="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl font-black">🔒</div>
-                <h2 class="text-xl font-black text-slate-800 mb-2">دسترسی بخش چیدمان محدود است</h2>
-                <p class="text-xs text-slate-500 leading-relaxed mb-2">مجوز دسترسی به «هوش چیدمان و استودیو VM» برای کاربر «<?php echo htmlspecialchars($currentUser['username'] ?? 'کاربر'); ?>» فعال نشده است.</p>
-                <p class="text-[11px] text-slate-400 mb-6">جهت فعال‌سازی این بخش، با مدیر ارشد یا مدیر پروژه تماس بگیرید.</p>
-                <a href="/panel/admin.php" class="inline-block w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition">بازگشت به پنل اصلی</a>
-            </div>
-        </body>
-        </html>
-        <?php
-        exit;
-    }
-}
-
-// Current active view tab
+require_once __DIR__ . '/../inc/ModuleProjectAccess.php';
+$projectSlug = $_GET['project_slug'] ?? ($_GET['project'] ?? ($_SESSION['project_id'] ?? null));
+$systemProject = ModuleProjectAccess::select($projectSlug);
 $view = $_GET['view'] ?? 'overview';
 $validViews = ['overview', 'stores', 'store', 'studio', 'analytics', 'scores', 'recommendations', 'reports'];
-if (!in_array($view, $validViews)) {
-    $view = 'overview';
-}
+if (!is_string($view) || !in_array($view, $validViews, true)) $view = 'overview';
+ModuleProjectAccess::enforce('vm_studio', 'vm', ModuleProjectAccess::vmFeature($view));
+$project = VmDB::getProject($systemProject['id']);
+$projectSlug = $project['slug'];
+$allProjects = ModuleProjectAccess::visibleProjects(VmDB::getAllProjects(), 'vm_studio', 'vm');
+$defaultSlug = $projectSlug;
+// A store selector must resolve inside this project, never to a fallback store elsewhere.
+$requestedStore = $_GET['store_id'] ?? ($_GET['store'] ?? null);
+if ($requestedStore !== null && (!is_string($requestedStore) || !VmDB::getStore($requestedStore, $project['id']))) AccessControl::deny();
 
 // Determine if routed via pretty URL or direct query params
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
@@ -262,36 +183,48 @@ $baseUrl = vm_url('overview');
                     <span>داشبورد کلان (Overview)</span>
                 </a>
 
+                <?php if (ModuleProjectAccess::allowed('vm_studio', 'vm', ModuleProjectAccess::vmFeature('stores'))): ?>
                 <a href="<?php echo vm_url('stores'); ?>" class="px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap <?php echo ($view === 'stores' || $view === 'store') ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'; ?>">
                     <span>🏪</span>
                     <span>۱. مدیریت شعب (Stores)</span>
                 </a>
+                <?php endif; ?>
 
+                <?php if (ModuleProjectAccess::allowed('vm_studio', 'vm', ModuleProjectAccess::vmFeature('studio'))): ?>
                 <a href="<?php echo vm_url('studio'); ?>" class="px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap <?php echo $view === 'studio' ? 'bg-indigo-600 text-white shadow ring-2 ring-indigo-400/50' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'; ?>">
                     <span>📐</span>
                     <span>۲. استودیو چیدمان (VM Studio)</span>
                 </a>
+                <?php endif; ?>
 
+                <?php if (ModuleProjectAccess::allowed('vm_studio', 'vm', ModuleProjectAccess::vmFeature('analytics'))): ?>
                 <a href="<?php echo vm_url('analytics'); ?>" class="px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap <?php echo $view === 'analytics' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'; ?>">
                     <span>📊</span>
                     <span>۳. تحلیل چیدمان (Layout Analytics)</span>
                 </a>
+                <?php endif; ?>
 
+                <?php if (ModuleProjectAccess::allowed('vm_studio', 'vm', ModuleProjectAccess::vmFeature('scores'))): ?>
                 <a href="<?php echo vm_url('scores'); ?>" class="px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap <?php echo $view === 'scores' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'; ?>">
                     <span>🏆</span>
                     <span>۴. امتیاز فروشگاه (Store Score)</span>
                 </a>
+                <?php endif; ?>
 
+                <?php if (ModuleProjectAccess::allowed('vm_studio', 'vm', ModuleProjectAccess::vmFeature('recommendations'))): ?>
                 <a href="<?php echo vm_url('recommendations'); ?>" class="px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap <?php echo $view === 'recommendations' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'; ?>">
                     <span>🧠</span>
                     <span>۵. هوش مصنوعی (AI Recommendations)</span>
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 </a>
+                <?php endif; ?>
 
+                <?php if (ModuleProjectAccess::allowed('vm_studio', 'vm', ModuleProjectAccess::vmFeature('reports'))): ?>
                 <a href="<?php echo vm_url('reports'); ?>" class="px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap <?php echo $view === 'reports' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'; ?>">
                     <span>📑</span>
                     <span>۶. گزارشات (Reports)</span>
                 </a>
+                <?php endif; ?>
             </div>
         </div>
     </header>
@@ -317,7 +250,7 @@ $baseUrl = vm_url('overview');
             btn.disabled = true;
         }
 
-        fetch('/panel/vm/api.php?action=mflow_sync&project_id=<?php echo urlencode($project['slug']); ?>')
+        fetch('/panel/vm/api.php?action=mflow_sync&project_id=<?php echo urlencode($project['id']); ?>', { method: 'POST' })
             .then(r => r.json())
             .then(data => {
                 if (data.success) {

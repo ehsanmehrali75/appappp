@@ -22,25 +22,12 @@ require_once __DIR__ . '/ComposioService.php';
 require_once __DIR__ . '/SyncEngine.php';
 require_once __DIR__ . '/SeoAIAnalyst.php';
 
-// Determine current business / project
-$businessParam = $_GET['business'] ?? ($_GET['slug'] ?? 'red-style');
-$currentBusiness = SeoDB::getBusiness($businessParam);
-if (!$currentBusiness) {
-    $currentBusiness = SeoDB::getBusiness('red-style') ?: [
-        'id' => 'biz_red_style',
-        'slug' => 'red-style',
-        'name' => 'Red Style',
-        'domain' => 'red-style.ir',
-        'industry' => 'Fashion & Retail',
-        'currency' => 'تومان'
-    ];
-}
-
-$allBusinesses = SeoDB::getBusinesses();
-
-// Determine current role (for RBAC testing: admin, seo_manager, content_creator, analyst)
-$userRole = $_GET['role'] ?? ($_SESSION['seo_role'] ?? 'admin');
-$_SESSION['seo_role'] = $userRole;
+require_once __DIR__ . '/../inc/ModuleProjectAccess.php';
+$businessParam = $_GET['business'] ?? ($_GET['slug'] ?? ($_SESSION['project_id'] ?? null));
+if ($businessParam === null && isMainAdmin()) $businessParam = SeoDB::getBusinesses()[0]['slug'] ?? null;
+$currentBusiness = ModuleProjectAccess::business($businessParam);
+ModuleProjectAccess::enforce('seo_intel', 'analysis');
+$allBusinesses = ModuleProjectAccess::visibleBusinesses(SeoDB::getBusinesses());
 
 // Determine current view
 $view = $_GET['view'] ?? ($_GET['tab'] ?? 'overview');
@@ -59,17 +46,12 @@ $validViews = [
     'reports' => 'گزارشات و مقایسه‌ها'
 ];
 
-// RBAC View Permissions Filter
-$rolePermissions = [
-    'admin' => array_keys($validViews),
-    'seo_manager' => ['overview', 'rank_tracking', 'keywords', 'pages', 'links', 'technical', 'recommendations', 'reports'],
-    'content_creator' => ['overview', 'rank_tracking', 'keywords', 'pages', 'links', 'content', 'recommendations'],
-    'analyst' => ['overview', 'rank_tracking', 'traffic', 'content', 'social', 'reports']
-];
-
-$allowedViews = $rolePermissions[$userRole] ?? array_keys($validViews);
-if (!in_array($view, $allowedViews)) {
-    $view = $allowedViews[0];
+// Screen visibility follows real session grants and explicit child restrictions.
+if (!is_string($view) || !isset($validViews[$view])) $view = 'overview';
+ModuleProjectAccess::enforce('seo_intel', 'analysis', ModuleProjectAccess::seoFeature($view));
+$allowedViews = [];
+foreach ($validViews as $candidate => $label) {
+    if (ModuleProjectAccess::allowed('seo_intel', 'analysis', ModuleProjectAccess::seoFeature($candidate))) $allowedViews[] = $candidate;
 }
 
 // Calculate summary stats for header
@@ -167,22 +149,13 @@ if (!function_exists('buildSeoUrl')) {
                         <span>سلامت سئو: <strong class="font-mono font-black"><?php echo $stats['seo_health']; ?>٪</strong></span>
                     </div>
 
-                    <!-- Role Switcher (RBAC Tester) -->
-                    <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs">
-                        <span class="text-slate-400 px-1 hidden lg:inline text-[11px] font-bold">نقش:</span>
-                        <select onchange="switchRole(this.value)" class="bg-transparent text-slate-700 font-bold text-xs border-none outline-none cursor-pointer">
-                            <option value="admin" <?php echo $userRole === 'admin' ? 'selected' : ''; ?>>👑 مدیر ارشد (Admin)</option>
-                            <option value="seo_manager" <?php echo $userRole === 'seo_manager' ? 'selected' : ''; ?>>🔍 مدیر سئو (SEO Manager)</option>
-                            <option value="content_creator" <?php echo $userRole === 'content_creator' ? 'selected' : ''; ?>>✍️ کارشناس محتوا (Content)</option>
-                            <option value="analyst" <?php echo $userRole === 'analyst' ? 'selected' : ''; ?>>📊 تحلیل‌گر داده (Analyst)</option>
-                        </select>
-                    </div>
+                    <span class="text-xs text-slate-500 font-bold"><?php echo htmlspecialchars(AccessControl::roles()[$_SESSION['user']['role'] ?? ''] ?? 'مدیر سیستم'); ?></span>
 
                     <!-- Sync All Trigger -->
-                    <button onclick="triggerSync('all')" id="btn-header-sync" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-200 cursor-pointer">
+                    <?php if (ModuleProjectAccess::allowed('seo_intel', 'analysis', 'seo_intel_integrations', 'use')): ?><button onclick="triggerSync('all')" id="btn-header-sync" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-200 cursor-pointer">
                         <span id="header-sync-icon">🔄</span>
                         <span class="hidden sm:inline">همگام‌سازی زنده</span>
-                    </button>
+                    </button><?php endif; ?>
 
                     <!-- Exit to Admin Panel -->
                     <a href="/panel/admin.php" class="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-100 transition-colors" title="بازگشت به کنترل پنل">
@@ -196,7 +169,7 @@ if (!function_exists('buildSeoUrl')) {
                 <?php foreach ($allowedViews as $vKey): 
                     $vLabel = $validViews[$vKey];
                     $isActive = ($view === $vKey);
-                    $tabUrl = buildSeoUrl($currentBusiness['slug'], $vKey, ($userRole !== 'admin' ? ['role' => $userRole] : []));
+                    $tabUrl = buildSeoUrl($currentBusiness['slug'], $vKey);
                 ?>
                 <a href="<?php echo htmlspecialchars($tabUrl); ?>" 
                    class="px-3 py-1.5 rounded-lg whitespace-nowrap transition-all <?php echo $isActive ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'; ?>">
@@ -261,12 +234,6 @@ if (!function_exists('buildSeoUrl')) {
             }
             const url = new URL(window.location.href);
             url.searchParams.set('business', slug);
-            window.location.href = url.toString();
-        }
-
-        function switchRole(role) {
-            const url = new URL(window.location.href);
-            url.searchParams.set('role', role);
             window.location.href = url.toString();
         }
 

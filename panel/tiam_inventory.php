@@ -26,8 +26,7 @@ try {
     } else {
         if (!isUser()) tiamReply(['error' => 'Login required'], 401);
         if (!isMainAdmin()) {
-            $member = null;
-            foreach (($project['users'] ?? []) as $candidate) if (($candidate['username'] ?? '') === ($_SESSION['user']['username'] ?? '')) $member = $candidate;
+            $member = SessionIdentity::member($project);
             if (!$member) AccessControl::deny();
             $_SESSION['user'] = $member;
         }

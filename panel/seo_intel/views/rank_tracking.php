@@ -34,9 +34,9 @@ $avgPositions = SeoDB::calculateAveragePositions($currentBusiness['id'], $calcPe
         <button onclick="document.getElementById('modal-add-rank').classList.remove('hidden')" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer">
             <span>+</span> ثبت رکورد رتبه جدید
         </button>
-        <button onclick="triggerSync('google_search_console')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
+        <?php if (ModuleProjectAccess::allowed('seo_intel', 'analysis', 'seo_intel_integrations', 'use')): ?><button onclick="triggerSync('google_search_console')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
             <span>🔄</span> همگام‌سازی سرچ کنسول
-        </button>
+        </button><?php endif; ?>
     </div>
 </div>
 

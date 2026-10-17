@@ -67,10 +67,10 @@ $avgScore = $scoredStoresCount > 0 ? round($sumScore / $scoredStoresCount, 1) : 
         </div>
     </div>
     <div class="flex items-center gap-3">
-        <button onclick="triggerMflowSync()" id="btn-sync-mflow" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2">
+        <?php if (ModuleProjectAccess::allowed('vm_studio', 'vm', 'vm_studio', 'use')): ?><button onclick="triggerMflowSync()" id="btn-sync-mflow" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2">
             <span>🔄</span>
             <span>همگام‌سازی کاتالوگ و موجودی</span>
-        </button>
+        </button><?php endif; ?>
         <a href="<?php echo vm_url('studio'); ?>" class="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl border border-white/10 transition flex items-center gap-2">
             <span>📐</span>
             <span>ورود مستقیم به VM Studio</span>

@@ -13,6 +13,8 @@ if (PHP_SAPI !== 'cli') {
     if (!isMainAdmin()) AccessControl::deny();
 }
 
+require_once __DIR__.'/panel/inc/BackgroundWorker.php';
+BackgroundWorker::begin();
 
 // Deterministic 48-hour support-quote expiry; independent of scraper outcome.
 try { require_once __DIR__ . '/panel/inc/SupportTickets.php'; (new SupportTickets())->expire(); }
@@ -47,8 +49,8 @@ if ($stuck && ($stuckRow = $stuck->fetch_assoc())) {
 }
 
 // 2. Process pending scraping jobs (Replacing Node.js worker)
-$pendingJobs = $conn ? $conn->query("SELECT * FROM scraping_jobs WHERE status = 'pending' ORDER BY priority DESC, id ASC LIMIT 5") : false;
-while ($pendingJobs && ($job = $pendingJobs->fetch_assoc())) {
+$pendingJobs = $conn ? $conn->query("SELECT * FROM scraping_jobs WHERE status = 'pending' ORDER BY priority DESC, id ASC LIMIT " . BackgroundWorker::batchSize()) : false;
+while ($pendingJobs && BackgroundWorker::hasTime() && ($job = $pendingJobs->fetch_assoc())) {
     $jid = $job['id'];
     $pid = $job['project_id'];
     $url = $job['url'];
@@ -173,12 +175,12 @@ if (isSqlActive()) {
 
 // 4. Dispatch Scheduled Posts
 $now = date('Y-m-d H:i:s');
-$stmt = $conn->prepare("SELECT * FROM schedules WHERE status = 'pending' AND approval_status = 'approved' AND scheduled_at <= ?");
+$stmt = $conn->prepare("SELECT * FROM schedules WHERE status = 'pending' AND approval_status = 'approved' AND scheduled_at <= ? ORDER BY scheduled_at ASC LIMIT " . BackgroundWorker::batchSize());
 if ($stmt) {
     $stmt->bind_param("s", $now);
     $stmt->execute();
     $tasks = $stmt->get_result();
-    while ($task = $tasks->fetch_assoc()) {
+    while (BackgroundWorker::hasTime() && ($task = $tasks->fetch_assoc())) {
         $tid = $task['id'];
         logSystem("[Scheduler] Dispatching post ID: $tid");
         

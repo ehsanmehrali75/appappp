@@ -4,12 +4,13 @@
  * Multi-Platform Connection Manager, Composio CLI & API Config, OAuth, and Sync Audit Logs
  */
 
-$composioConfig = ComposioService::getConfig();
+$composioConfig = isMainAdmin() ? ComposioService::getConfig() : [];
 $connections = SeoDB::getConnections($currentBusiness['id']);
 $allIntegrations = SeoDB::getData()['integrations'] ?? [];
 $syncLogs = SeoDB::getSyncLogs($currentBusiness['id'], 15);
 ?>
 
+<?php if (isMainAdmin()): ?>
 <!-- Composio Engine Status Hero -->
 <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm mb-6" id="sec-composio-core">
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100">
@@ -81,6 +82,8 @@ $syncLogs = SeoDB::getSyncLogs($currentBusiness['id'], 15);
     </div>
 </div>
 
+<?php endif; ?>
+
 <!-- Business Connections Hub -->
 <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm mb-6" id="sec-business-connections">
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 mb-6 border-b border-slate-100">
@@ -91,9 +94,9 @@ $syncLogs = SeoDB::getSyncLogs($currentBusiness['id'], 15);
             <p class="text-xs text-slate-400 mt-1">شناسه یکتای نهاد (Entity ID): <code class="font-mono text-indigo-700"><?php echo htmlspecialchars($currentBusiness['slug']); ?></code> | دامنه: <code class="font-mono text-slate-600"><?php echo htmlspecialchars($currentBusiness['domain']); ?></code></p>
         </div>
         <div class="flex items-center gap-2">
-            <button onclick="triggerSync('all')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm cursor-pointer flex items-center gap-1.5">
+            <?php if (ModuleProjectAccess::allowed('seo_intel', 'analysis', 'seo_intel_integrations', 'use')): ?><button onclick="triggerSync('all')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm cursor-pointer flex items-center gap-1.5">
                 <span>🔄</span> همگام‌سازی کامل تمام سرویس‌ها
-            </button>
+            </button><?php endif; ?>
         </div>
     </div>
 
@@ -145,13 +148,13 @@ $syncLogs = SeoDB::getSyncLogs($currentBusiness['id'], 15);
                     ⚙️ پیکربندی
                 </button>
                 <?php if ($isConnected): ?>
-                    <button onclick="triggerSync('<?php echo $slug; ?>')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition-all cursor-pointer">
+                    <?php if (ModuleProjectAccess::allowed('seo_intel', 'analysis', 'seo_intel_integrations', 'use')): ?><button onclick="triggerSync('<?php echo $slug; ?>')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition-all cursor-pointer">
                         🔄 سنک
-                    </button>
+                    </button><?php endif; ?>
                 <?php else: ?>
-                    <button onclick="initiateOauthConnection('<?php echo $slug; ?>')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer">
+                    <?php if (ModuleProjectAccess::allowed('seo_intel', 'analysis', 'seo_intel_integrations', 'use')): ?><button onclick="initiateOauthConnection('<?php echo $slug; ?>')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all cursor-pointer">
                         اتصال
-                    </button>
+                    </button><?php endif; ?>
                 <?php endif; ?>
             </div>
         </div>

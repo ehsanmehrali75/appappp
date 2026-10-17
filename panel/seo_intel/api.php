@@ -21,22 +21,39 @@ require_once __DIR__ . '/ComposioService.php';
 require_once __DIR__ . '/SyncEngine.php';
 require_once __DIR__ . '/SeoAIAnalyst.php';
 
-$action = $_GET['action'] ?? ($_POST['action'] ?? '');
-$businessSlug = $_GET['business'] ?? ($_POST['business'] ?? 'red-style');
-$business = SeoDB::getBusiness($businessSlug);
-$businessId = $business['id'] ?? 'biz_red_style';
-
-// Parse JSON body if available
+require_once __DIR__ . '/../inc/ModuleProjectAccess.php';
 $rawInput = file_get_contents('php://input');
-$jsonBody = json_decode($rawInput, true) ?: [];
+$jsonBody = json_decode($rawInput, true);
+if (!is_array($jsonBody)) $jsonBody = [];
+$input = array_replace($_GET, $_POST, $jsonBody);
+$action = $input['action'] ?? '';
+if (!is_string($action)) AccessControl::deny();
+$readActions = ['get_overview', 'get_keywords', 'get_pages', 'get_technical', 'get_traffic', 'get_social',
+    'get_recommendations', 'get_rank_history', 'calculate_avg_positions', 'get_internal_links', 'get_comparison', 'get_report', 'get_sync_logs'];
+$mutable = !in_array($action, $readActions, true);
+if ($mutable) ModuleProjectAccess::mutation();
+$businessSlug = $input['business'] ?? ($_SESSION['project_id'] ?? null);
+if ($businessSlug === null && isMainAdmin()) $businessSlug = SeoDB::getBusinesses()[0]['slug'] ?? null;
+$business = ModuleProjectAccess::business($businessSlug);
+$businessId = $business['id'];
+$actionFeature = ['get_keywords'=>'keywords', 'add_keyword'=>'keywords', 'get_rank_history'=>'rank_tracking',
+    'calculate_avg_positions'=>'rank_tracking', 'add_rank_history'=>'rank_tracking', 'get_pages'=>'pages',
+    'get_technical'=>'technical', 'get_traffic'=>'traffic', 'get_social'=>'social', 'get_recommendations'=>'recommendations',
+    'update_recommendation'=>'recommendations', 'ask_ai'=>'recommendations', 'get_internal_links'=>'links',
+    'get_comparison'=>'reports', 'get_report'=>'reports', 'get_sync_logs'=>'integrations', 'trigger_sync'=>'integrations',
+    'test_composio'=>'integrations', 'save_composio_config'=>'integrations', 'save_connection'=>'integrations', 'initiate_oauth'=>'integrations'][$action] ?? 'overview';
+ModuleProjectAccess::enforce('seo_intel', 'analysis', ModuleProjectAccess::seoFeature($actionFeature), $mutable ? 'use' : 'view');
+// The Composio credential configures the entire installation, not one business.
+if (in_array($action, ['save_composio_config', 'test_composio'], true) && !isMainAdmin()) AccessControl::deny();
 
 try {
     switch ($action) {
         case 'get_overview':
             $scoreData = SeoDB::calculateScoreAndStats($businessId);
-            $conns = SeoDB::getConnections($businessId);
-            $recentLogs = SeoDB::getSyncLogs($businessId, 5);
-            $recentRecs = SeoDB::getRecommendations($businessId, 'pending');
+            $canIntegrate = ModuleProjectAccess::allowed('seo_intel', 'analysis', 'seo_intel_integrations');
+            $conns = $canIntegrate ? SeoDB::getConnections($businessId) : [];
+            $recentLogs = $canIntegrate ? SeoDB::getSyncLogs($businessId, 5) : [];
+            $recentRecs = ModuleProjectAccess::allowed('seo_intel', 'analysis', 'seo_intel_recommendations') ? SeoDB::getRecommendations($businessId, 'pending') : [];
 
             echo json_encode([
                 'success' => true,

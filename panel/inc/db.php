@@ -535,7 +535,7 @@ function db_get_all() {
     return fetchDB();
 }
 
-function db_save_project($project, $onlyProducts = null, $onlySchedules = null) {
+function db_save_project($project, $onlyProducts = null, $onlySchedules = null, $manageTransaction = true) {
     if (class_exists('MaarkshoCache') && isset($project['id'])) {
         MaarkshoCache::delete('project_full_' . $project['id']);
     }
@@ -544,7 +544,7 @@ function db_save_project($project, $onlyProducts = null, $onlySchedules = null) 
         $success = true;
         
         // Use Transaction for integrity
-        $conn->begin_transaction();
+        if ($manageTransaction) $conn->begin_transaction();
         try {
             // 1. Update/Insert Project basic info & settings (Only on full save)
             if ($onlyProducts === null && $onlySchedules === null) {
@@ -719,7 +719,7 @@ function db_save_project($project, $onlyProducts = null, $onlySchedules = null) 
                                 $p_stage1_decision, $p_stage2_decision,
                                 $p_size_chart_uploaded, $p_size_chart_uploaded_at, $p_website_sync
                             );
-                            $stmt->execute();
+                            if (!$stmt->execute()) throw new RuntimeException('Product write failed');
                         }
                         $stmt->close();
                     } else {
@@ -805,9 +805,9 @@ function db_save_project($project, $onlyProducts = null, $onlySchedules = null) 
                 }
             }
             
-            $conn->commit();
+            if ($manageTransaction) $conn->commit();
         } catch (Exception $e) {
-            if (isset($conn) && $conn) $conn->rollback();
+            if ($manageTransaction && isset($conn) && $conn) $conn->rollback();
             error_log("DB SAVE ERR: " . $e->getMessage());
             $success = false;
             throw $e;

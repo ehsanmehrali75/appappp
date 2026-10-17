@@ -34,6 +34,8 @@ if (!file_exists($functionsPath)) {
     die('خطای سیستم: فایل توابع یافت نشد.');
 }
 require_once $functionsPath;
+require_once __DIR__.'/inc/PortalAccess.php';
+require_once __DIR__.'/inc/ProjectPermissions.php';
 
 // Authentication check
 if (!isUser()) {
@@ -66,52 +68,19 @@ if (isset($_GET['switch_project']) || (isset($_GET['project']) && $_GET['project
     $target_pid = $_GET['switch_project'] ?? $_GET['project'];
     $allowed = false;
     
-    if (isSuperAdmin()) {
-        $allowed = true;
-    } else {
-        $u_username = $_SESSION['user']['username'] ?? '';
-        $u_mobile = $_SESSION['portal_user'] ?? '';
-        $db_p = getDB();
-        foreach ($db_p['projects'] as $p_item) {
-            if ($p_item['id'] === $target_pid && isset($p_item['users']) && is_array($p_item['users'])) {
-                foreach ($p_item['users'] as $pu) {
-                    if (($u_username && $pu['username'] === $u_username) || ($u_mobile && isset($pu['mobile']) && trim($pu['mobile']) === $u_mobile)) {
-                        $_SESSION['user'] = $pu; // update active profile permissions!
-                        $allowed = true;
-                        break 2;
-                    }
-                }
-            }
-        }
-    }
+    $target_project = getCurrentProject($target_pid, true);
+    $allowed = $target_project && SessionIdentity::select($target_project);
     
     if ($allowed) {
         $_SESSION['project_id'] = $target_pid;
         redirect('portal.php?project=' . urlencode($target_pid));
     } else {
-        die('خطای دسترسی: شما مجاز به مشاهده این پروژه نیستید.');
+        http_response_code(403); die('خطای دسترسی: شما مجاز به مشاهده این پروژه نیستید.');
     }
 }
 
 // STRICT PROJECT ACCESS CHECK FOR SECURITY (ACCURACY AT 100%)
-$allowed = false;
-if (isSuperAdmin()) {
-    $allowed = true;
-} else {
-    $u_username = $_SESSION['user']['username'] ?? '';
-    $u_mobile = $_SESSION['portal_user'] ?? '';
-    
-    if (isset($project['users']) && is_array($project['users'])) {
-        foreach ($project['users'] as $pu) {
-            if (($u_username && $pu['username'] === $u_username) || ($u_mobile && isset($pu['mobile']) && trim($pu['mobile']) === $u_mobile)) {
-                $allowed = true;
-                break;
-            }
-        }
-    }
-    
-
-}
+$allowed = SessionIdentity::select($project);
 
 if (!$allowed) {
     http_response_code(403);die('شما عضو این پروژه نیستید. برای پیگیری دسترسی از بخش پشتیبانی حساب کاربری اقدام کنید.');
@@ -123,18 +92,7 @@ $db_p = getDB();
 foreach ($db_p['projects'] as $p_item) {
     if (isSuperAdmin()) {
         $user_allowed_projects[] = $p_item;
-    } else {
-        $u_username = $_SESSION['user']['username'] ?? '';
-        $u_mobile = $_SESSION['portal_user'] ?? '';
-        if (isset($p_item['users']) && is_array($p_item['users'])) {
-            foreach ($p_item['users'] as $pu) {
-                if (($u_username && $pu['username'] === $u_username) || ($u_mobile && isset($pu['mobile']) && trim($pu['mobile']) === $u_mobile)) {
-                    $user_allowed_projects[] = $p_item;
-                    break;
-                }
-            }
-        }
-    }
+    } else if (SessionIdentity::member($p_item)) $user_allowed_projects[] = $p_item;
 }
 
 if (!function_exists('is_product_without_image')) {
@@ -147,6 +105,17 @@ if (!function_exists('is_product_without_image')) {
 if (!isset($project['products']) || !is_array($project['products'])) $project['products'] = [];
 if (!isset($project['schedules']) || !is_array($project['schedules'])) $project['schedules'] = [];
 if (!isset($project['settings']) || !is_array($project['settings'])) $project['settings'] = [];
+
+$portalActionRequest = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+    && strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'xmlhttprequest' && isset($_POST['action']);
+if (!$portalActionRequest && !PortalAccess::canViewTab($active_tab)) {
+    if (!isset($_GET['tab']) && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+        foreach (['calendar', 'occasions'] as $fallbackTab) {
+            if (PortalAccess::canViewTab($fallbackTab)) { $active_tab = $fallbackTab; break; }
+        }
+    }
+    if (!PortalAccess::canViewTab($active_tab)) AccessControl::deny();
+}
 
 // Apply Active Module restrictions for Clients/Portals
 if (!isModuleActive('products')) {
@@ -292,18 +261,19 @@ if (!isset($_SESSION['display_name'])) {
 $current_p_username = $_SESSION['user']['username'] ?? $_SESSION['display_name'] ?? 'guest';
 $content_gen_users_raw = $project['settings']['prod_content_gen_users'] ?? '';
 $content_gen_users = array_filter(array_map('trim', preg_split('/[,\x{060c}]+/u', strtolower($content_gen_users_raw))));
-$can_request_content_gen = ImageProduction::canRequest($project);
+$can_request_content_gen = PortalAccess::canAction('bulk_request_content_gen') && ImageProduction::canRequest($project);
 
 $couples_users_raw = $project['settings']['prod_couples_users'] ?? '';
 $couples_users = array_filter(array_map('trim', preg_split('/[,\x{060c}]+/u', strtolower($couples_users_raw))));
-$can_create_couples = empty($couples_users) || in_array(strtolower($current_p_username), $couples_users);
+$can_create_couples = PortalAccess::canAction('create_couple_set') && (empty($couples_users) || in_array(strtolower($current_p_username), $couples_users));
 
 $ref_image_users_raw = $project['settings']['prod_ref_image_users'] ?? '';
 $ref_image_users = array_filter(array_map('trim', preg_split('/[,\x{060c}]+/u', strtolower($ref_image_users_raw))));
-$can_manage_ref_images = ImageProduction::canReference($project);
+$can_manage_ref_images = PortalAccess::canAction('upload_product_ref_images') && ImageProduction::canReference($project);
 
 $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
 if ($isAjax && isset($_POST['action'])) {
+    if (!is_string($_POST['action']) || !PortalAccess::canAction($_POST['action'])) AccessControl::deny();
     header('Content-Type: application/json');
     $response = ['status' => 'error', 'msg' => 'درخواست نامعتبر'];
     
@@ -1507,6 +1477,12 @@ if ($isAjax && isset($_POST['action'])) {
     echo json_encode($response);
     exit;
 }
+// Rendering a permitted calendar must not serialize a hidden product library.
+// This view copy is narrowed only after every mutation handler has exited.
+if (!PortalAccess::canProducts()) {
+    $project['products'] = [];
+    $productsByName = [];
+}
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl" class="scroll-smooth">
@@ -1738,6 +1714,11 @@ if ($isAjax && isset($_POST['action'])) {
 <script src="/panel/assets/portal-workspace.js?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.js'); ?>" defer></script>
 </head>
 <body class="portal-workspace" data-portal-tab="<?php echo htmlspecialchars($active_tab,ENT_QUOTES,'UTF-8'); ?>">
+<style id="portal-action-permissions">
+<?php foreach (['vote','comment','vote_schedule','comment_schedule','cast_occasion_vote','bulk_request_content_gen','bulk_request_publish_priority','reset_publish_priority','reset_content_gen_priority','create_couple_set','approve','reject','quick_action'] as $portalAction): if (!PortalAccess::canAction($portalAction)): ?>
+[data-portal-action="<?php echo $portalAction; ?>"] { display: none !important; }
+<?php endif; endforeach; ?>
+</style>
 <script>
     window.portalProducts = <?php 
         $jsProds = [];
@@ -1747,7 +1728,7 @@ if ($isAjax && isset($_POST['action'])) {
         echo json_encode($jsProds, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); 
     ?> || {};
     window.portalSchedules = {};
-    window.projectSettings = <?php echo json_encode($project['settings'] ?? [], JSON_UNESCAPED_UNICODE); ?>;
+    window.projectSettings = <?php echo json_encode(ProjectPermissions::publicSettings($project['settings'] ?? []), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
     window.currentUser = <?php echo json_encode($_SESSION['user']['username'] ?? $_SESSION['display_name'] ?? 'visitor', JSON_UNESCAPED_UNICODE); ?>;
     window.isSuperOrAdmin = <?php echo json_encode(isSuperAdmin() || isProjectAdmin()); ?>;
 </script>
@@ -1823,6 +1804,9 @@ if ($storageInfo['is_warning'] || $storageInfo['is_full']):
 <?php endif; ?>
 
 <main id="portal-main-container" class="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
+<?php if (($active_tab === 'calendar' && !canAccessFeature('calendar','use')) || ($active_tab === 'occasions' && !canAccessFeature('occasions','use')) || (!in_array($active_tab,['calendar','occasions'],true) && !PortalAccess::canProducts('use'))): ?>
+<p id="portal-readonly-notice" class="rounded-xl border border-slate-200 bg-slate-50 p-3 mb-4 text-sm" role="status">دسترسی شما در این بخش فقط برای مشاهده است؛ انجام عملیات نیاز به مجوز جداگانه دارد.</p>
+<?php endif; ?>
 <div class="portal-page-heading"><div><p>پروژه / <?php echo $pnEscape($project['name']); ?></p><h1><?php echo $pnEscape($pnTitle); ?></h1><span>همان محصولات و وضعیت‌های پنل مدیریت، در فضای کاری پروژه</span></div><?php if($active_tab==='library'): ?><span class="portal-total"><?php echo number_format($pnCounts['all']); ?> محصول در کتابخانه</span><?php endif; ?></div>
 
 <?php
@@ -2824,11 +2808,11 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                                 ? "flex-1 py-2.5 rounded-xl bg-rose-500 border-rose-500 text-white flex items-center justify-center text-xs font-black hover:bg-rose-600 transition-all gap-1.5 shadow-sm" 
                                 : "flex-1 py-2.5 rounded-xl bg-slate-50 border border-slate-100/50 text-slate-600 flex items-center justify-center text-xs font-black hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all gap-1.5";
                             ?>
-                            <button onclick="vote('like', '<?php echo $p['id']; ?>')" class="<?php echo $likeBtnClass; ?>" id="like-btn-<?php echo $p['id']; ?>">
+                            <button data-portal-action="vote" onclick="vote('like', '<?php echo $p['id']; ?>')" class="<?php echo $likeBtnClass; ?>" id="like-btn-<?php echo $p['id']; ?>">
                                 <span>❤️</span>
                                 <span id="likes-<?php echo $p['id']; ?>"><?php echo $p['likes'] ?? 0; ?></span>
                             </button>
-                            <button onclick="vote('dislike', '<?php echo $p['id']; ?>')" class="<?php echo $dislikeBtnClass; ?>" id="dislike-btn-<?php echo $p['id']; ?>">
+                            <button data-portal-action="vote" onclick="vote('dislike', '<?php echo $p['id']; ?>')" class="<?php echo $dislikeBtnClass; ?>" id="dislike-btn-<?php echo $p['id']; ?>">
                                 <span>👎</span>
                                 <span id="dislikes-<?php echo $p['id']; ?>"><?php echo $p['dislikes'] ?? 0; ?></span>
                             </button>
@@ -2913,7 +2897,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                                 </div>
                             <?php endif; ?>
                             
-                            <button onclick="portalComment('<?php echo $p['id']; ?>')" class="w-full py-2.5 bg-brand-50 hover:bg-brand-600 text-brand-600 hover:text-white border border-brand-100 rounded-xl text-xs font-black transition-all">ارسال سریع بازخورد 💬</button>
+                            <button data-portal-action="comment" onclick="portalComment('<?php echo $p['id']; ?>')" class="w-full py-2.5 bg-brand-50 hover:bg-brand-600 text-brand-600 hover:text-white border border-brand-100 rounded-xl text-xs font-black transition-all">ارسال سریع بازخورد 💬</button>
                             <button onclick="openCommentsPopup('<?php echo $p['id']; ?>')" class="w-full mt-2 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-[11px] font-black tracking-wide transition-all flex items-center justify-center gap-1.5 shadow-sm">
                                 <span>👁️‍🗨️</span> مشاهده کامنت‌ها و تاریخچه
                             </button>
@@ -2954,7 +2938,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                                             <span>🎨</span> تایید استایل ثبت شده (<?php echo count($p_st1_approvals); ?>/<?php echo $st1_min; ?>)
                                         </button>
                                     <?php else: ?>
-                                        <button onclick="advancedAction('approve_stage1', '<?php echo $p['id']; ?>')" class="py-2 px-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-[10px] flex items-center justify-center gap-1 shadow-sm hover:shadow transition-all w-full cursor-pointer">
+                                        <button data-portal-action="quick_action" onclick="advancedAction('approve_stage1', '<?php echo $p['id']; ?>')" class="py-2 px-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-[10px] flex items-center justify-center gap-1 shadow-sm hover:shadow transition-all w-full cursor-pointer">
                                             <span>🎨</span> تایید استایل (بخش ۱)
                                         </button>
                                     <?php endif; ?>
@@ -2971,7 +2955,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                                             <span>🧐</span> تایید انطباق ثبت شده (<?php echo count($p_st2_approvals); ?>/<?php echo $st2_min; ?>)
                                         </button>
                                     <?php else: ?>
-                                        <button onclick="advancedAction('approve_stage2', '<?php echo $p['id']; ?>')" class="py-2 px-1 bg-teal-500 hover:bg-teal-600 text-white rounded-xl font-black text-[10px] flex items-center justify-center gap-1 shadow-sm hover:shadow transition-all w-full cursor-pointer">
+                                        <button data-portal-action="quick_action" onclick="advancedAction('approve_stage2', '<?php echo $p['id']; ?>')" class="py-2 px-1 bg-teal-500 hover:bg-teal-600 text-white rounded-xl font-black text-[10px] flex items-center justify-center gap-1 shadow-sm hover:shadow transition-all w-full cursor-pointer">
                                             <span>🧐</span> تایید انطباق (بخش ۲)
                                         </button>
                                     <?php endif; ?>
@@ -2985,7 +2969,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                             <!-- Reject Buttons -->
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full mt-1">
                                 <?php if ($canApproveSt1): ?>
-                                    <button class="py-2.5 rounded-xl text-white font-black text-[10px] bg-rose-500 hover:bg-rose-600 hover:shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer w-full" onclick="advancedAction('reject_stage1', '<?php echo $p['id']; ?>')">
+                                    <button data-portal-action="quick_action" class="py-2.5 rounded-xl text-white font-black text-[10px] bg-rose-500 hover:bg-rose-600 hover:shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer w-full" onclick="advancedAction('reject_stage1', '<?php echo $p['id']; ?>')">
                                         <span>❌</span> رد استایل و محتوا (بخش ۱)
                                     </button>
                                 <?php else: ?>
@@ -2995,7 +2979,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                                 <?php endif; ?>
 
                                 <?php if ($canApproveSt2): ?>
-                                    <button class="py-2.5 rounded-xl text-white font-black text-[10px] bg-rose-500 hover:bg-rose-600 hover:shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer w-full" onclick="advancedAction('reject_stage2', '<?php echo $p['id']; ?>')">
+                                    <button data-portal-action="quick_action" class="py-2.5 rounded-xl text-white font-black text-[10px] bg-rose-500 hover:bg-rose-600 hover:shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer w-full" onclick="advancedAction('reject_stage2', '<?php echo $p['id']; ?>')">
                                         <span>❌</span> رد جزئیات و انطباق (بخش ۲)
                                     </button>
                                 <?php else: ?>
@@ -3008,10 +2992,10 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                         <?php else: ?>
                             <!-- Non-split mode -->
                             <div class="flex gap-2 w-full">
-                                <button class="flex-1 py-2 rounded-xl text-white font-black text-xs bg-emerald-500 hover:bg-emerald-600 hover:shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer" onclick="advancedAction('approve', '<?php echo $p['id']; ?>')">
+                                <button data-portal-action="approve" class="flex-1 py-2 rounded-xl text-white font-black text-xs bg-emerald-500 hover:bg-emerald-600 hover:shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer" onclick="advancedAction('approve', '<?php echo $p['id']; ?>')">
                                     <span>✅</span> تایید محصول
                                 </button>
-                                <button class="flex-1 py-2 rounded-xl text-white font-black text-xs bg-rose-500 hover:bg-rose-600 hover:shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer" onclick="advancedAction('reject', '<?php echo $p['id']; ?>')">
+                                <button data-portal-action="reject" class="flex-1 py-2 rounded-xl text-white font-black text-xs bg-rose-500 hover:bg-rose-600 hover:shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer" onclick="advancedAction('reject', '<?php echo $p['id']; ?>')">
                                     <span>❌</span> رد محصول
                                 </button>
                             </div>
@@ -3399,10 +3383,10 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
             </div>
             
             <div class="flex flex-wrap gap-2">
-                <button onclick="resetPublishPriority()" class="px-6 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-2xl text-xs font-black shadow-sm active:translate-y-0.5 transform transition-all flex items-center gap-2">
+                <button data-portal-action="reset_publish_priority" onclick="resetPublishPriority()" class="px-6 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-2xl text-xs font-black shadow-sm active:translate-y-0.5 transform transition-all flex items-center gap-2">
                     <span>🔄 ریست اولویت انتشار</span>
                 </button>
-                <button onclick="submitBulkPublishPriorityRequest()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black shadow-lg shadow-indigo-500/20 active:translate-y-0.5 transform transition-all flex items-center gap-2">
+                <button data-portal-action="bulk_request_publish_priority" onclick="submitBulkPublishPriorityRequest()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black shadow-lg shadow-indigo-500/20 active:translate-y-0.5 transform transition-all flex items-center gap-2">
                     <span>🚀 ارسال درخواست اولویت انتشار/تقویم</span>
                     <span id="selected-library-count" class="bg-white/25 px-2 py-0.5 rounded-full text-[10px]">۰ کالا</span>
                 </button>
@@ -3427,7 +3411,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
             </div>
             
             <div class="flex flex-wrap gap-2">
-                <button onclick="openCoupleSetModal()" class="px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-black shadow-lg shadow-rose-500/20 active:translate-y-0.5 transform transition-all flex items-center gap-2">
+                <button data-portal-action="create_couple_set" onclick="openCoupleSetModal()" class="px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-black shadow-lg shadow-rose-500/20 active:translate-y-0.5 transform transition-all flex items-center gap-2">
                     <span>✨ ساخت محصول کاپل / ست (ادغام ۲ کالا)</span>
                     <span id="selected-couples-count-badge" class="bg-white/25 px-2 py-0.5 rounded-full text-[10px]">۰ کالا</span>
                 </button>
@@ -3644,11 +3628,11 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                                 ? "flex-1 py-2.5 rounded-xl bg-rose-500 border-rose-500 text-white flex items-center justify-center text-xs font-black hover:bg-rose-600 transition-all gap-1.5 shadow-sm" 
                                 : "flex-1 py-2.5 rounded-xl bg-slate-50 border border-slate-100/50 text-slate-600 flex items-center justify-center text-xs font-black hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all gap-1.5";
                             ?>
-                            <button onclick="vote('like', '<?php echo $p['id']; ?>')" class="<?php echo $likeBtnClass; ?>" id="like-btn-<?php echo $p['id']; ?>">
+                            <button data-portal-action="vote" onclick="vote('like', '<?php echo $p['id']; ?>')" class="<?php echo $likeBtnClass; ?>" id="like-btn-<?php echo $p['id']; ?>">
                                 <span>❤️</span>
                                 <span id="likes-<?php echo $p['id']; ?>"><?php echo $p['likes'] ?? 0; ?></span>
                             </button>
-                            <button onclick="vote('dislike', '<?php echo $p['id']; ?>')" class="<?php echo $dislikeBtnClass; ?>" id="dislike-btn-<?php echo $p['id']; ?>">
+                            <button data-portal-action="vote" onclick="vote('dislike', '<?php echo $p['id']; ?>')" class="<?php echo $dislikeBtnClass; ?>" id="dislike-btn-<?php echo $p['id']; ?>">
                                 <span>👎</span>
                                 <span id="dislikes-<?php echo $p['id']; ?>"><?php echo $p['dislikes'] ?? 0; ?></span>
                             </button>
@@ -3731,7 +3715,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                                  </div>
                              <?php endif; ?>
                              
-                             <button onclick="portalComment('<?php echo $p['id']; ?>')" class="w-full py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-black transition-all">ثبت بازخورد و بهینه‌سازی 💬</button>
+                             <button data-portal-action="comment" onclick="portalComment('<?php echo $p['id']; ?>')" class="w-full py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-xs font-black transition-all">ثبت بازخورد و بهینه‌سازی 💬</button>
                              <button onclick="openCommentsPopup('<?php echo $p['id']; ?>')" class="w-full mt-2 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-xl text-[11px] font-black tracking-wide transition-all flex items-center justify-center gap-1.5 shadow-sm">
                                  <span>👁️‍🗨️</span> مشاهده کامنت‌ها و تاریخچه
                              </button>
@@ -4005,10 +3989,10 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
             
             <div class="flex flex-wrap gap-2">
                 <?php if ($can_request_content_gen): ?>
-                    <button onclick="resetContentGenPriority()" class="px-6 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-2xl text-xs font-black shadow-sm active:translate-y-0.5 transform transition-all flex items-center gap-2">
+                    <button data-portal-action="reset_content_gen_priority" onclick="resetContentGenPriority()" class="px-6 py-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-2xl text-xs font-black shadow-sm active:translate-y-0.5 transform transition-all flex items-center gap-2">
                         <span>🔄 ریست اولویت تولید محتوا</span>
                     </button>
-                    <button onclick="submitBulkContentGenRequest()" class="px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-black shadow-lg shadow-rose-500/20 active:translate-y-0.5 transform transition-all flex items-center gap-2">
+                    <button data-portal-action="bulk_request_content_gen" onclick="submitBulkContentGenRequest()" class="px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl text-xs font-black shadow-lg shadow-rose-500/20 active:translate-y-0.5 transform transition-all flex items-center gap-2">
                         <span>🚀 ارسال درخواست گروهی تولید محتوا</span>
                         <span id="selected-no-img-count" class="bg-white/25 px-2 py-0.5 rounded-full text-[10px]">۰ کالای انتخاب شده</span>
                     </button>
@@ -4182,7 +4166,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
             <!-- Footer actions -->
             <div class="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6 flex-shrink-0">
                 <button onclick="closeCoupleSetModal()" class="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-extrabold rounded-2xl text-xs transition-all">انصراف</button>
-                <button onclick="submitCoupleSetCreation()" id="cs-submit-btn" class="px-8 py-3 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-2xl text-xs shadow-lg shadow-rose-500/20 active:translate-y-0.5 transition-all flex items-center gap-2">
+                <button data-portal-action="create_couple_set" onclick="submitCoupleSetCreation()" id="cs-submit-btn" class="px-8 py-3 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-2xl text-xs shadow-lg shadow-rose-500/20 active:translate-y-0.5 transition-all flex items-center gap-2">
                     <span>🚀 ثبت نهایی و ساخت محصول ست</span>
                 </button>
             </div>
@@ -4445,7 +4429,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                         if ($is_s1_voter): 
                             $has_voted1 = in_array($user_lo, array_map('strtolower', $approvals1));
                         ?>
-                            <button type="button" onclick="castOccasionVote('<?php echo $occ_key; ?>', 'stage1', <?php echo $has_voted1 ? '0' : '1'; ?>)" class="flex-1 py-2.5 px-3 rounded-xl font-black text-[10px] transition-all cursor-pointer flex items-center justify-center gap-1.5 <?php echo $has_voted1 ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm'; ?>">
+                            <button data-portal-action="cast_occasion_vote" type="button" onclick="castOccasionVote('<?php echo $occ_key; ?>', 'stage1', <?php echo $has_voted1 ? '0' : '1'; ?>)" class="flex-1 py-2.5 px-3 rounded-xl font-black text-[10px] transition-all cursor-pointer flex items-center justify-center gap-1.5 <?php echo $has_voted1 ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm'; ?>">
                                 <span>🎨</span>
                                 <span><?php echo $has_voted1 ? 'لغو تایید ممیزی ۱' : 'تایید ممیزی ۱'; ?></span>
                             </button>
@@ -4454,7 +4438,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                         <?php if ($is_s2_voter && !empty($project['settings']['cal_approval_split_enabled'])): 
                             $has_voted2 = in_array($user_lo, array_map('strtolower', $approvals2));
                         ?>
-                            <button type="button" onclick="castOccasionVote('<?php echo $occ_key; ?>', 'stage2', <?php echo $has_voted2 ? '0' : '1'; ?>)" class="flex-1 py-2.5 px-3 rounded-xl font-black text-[10px] transition-all cursor-pointer flex items-center justify-center gap-1.5 <?php echo $has_voted2 ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200' : 'bg-teal-600 text-white hover:bg-teal-700 shadow-sm'; ?>">
+                            <button data-portal-action="cast_occasion_vote" type="button" onclick="castOccasionVote('<?php echo $occ_key; ?>', 'stage2', <?php echo $has_voted2 ? '0' : '1'; ?>)" class="flex-1 py-2.5 px-3 rounded-xl font-black text-[10px] transition-all cursor-pointer flex items-center justify-center gap-1.5 <?php echo $has_voted2 ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200' : 'bg-teal-600 text-white hover:bg-teal-700 shadow-sm'; ?>">
                                 <span>🧐</span>
                                 <span><?php echo $has_voted2 ? 'لغو تایید ممیزی ۲' : 'تایید ممیزی ۲'; ?></span>
                             </button>
@@ -5516,7 +5500,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                             تایید چیدمان ثبت شده (${s_st1_approvals.length} از ${st1_min})
                         </button>`;
                     } else {
-                        html += `<button onclick="voteSchedule('${s.id}', 'approved', 'stage1')" class="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-xs transition-transform hover:scale-[1.02] shadow-sm cursor-pointer">
+                        html += `<button data-portal-action="vote_schedule" onclick="voteSchedule('${s.id}', 'approved', 'stage1')" class="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-xs transition-transform hover:scale-[1.02] shadow-sm cursor-pointer">
                             تایید چیدمان (بخش ۱)
                         </button>`;
                     }
@@ -5533,7 +5517,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                             تایید موجودی ثبت شده (${s_st2_approvals.length} از ${st2_min})
                         </button>`;
                     } else {
-                        html += `<button onclick="voteSchedule('${s.id}', 'approved', 'stage2')" class="flex-1 py-3 bg-teal-500 hover:bg-teal-600 text-white rounded-xl font-black text-xs transition-transform hover:scale-[1.02] shadow-sm cursor-pointer">
+                        html += `<button data-portal-action="vote_schedule" onclick="voteSchedule('${s.id}', 'approved', 'stage2')" class="flex-1 py-3 bg-teal-500 hover:bg-teal-600 text-white rounded-xl font-black text-xs transition-transform hover:scale-[1.02] shadow-sm cursor-pointer">
                             تایید موجودی (بخش ۲)
                         </button>`;
                     }
@@ -5548,7 +5532,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                 
                 // Stage 1 Rejection Better Output Check
                 if (canApproveSt1) {
-                    html += `<button onclick="voteSchedule('${s.id}', 'rejected', 'stage1')" class="flex-1 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-black text-xs transition-transform hover:scale-[1.02] shadow-sm cursor-pointer">
+                    html += `<button data-portal-action="vote_schedule" onclick="voteSchedule('${s.id}', 'rejected', 'stage1')" class="flex-1 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-black text-xs transition-transform hover:scale-[1.02] shadow-sm cursor-pointer">
                         ❌ رد چیدمان (بخش ۱)
                     </button>`;
                 } else {
@@ -5559,7 +5543,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                 
                 // Stage 2 Rejection Better Output Check
                 if (canApproveSt2) {
-                    html += `<button onclick="voteSchedule('${s.id}', 'rejected', 'stage2')" class="flex-1 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-black text-xs transition-transform hover:scale-[1.02] shadow-sm cursor-pointer">
+                    html += `<button data-portal-action="vote_schedule" onclick="voteSchedule('${s.id}', 'rejected', 'stage2')" class="flex-1 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-black text-xs transition-transform hover:scale-[1.02] shadow-sm cursor-pointer">
                         ❌ رد موجودی (بخش ۲)
                     </button>`;
                 } else {
@@ -5573,8 +5557,8 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                 btnContainer.innerHTML = html;
             } else {
                 btnContainer.innerHTML = `
-                    <button onclick="voteSchedule('${s.id}', 'approved')" id="sm-approve-btn" class="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-xs transition-all shadow-sm cursor-pointer">تایید نهایی ✅</button>
-                    <button onclick="voteSchedule('${s.id}', 'rejected')" id="sm-reject-btn" class="flex-1 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-black text-xs transition-all shadow-sm cursor-pointer">نیاز به اصلاح ❌</button>
+                    <button data-portal-action="vote_schedule" onclick="voteSchedule('${s.id}', 'approved')" id="sm-approve-btn" class="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-xs transition-all shadow-sm cursor-pointer">تایید نهایی ✅</button>
+                    <button data-portal-action="vote_schedule" onclick="voteSchedule('${s.id}', 'rejected')" id="sm-reject-btn" class="flex-1 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-black text-xs transition-all shadow-sm cursor-pointer">نیاز به اصلاح ❌</button>
                 `;
             }
         }
@@ -6190,7 +6174,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                                     `<button disabled class="py-2.5 px-2 bg-emerald-100 text-emerald-700 rounded-xl font-black text-[11px] cursor-not-allowed opacity-80 flex items-center justify-center gap-1">
                                         <span>🎨</span> تایید استایل ثبت شده (${st1_count}/${st1_min})
                                     </button>` :
-                                    `<button onclick="advancedAction('approve_stage1', '${p.id}')" class="py-2.5 px-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-[11px] flex items-center justify-center gap-1 shadow-sm hover:shadow transition-all cursor-pointer">
+                                    `<button data-portal-action="quick_action" onclick="advancedAction('approve_stage1', '${p.id}')" class="py-2.5 px-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-[11px] flex items-center justify-center gap-1 shadow-sm hover:shadow transition-all cursor-pointer">
                                         <span>🎨</span> تایید استایل (بخش ۱)
                                     </button>`
                                 ) : `
@@ -6204,7 +6188,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                                     `<button disabled class="py-2.5 px-2 bg-emerald-100 text-emerald-700 rounded-xl font-black text-[11px] cursor-not-allowed opacity-80 flex items-center justify-center gap-1">
                                         <span>🧐</span> تایید انطباق ثبت شده (${st2_count}/${st2_min})
                                     </button>` :
-                                    `<button onclick="advancedAction('approve_stage2', '${p.id}')" class="py-2.5 px-2 bg-teal-500 hover:bg-teal-600 text-white rounded-xl font-black text-[11px] flex items-center justify-center gap-1 shadow-sm hover:shadow transition-all cursor-pointer">
+                                    `<button data-portal-action="quick_action" onclick="advancedAction('approve_stage2', '${p.id}')" class="py-2.5 px-2 bg-teal-500 hover:bg-teal-600 text-white rounded-xl font-black text-[11px] flex items-center justify-center gap-1 shadow-sm hover:shadow transition-all cursor-pointer">
                                         <span>🧐</span> تایید انطباق (بخش ۲)
                                     </button>`
                                 ) : `
@@ -6216,7 +6200,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
 
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 ${canApproveSt1 ? `
-                                    <button onclick="advancedAction('reject_stage1', '${p.id}')" class="py-2.5 px-2 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-1 cursor-pointer">
+                                    <button data-portal-action="quick_action" onclick="advancedAction('reject_stage1', '${p.id}')" class="py-2.5 px-2 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-1 cursor-pointer">
                                         <span>❌</span> رد استایل (بخش ۱)
                                     </button>
                                 ` : `
@@ -6226,7 +6210,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                                 `}
 
                                 ${canApproveSt2 ? `
-                                    <button onclick="advancedAction('reject_stage2', '${p.id}')" class="py-2.5 px-2 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-1 cursor-pointer">
+                                    <button data-portal-action="quick_action" onclick="advancedAction('reject_stage2', '${p.id}')" class="py-2.5 px-2 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-black text-[11px] transition-all flex items-center justify-center gap-1 cursor-pointer">
                                         <span>❌</span> رد انطباق (بخش ۲)
                                     </button>
                                 ` : `
@@ -6241,10 +6225,10 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                     html += `
                         <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">⚡ تعیین وضعیت و تصمیم‌گیری محصول</label>
                         <div class="flex gap-2 w-full">
-                            <button onclick="advancedAction('approve', '${p.id}')" class="flex-1 py-3 rounded-2xl text-white font-black text-xs bg-emerald-500 hover:bg-emerald-600 shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                            <button data-portal-action="approve" onclick="advancedAction('approve', '${p.id}')" class="flex-1 py-3 rounded-2xl text-white font-black text-xs bg-emerald-500 hover:bg-emerald-600 shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer">
                                 <span>✅</span> تایید تصویر و محصول
                             </button>
-                            <button onclick="advancedAction('reject', '${p.id}')" class="flex-1 py-3 rounded-2xl text-white font-black text-xs bg-rose-500 hover:bg-rose-600 shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                            <button data-portal-action="reject" onclick="advancedAction('reject', '${p.id}')" class="flex-1 py-3 rounded-2xl text-white font-black text-xs bg-rose-500 hover:bg-rose-600 shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer">
                                 <span>❌</span> رد محصول و ثبت اصلاحیه
                             </button>
                         </div>
@@ -7119,6 +7103,7 @@ ${desc2}
     let relayedCount = 0;
 
     function initBrowserRelayScheduler() {
+        if (!<?php echo PortalAccess::canAction('get_pending_browser_relay_posts')?'true':'false'; ?>) return;
         // ALWAYS initialize browser relay helper to utilize the active VPN and dispatch scheduled posts!
         
         // Show lightweight status dot in portal page

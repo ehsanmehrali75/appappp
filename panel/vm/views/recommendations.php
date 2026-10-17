@@ -33,10 +33,10 @@ $objects = $layout['objects'] ?? [];
             <?php endforeach; ?>
         </select>
 
-        <button onclick="generateFreshAI()" id="btn-ai-generate" class="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2">
+        <?php if (ModuleProjectAccess::allowed('vm_studio', 'vm', 'vm_ai', 'use')): ?><button onclick="generateFreshAI()" id="btn-ai-generate" class="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg transition flex items-center gap-2">
             <span>✨</span>
             <span>تحلیل مجدد و تولید پیشنهادهای جدید</span>
-        </button>
+        </button><?php endif; ?>
     </div>
 </div>
 
@@ -55,10 +55,10 @@ $objects = $layout['objects'] ?? [];
     <div class="text-4xl mb-3">✨</div>
     <h3 class="text-base font-black text-slate-800 mb-2">چیدمان فعلی در وضعیت مطلوب است</h3>
     <p class="text-xs text-slate-500 max-w-md mx-auto mb-6">هیچ تداخل یا هشدار بحرانی برای این چیدمان یافت نشد. می‌توانید با کلیک بر روی دکمه زیر، تحلیل عمیق‌تری را فراخوانی نمایید.</p>
-    <button onclick="generateFreshAI()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-2 shadow-lg shadow-indigo-600/20">
+    <?php if (ModuleProjectAccess::allowed('vm_studio', 'vm', 'vm_ai', 'use')): ?><button onclick="generateFreshAI()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-2 shadow-lg shadow-indigo-600/20">
         <span>🔄</span>
         <span>تحلیل مجدد چیدمان با هوش مصنوعی</span>
-    </button>
+    </button><?php endif; ?>
 </div>
 <?php else: ?>
 
@@ -97,10 +97,10 @@ $objects = $layout['objects'] ?? [];
                     <span>✓</span> اعمال شده در چیدمان
                 </span>
                 <?php elseif (!empty($r['target_coords'])): ?>
-                <button onclick="applyAiSuggestion('<?php echo $r['id']; ?>', this)" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20">
+                <?php if (ModuleProjectAccess::allowed('vm_studio', 'vm', 'vm_ai', 'use')): ?><button onclick="applyAiSuggestion('<?php echo $r['id']; ?>', this)" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-indigo-600/20">
                     <span>⚡</span>
                     <span>اعمال خودکار بر روی نقشه</span>
-                </button>
+                </button><?php endif; ?>
                 <?php endif; ?>
             </div>
         </div>
@@ -133,7 +133,7 @@ function applyAiSuggestion(recId, btn) {
     btn.innerHTML = '<span>⏳</span><span>در حال اعمال...</span>';
     btn.disabled = true;
 
-    fetch('/panel/vm/api.php?action=apply_recommendation&store_id=<?php echo $store['id']; ?>&rec_id=' + encodeURIComponent(recId))
+    fetch('/panel/vm/api.php?action=apply_recommendation&project_id=<?php echo urlencode($project['id']); ?>&store_id=<?php echo urlencode($store['id']); ?>&rec_id=' + encodeURIComponent(recId), { method: 'POST' })
         .then(r => r.json())
         .then(data => {
             if (data.success) {
@@ -159,7 +159,7 @@ function generateFreshAI() {
         btn.disabled = true;
     }
 
-    fetch('/panel/vm/api.php?action=generate_ai_recommendations&store_id=<?php echo $store['id']; ?>')
+    fetch('/panel/vm/api.php?action=generate_ai_recommendations&project_id=<?php echo urlencode($project['id']); ?>&store_id=<?php echo urlencode($store['id']); ?>', { method: 'POST' })
         .then(r => r.json())
         .then(data => {
             alert(data.message || 'پیشنهادهای هوش مصنوعی به‌روزرسانی شدند.');

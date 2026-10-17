@@ -21,7 +21,7 @@ if ($project) {
 }
 
 // Resolve user permission
-$can_manage_promp = isSuperAdmin() || isProjectAdmin() || hasPermission('prompthub_manage');
+$can_manage_promp = canAccessFeature('prompthub_manage', 'use');
 
 // JSON DB definition
 define('PROMPT_HUB_DB', __DIR__ . '/db/prompthub.json');

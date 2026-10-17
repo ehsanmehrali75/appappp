@@ -45,98 +45,22 @@ if (!hasPermission('size_chart') && !hasPermission('settings') && !hasPermission
     </div>');
 }
 
-// Project Switcher inside Size Chart Studio
-if (isset($_GET['switch_project'])) {
-    $swPid = $_GET['switch_project'];
-    $hasAccess = false;
-    if (isSuperAdmin()) {
-        $hasAccess = true;
-    } else {
-        $db = getDB();
-        $username = $_SESSION['user']['username'] ?? '';
-        foreach (($db['projects'] ?? []) as $p) {
-            if ($p['id'] === $swPid) {
-                foreach (($p['users'] ?? []) as $u) {
-                    if ($u['username'] === $username) {
-                        $hasAccess = true;
-                        break;
-                    }
-                }
-            }
-        }
-    }
-    if ($hasAccess) {
-        $_SESSION['project_id'] = $swPid;
-    }
-    redirect('index.php?project=' . urlencode($swPid));
-}
-
-if (isset($_GET['project'])) {
-    $swPid = $_GET['project'];
-    $hasAccess = false;
-    if (isSuperAdmin()) {
-        $hasAccess = true;
-    } else {
-        $db = getDB();
-        $username = $_SESSION['user']['username'] ?? '';
-        foreach (($db['projects'] ?? []) as $p) {
-            if ($p['id'] === $swPid) {
-                foreach (($p['users'] ?? []) as $u) {
-                    if ($u['username'] === $username) {
-                        $hasAccess = true;
-                        break;
-                    }
-                }
-            }
-        }
-    }
-    if ($hasAccess) {
-        $_SESSION['project_id'] = $swPid;
-    }
-} else {
-    // If project is not set in URL, find the best project and redirect automatically to make URL project-specific
-    $current_pid = $_SESSION['project_id'] ?? null;
-    if (!$current_pid) {
-        $db = getDB();
-        if (isSuperAdmin()) {
-            if (!empty($db['projects'])) {
-                $first_p = reset($db['projects']);
-                $current_pid = $first_p['id'] ?? null;
-            }
-        } else {
-            $username = $_SESSION['user']['username'] ?? '';
-            foreach (($db['projects'] ?? []) as $p) {
-                $users = $p['users'] ?? [];
-                foreach ($users as $u) {
-                    if ($u['username'] === $username) {
-                        $current_pid = $p['id'];
-                        break 2;
-                    }
-                }
-            }
-        }
-    }
-    if ($current_pid) {
-        $_SESSION['project_id'] = $current_pid;
-        redirect('index.php?project=' . urlencode($current_pid));
-    }
-}
-
-$allProjects = [];
+// Resolve every project through the credentials verified by this browser login.
 $db = getDB();
-if (isSuperAdmin()) {
-    $allProjects = $db['projects'] ?? [];
+$allProjects = array_values(array_filter($db['projects'] ?? [], static function($candidate) {
+    return isMainAdmin() || SessionIdentity::member($candidate);
+}));
+if (isset($_GET['switch_project'])) {
+    $target = getCurrentProject($_GET['switch_project'], true);
+    if (!$target || !SessionIdentity::select($target)) AccessControl::deny();
+    redirect('index.php?project=' . urlencode($target['id']));
+}
+if (isset($_GET['project'])) {
+    $target = getCurrentProject($_GET['project'], true);
+    if (!$target || !SessionIdentity::select($target)) AccessControl::deny();
 } else {
-    $username = $_SESSION['user']['username'] ?? '';
-    foreach (($db['projects'] ?? []) as $p) {
-        $users = $p['users'] ?? [];
-        foreach ($users as $u) {
-            if ($u['username'] === $username) {
-                $allProjects[] = $p;
-                break;
-            }
-        }
-    }
+    $current_pid = $_SESSION['project_id'] ?? ($allProjects[0]['id'] ?? null);
+    if ($current_pid) redirect('index.php?project=' . urlencode($current_pid));
 }
 
 // Bind branding requests to the project displayed in this studio, not a
