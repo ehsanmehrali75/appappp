@@ -96,3 +96,12 @@ worker حداکثر سه صفحهٔ گوگل در هر اجرا، ادامهٔ c
 کنترل دسترسی هر دامنه و زیرنماهای هوش داده مستقل است؛ دانستن لینک یا شناسهٔ پروژه دسترسی ایجاد نمی‌کند. JSON خروجی ردیف‌ها صریحاً برای همان صفحه است؛ برای دریافت همهٔ داده‌ها صفحه‌های بعد یا read_data فراخوانی شود.
 
 فرم‌های تخصصی قبلی (اهداف، فروشگاه‌ها، شاخص‌های سفارشی و ابزارهای تخصصی سئو) از تب ابزارها با legacy=1 حفظ شده‌اند؛ همهٔ فرم‌های داخلی قدیمی در این انتشار بازنویسی نشده‌اند. سوابق فروش قدیمی بدون واحد مبلغ/تعریف بازهٔ یکسان به جمع سفارش منابع جدید اضافه نمی‌شوند، اما از بخش فروشگاه‌های ثبت‌شده قابل بررسی و ویرایش هستند.
+
+
+### Connection reconfiguration and audit safeguards
+
+Each warehouse source has one automated adapter (Google or Composio). Reconfiguring it clears the old adapter and its pagination checkpoints. A configuration revision prevents an in-flight old import, OAuth callback or worker checkpoint from writing into the new configuration. Existing warehouse rows remain intact; once rows exist, changing the configured Search Console site or GA4 property requires creating a separate source to preserve provenance.
+
+Connection tests are tied to the tested settings. Changed settings, tests older than 24 hours and legacy tests without a configuration fingerprint display as requiring a new test. The private fingerprint is never returned by the health API. Project deletion also removes connection tests and adapter checkpoints.
+
+Warehouse pages retain only the requested rows and a bounded document cache while calculating an exact filtered count. Invalid calendar dates, reversed date ranges, non-list batches, boolean record IDs and fractional order counts are rejected. Successful empty Composio search responses are accepted as empty pages, without deleting existing observations.

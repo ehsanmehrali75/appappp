@@ -29,5 +29,5 @@ try:
         page.goto(base+'/panel/sale.php?project=p');assert '/panel/insights.php?' in page.url
         page.goto(base+'/panel/seo.php?project=p');assert '/panel/insights.php?' in page.url
         assert not errors,errors;browser.close()
-    print(json.dumps({'workspaces':3,'sections':5,'viewports':[1440,375],'routes':60,'legacy_entry_redirects':True,'js_errors':errors,'artifacts':str(out)}))
+    print(json.dumps({'workspaces':3,'sections':5,'viewports':[1440,375],'routes':30,'legacy_entry_redirects':True,'js_errors':errors,'artifacts':str(out)}))
 finally:HttpSecurity.tearDownClass()

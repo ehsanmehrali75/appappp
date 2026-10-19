@@ -29,5 +29,22 @@ $result=AiAccess::run($grant,function($project)use($store,$grant){
     $probe=new IntegrationHealth($store,static fn()=>['status'=>200,'body'=>['status'=>'success','capabilities'=>['products']]]);$probeProject=$project;$probeProject['settings']['wordpress']=['site_url'=>'https://fixture.example','token'=>'fixture-secret'];$tested=$probe->probe($probeProject,$grant,'wordpress');checkHub($tested['success']&&strpos(json_encode($tested),'fixture-secret')===false,'safe live probe contract');
     $bridge=new ComposioBridge($store,static fn()=>['status'=>200,'body'=>['successful'=>true,'data'=>['rows'=>[['keys'=>['2026-10-18','https://fixture.test/a','composio query'],'clicks'=>3,'impressions'=>30,'ctr'=>0.1,'position'=>5]]]]]);
     $bridge->configure($project,$grant,['source_id'=>$source['id'],'api_key'=>'synthetic-composio-key-1234567890','account_id'=>'ca_fixture','tool'=>ComposioBridge::TOOLS[0],'site'=>'sc-domain:fixture.test']);$source=$hub->source($project,$source['id']);$cp=$bridge->pull($source,'2026-10-18','2026-10-18');checkHub($cp['accepted']===1,'Composio normalized ingestion');checkHub(strpos(json_encode($hub->sources($project)),'synthetic-composio-key')===false,'Composio key redaction');
+    $healthStore=$store->read();$savedTest=$healthStore['integration_tests'][$project['id']]['wordpress']??null;
+    checkHub($savedTest!==null,'connection test persisted');
+    $health=new IntegrationHealth($store);$changedProject=$project;$changedProject['settings']['wordpress']['token']='changed-fixture-token';
+    $changedHealth=$health->overview($changedProject);checkHub($changedHealth['tests']['wordpress']['stale']&&!$changedHealth['tests']['wordpress']['success'],'changed credentials invalidate old success');
+    checkHub(strpos(json_encode($changedHealth),'_config_fingerprint')===false,'private config fingerprint redacted');
+    checkHub(empty($source['google'])&&$source['transport']==='composio','only one automated adapter active');
+    $oldSource=$source;$hub->configureAdapter($source,'composio',$source['composio']);$source=$hub->source($project,$source['id']);
+    try{$hub->ingest($project,$oldSource,'gsc',[],'stale-worker-batch');throw new LogicException('stale worker accepted');}catch(RuntimeException $e){}
+    $different=$source['composio'];$different['site']='sc-domain:another.test';
+    try{$hub->configureAdapter($source,'composio',$different);throw new LogicException('mixed property data accepted');}catch(RuntimeException $e){}
+    foreach([['from'=>'2026-02-30'],['from'=>'2026-10-20','to'=>'2026-10-19']] as $filters){try{$hub->read($project,$source['id'],'sales',$filters);throw new LogicException('bad date accepted');}catch(RuntimeException $e){}}
+    try{$hub->source($project,[]);throw new LogicException('array source accepted');}catch(RuntimeException $e){}
+    try{$hub->ingest($project,$source,'sales',['key'=>$row],'non-list-batch');throw new LogicException('non-list accepted');}catch(RuntimeException $e){}
+    $page=$hub->read($project,$source['id'],'sales',[],1,1);checkHub(count($page['rows'])===1&&$page['total']===3&&$page['next_offset']===2,'bounded page keeps exact total and offset');
+    $emptyBridge=new ComposioBridge($store,static fn()=>['status'=>200,'body'=>['successful'=>true,'data'=>[]]]);
+    checkHub($emptyBridge->pull($source,'2026-10-18','2026-10-18')['accepted']===0,'empty successful GSC response');
+    try{$emptyBridge->pull($source,'2026-02-30','2026-03-01');throw new LogicException('impossible Composio date accepted');}catch(RuntimeException $e){}
     return ['source'=>$source['id'],'warehouse'=>true,'google'=>true,'social'=>true,'calendar'=>true];
 });echo json_encode($result);
