@@ -3,7 +3,8 @@ if (!hasPermission('products')) return;
 if (empty($_SESSION['website_catalog_csrf'])) $_SESSION['website_catalog_csrf']=bin2hex(random_bytes(24));
 $wcEscape=static fn($value)=>htmlspecialchars((string)$value,ENT_QUOTES,'UTF-8');
 $websiteQueueLabels=['image_not_required'=>'عکس نیاز ندارد','image_request'=>'درخواست تولید تصویر','needs_reference'=>'در انتظار عکس رفرنس','archived'=>'ناموجود؛ در آرشیو','inventory_issue'=>'مشکل موجودی','technical_pending'=>'بررسی مشکل فنی','pending_upload'=>'منتظر آپلود عکس','pending_image'=>'منتظر تولید عکس','pending_approval'=>'منتظر تأیید پورتال','uploaded'=>'عکس در سایت موجود','resolved'=>'آپلود ثبت‌شده؛ منتظر تطبیق بعدی'];
-$wcFilters=['image_not_required'=>'عکس نیاز ندارد','chart_not_required'=>'جدول سایز نیاز ندارد','photo_review'=>'بررسی عکس و مشکلات','missing_photo'=>'بدون عکس؛ نیازمند عکس','inventory_issue'=>'مشکل موجودی','site_visible'=>'در سایت با تصویر موجود','site_missing'=>'در خروجی کامل سایت نیست','site_unknown'=>'هنوز با سایت تطبیق نشده','archive'=>'آرشیو ناموجودها','work'=>'همهٔ کارهای باقی‌مانده','pending_upload'=>'آپلود عکس','technical_pending'=>'باگ فنی انتشار','image_request'=>'درخواست تولید تصویر','needs_reference'=>'عکس رفرنس ندارد','reference_ready'=>'رفرنس دارد؛ آمادهٔ تولید','pending_image'=>'تولید عکس','pending_approval'=>'تأیید تصویر در پورتال','needs_size_chart'=>'تولید جدول سایز','size_chart_upload'=>'آپلود جدول سایز','needs_description'=>'تولید توضیحات','content_upload'=>'آپلود محتوای آماده','compare'=>'مقایسهٔ پنل و سایت','resolved'=>'آپلود تأییدشده','all'=>'همهٔ محصولات'];
+require_once __DIR__.'/WebsiteCatalogQueue.php';
+$wcFilters=WebsiteCatalogQueue::FILTERS;
 $wcQueueInput=$_GET['wc_queue']??'';
 $wcQueue=is_string($wcQueueInput)&&isset($wcFilters[$wcQueueInput])?$wcQueueInput:'work';
 $wcSearch=trim(mb_substr(is_string($_GET['wc_q']??null)?$_GET['wc_q']:'',0,120));
@@ -19,43 +20,9 @@ foreach($project['settings']['website_catalog']['chart_exempt_categories']??[] a
 ksort($wcCategories);
 $wcCategory=is_string($_GET['wc_category']??null)&&isset($wcCategories[$_GET['wc_category']])?$_GET['wc_category']:'';
 $websiteQueues=[];$wcCounts=array_fill_keys(array_keys($wcFilters),0);
-foreach(($project['products']??[]) as $websiteProduct) {
-    if($wcSearch!==''&&mb_strpos($wcNormalize(($websiteProduct['name']??'').' '.($websiteProduct['sku']??'')),$wcNormalize($wcSearch))===false)continue;
-    if($wcCategory!==''&&!in_array($wcCategory,WebsiteCatalogSync::categories($websiteProduct),true))continue;
-    $ws=WebsiteCatalogSync::state($project,$websiteProduct);$pub=$ws['publication']??'';$tasks=[];
-    if(isset($wcStockStatuses[$wcStock])&&$ws['inventory']!==$wcStock)continue;
-    if(isset($wcStockThresholds[$wcStock])) {
-        $wcQuantity=WebsiteCatalogSync::totalStock($websiteProduct);
-        if($ws['archived']||$wcQuantity===null||$wcQuantity<=$wcStockThresholds[$wcStock])continue;
-    }
-    foreach(['needs_size_chart','needs_description'] as $key)if($ws[$key])$tasks[]=$key;
-    if($ws['size_chart_upload_pending'])$tasks[]='size_chart_upload';
-    if($ws['description_upload_pending']||$ws['size_chart_upload_pending'])$tasks[]='content_upload';
-    if($ws['archived'])$tasks[]='archive';
-    if(in_array($pub,['technical_pending','pending_upload','image_request','needs_reference','pending_image','pending_approval','resolved'],true))$tasks[]=$pub;
-    if($ws['image_production']['needs_reference'])$tasks[]='needs_reference';
-    if($ws['image_production']['reference_ready'])$tasks[]='reference_ready';
-    if($ws['comparison_available'])$tasks[]='compare';
-    if($ws['archived'])$tasks=['archive'];
-    if(!$ws['archived']&&$ws['needs_image'])$tasks[]='missing_photo';
-    if($ws['image_not_required'])$tasks[]='image_not_required';
-    if($ws['chart_not_required'])$tasks[]='chart_not_required';
-    if($ws['issue_type']==='technical')$tasks[]='technical_pending';
-    if($ws['issue_type']==='inventory')$tasks[]='inventory_issue';
-    if(in_array('missing_photo',$tasks,true)||$ws['production_blocked']||$pub==='technical_pending')$tasks[]='photo_review';
-    $work=!$ws['archived']&&(bool)array_diff($tasks,['resolved','compare','archive','image_not_required','chart_not_required']);
-    if(!$ws['archived']&&$ws['site_visible_with_images'])$tasks[]='site_visible';
-    if(!$ws['archived']&&($ws['presence']??'')==='missing')$tasks[]='site_missing';
-    if(!$ws['archived']&&!in_array($ws['presence']??'',['seen','missing'],true))$tasks[]='site_unknown';
-    $wcCounts['all']++;if($work)$wcCounts['work']++;foreach(array_unique($tasks) as $key)if(isset($wcCounts[$key]))$wcCounts[$key]++;
-    if($ws['archived']&&!in_array($wcQueue,['all','archive','photo_review','technical_pending','inventory_issue','image_not_required','chart_not_required'],true))continue;
-    if($wcQueue!=='all'&&!($wcQueue==='work'?$work:in_array($wcQueue,$tasks,true)))continue;
-    $websiteQueues[]=['product'=>$websiteProduct,'state'=>$ws,'tasks'=>$tasks];
-}
-usort($websiteQueues,static function($a,$b){
-    $rank=static fn($e)=>(!empty($e['state']['low_priority'])?100:0)+(['technical_pending'=>0,'pending_upload'=>1,'pending_image'=>2,'pending_approval'=>3][$e['state']['publication']??'']??4);
-    return $rank($a)<=>$rank($b) ?: strcmp((string)($a['product']['sku']??''),(string)($b['product']['sku']??''));
-});
+$wcEntries=WebsiteCatalogQueue::entries($project,['wc_q'=>$wcSearch,'wc_stock'=>$wcStock,'wc_category'=>$wcCategory]);
+foreach($wcEntries as $entry){foreach($entry['tasks'] as $key)if(isset($wcCounts[$key]))$wcCounts[$key]++;if(WebsiteCatalogQueue::matches($entry,$wcQueue))$websiteQueues[]=$entry;}
+$websiteQueues=WebsiteCatalogQueue::sorted($websiteQueues);
 $wcTotal=count($websiteQueues);$wcPages=max(1,(int)ceil($wcTotal/$wcLimit));$wcPage=max(1,min($wcPages,(int)($_GET['wc_page']??1)));
 $websiteQueues=array_slice($websiteQueues,($wcPage-1)*$wcLimit,$wcLimit);
 $wcUrl=static function($page)use($tab,$wcQueue,$wcSearch,$wcStock,$wcLimit,$wcCategory){return 'admin.php?'.http_build_query(['tab'=>$tab,'we_view'=>'work','wc_queue'=>$wcQueue,'wc_category'=>$wcCategory,'wc_q'=>$wcSearch,'wc_stock'=>$wcStock,'wc_size'=>$wcLimit,'wc_page'=>$page]).'#website-catalog-list';};
@@ -90,6 +57,7 @@ $wcPhotos=static function($urls,$label)use($wcEscape){
     </form>
     <p id="website-catalog-filter-hint" class="wc-hint">بازه‌های عددی بر اساس موجودی کل هستند؛ مقدار نامشخص در آن‌ها نمایش داده نمی‌شود. شمارندهٔ صف‌ها با فیلتر موجودی و جست‌وجو به‌روز می‌شود.</p>
     <p id="website-catalog-queue-count" class="wc-hint"><?php echo $wcTotal?'نمایش '.((($wcPage-1)*$wcLimit)+1).' تا '.min($wcPage*$wcLimit,$wcTotal).' از '.$wcTotal.' محصول':'محصولی با این فیلتر پیدا نشد.'; ?> — صفحهٔ <?php echo $wcPage.' از '.$wcPages; ?></p>
+    <?php $workflowScope="queue";require __DIR__."/WebsiteWorkflowTools.php"; ?>
     <div class="wc-products">
     <?php if(!$websiteQueues): ?><div class="wc-empty"><strong>محصولی در این صف نیست</strong><p>فیلترها را تغییر دهید یا از تب «همهٔ محصولات» وضعیت محصولات را بررسی کنید.</p></div><?php endif; ?>
     <?php foreach($websiteQueues as $websiteEntry):$wp=$websiteEntry['product'];$ws=$websiteEntry['state'];$pub=$ws['publication']??'';$labels=[];
@@ -102,7 +70,7 @@ $wcPhotos=static function($urls,$label)use($wcEscape){
         $wcProductUrl='admin.php?tab=products&filter=all&admin_q='.rawurlencode($wp['sku']??$wp['name']??'');
     ?>
     <article class="website-catalog-row wc-product <?php echo $ws['low_priority']?'wc-low-priority':''; ?>" data-product-id="<?php echo $wcEscape($wp['id']); ?>">
-        <div class="wc-product-summary"><div class="wc-product-identity"><?php $thumb=$ws['local_image_urls'][0]??$ws['site_main_image_url']??'';if($thumb): ?><img class="wc-thumbnail" src="<?php echo $wcEscape($thumb); ?>" alt="" loading="lazy"><?php else: ?><span class="wc-no-photo" aria-label="بدون عکس">بدون<br>عکس</span><?php endif; ?><div><strong><?php echo $wcEscape($wp['name']??''); ?></strong><div class="wc-sku" dir="ltr"><?php echo $wcEscape($wp['sku']??''); ?></div></div></div><div><span class="wc-badge"><?php echo $ws['site_visible_with_images']?'در سایت موجود؛ تصویر ثبت شده':(($ws['presence']??'')==='seen'?'صفحه در سایت موجود؛ تصویر در خروجی ثبت نشده':(($ws['presence']??'')==='missing'?'در خروجی کامل سایت پیدا نشد':'حضور در سایت هنوز بررسی نشده')); ?></span><span class="wc-badge"><?php echo $wcEscape($websiteQueueLabels[$pub]??'هنوز تطبیق نشده'); ?></span><p class="wc-task-label"><?php echo $wcEscape($ws['archived']?'خارج از صف اجرا؛ تصاویر در آرشیو محفوظ‌اند':(implode(' · ',$labels)?:'کار محتوایی باقی نمانده')); ?></p></div><div class="wc-stock"><span><?php echo ['in_stock'=>'موجود','out_of_stock'=>'ناموجود؛ خارج از صف اجرا','unknown'=>'موجودی نامشخص'][$ws['inventory']]; ?></span><small>کل: <?php echo $wcEscape($wp['stock_total']??'—'); ?> · آنلاین: <?php echo $wcEscape($wp['stock_online']??'—'); ?></small></div></div>
+        <div class="wc-product-summary"><div class="wc-product-identity"><?php if(canAccessFeature('products','use')): ?><label class="wc-select-label"><input class="wc-select-item" type="checkbox" value="<?php echo $wcEscape($wp['id']); ?>" aria-label="انتخاب محصول"></label><?php endif; ?><?php $thumb=$ws['local_image_urls'][0]??$ws['site_main_image_url']??'';if($thumb): ?><img class="wc-thumbnail" src="<?php echo $wcEscape($thumb); ?>" alt="" loading="lazy"><?php else: ?><span class="wc-no-photo" aria-label="بدون عکس">بدون<br>عکس</span><?php endif; ?><div><strong><?php echo $wcEscape($wp['name']??''); ?></strong><div class="wc-sku" dir="ltr"><?php echo $wcEscape($wp['sku']??''); ?></div></div></div><div><span class="wc-badge"><?php echo $ws['site_visible_with_images']?'در سایت موجود؛ تصویر ثبت شده':(($ws['presence']??'')==='seen'?'صفحه در سایت موجود؛ تصویر در خروجی ثبت نشده':(($ws['presence']??'')==='missing'?'در خروجی کامل سایت پیدا نشد':'حضور در سایت هنوز بررسی نشده')); ?></span><span class="wc-badge"><?php echo $wcEscape($websiteQueueLabels[$pub]??'هنوز تطبیق نشده'); ?></span><p class="wc-task-label"><?php echo $wcEscape($ws['archived']?'خارج از صف اجرا؛ تصاویر در آرشیو محفوظ‌اند':(implode(' · ',$labels)?:'کار محتوایی باقی نمانده')); ?></p></div><div class="wc-stock"><span><?php echo ['in_stock'=>'موجود','out_of_stock'=>'ناموجود؛ خارج از صف اجرا','unknown'=>'موجودی نامشخص'][$ws['inventory']]; ?></span><small>کل: <?php echo $wcEscape($wp['stock_total']??'—'); ?> · آنلاین: <?php echo $wcEscape($wp['stock_online']??'—'); ?></small></div></div>
         <div class="wc-quick-actions" aria-label="اقدام سریع محصول">
             <span class="wc-quick-context"><?php echo $wcEscape(implode(' / ',WebsiteCatalogSync::categories($wp))); ?><?php if($ws['chart_not_required'])echo ' · جدول سایز نیاز ندارد'; ?></span>
             <?php if(canAccessFeature('products','use')): ?>
@@ -130,3 +98,5 @@ $wcPhotos=static function($urls,$label)use($wcEscape){
 </section>
 <script>const websiteCatalogCsrf=<?php echo json_encode($_SESSION['website_catalog_csrf']); ?>;</script>
 <script src="/panel/assets/website-catalog.js?v=<?php echo filemtime(__DIR__.'/../assets/website-catalog.js'); ?>" defer></script>
+
+<script src="/panel/assets/workflow-transfer.js?v=<?php echo filemtime(__DIR__.'/../assets/workflow-transfer.js'); ?>" defer></script>

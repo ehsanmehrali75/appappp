@@ -28,6 +28,7 @@
     const previous=document.createElement('button'),next=document.createElement('button'),all=document.createElement('button'),status=document.createElement('span');
     [previous,next,all].forEach(b=>{b.type='button';b.className='btn btn-outline';});previous.textContent='صفحهٔ قبل';next.textContent='صفحهٔ بعد';all.textContent='انتخاب همهٔ نتایج این صف';status.setAttribute('role','status');toolbar.append(all,previous,status,next);document.getElementById('export-products-list').after(toolbar);
     let page=1,filtered=[];const pageSize=20;
+    window.websiteExportFilteredIds=()=>filtered.map(row=>row.dataset.id);
     const normalize=value=>value.toLowerCase().replace(/ي/g,'ی').replace(/ك/g,'ک').replace(/\u200c/g,'');
     const clear=()=>{rows.forEach(r=>r.querySelector('.chk-export-item').checked=false);document.getElementById('chk-export-select-all').checked=false;};
     function render(){
@@ -44,7 +45,8 @@
         rows.forEach(r=>r.hidden=true);filtered.slice((page-1)*pageSize,page*pageSize).forEach(r=>r.hidden=false);
         status.textContent=`${filtered.length.toLocaleString('fa-IR')} محصول · صفحهٔ ${page.toLocaleString('fa-IR')} از ${pages.toLocaleString('fa-IR')}`;
         previous.disabled=page===1;next.disabled=page===pages;all.disabled=!filtered.some(r=>!r.querySelector('input').disabled);
-        updateSelectedExportCount();
+        const currentUrl=new URL(location.href);for(const [key,value] of Object.entries({we_q:document.getElementById('export-search-input').value,we_status:state,we_sort:order})){if(value&&value!=='all'&&value!=='default')currentUrl.searchParams.set(key,value);else currentUrl.searchParams.delete(key);}history.replaceState(null,'',currentUrl);
+        updateSelectedExportCount();document.dispatchEvent(new Event('workflow-selection'));
     }
     window.switchExportSubTab=tab=>{
         if(!['tab1','tab2','tab3','tab4'].includes(tab))return;
@@ -57,5 +59,5 @@
     window.toggleExportSelectAll=master=>{filtered.filter(r=>!r.hidden).forEach(r=>{const checkbox=r.querySelector('.chk-export-item');if(!checkbox.disabled)checkbox.checked=master.checked;});updateSelectedExportCount();};
     previous.addEventListener('click',()=>{page--;render();});next.addEventListener('click',()=>{page++;render();});all.addEventListener('click',()=>{filtered.forEach(r=>{const checkbox=r.querySelector('.chk-export-item');if(!checkbox.disabled)checkbox.checked=true;});updateSelectedExportCount();});
     document.getElementById('chk-export-select-all').setAttribute('aria-label','انتخاب محصولات همین صفحه');
-    const initial=new URL(location.href).searchParams;show(initial.get('we_view')||(initial.has('wc_queue')?'work':'export'));window.switchExportSubTab(initial.get('we_tab')||'tab2');
+    const initial=new URL(location.href).searchParams;show(initial.get('we_view')||(initial.has('wc_queue')?'work':'export'));window.switchExportSubTab(initial.get('we_tab')||'tab2');document.getElementById('export-search-input').value=initial.get('we_q')||'';const statusFilter=document.getElementById('export-filter-status');if([...statusFilter.options].some(option=>option.value===initial.get('we_status')))statusFilter.value=initial.get('we_status');const sortFilter=document.getElementById('export-sort-order');if([...sortFilter.options].some(option=>option.value===initial.get('we_sort')))sortFilter.value=initial.get('we_sort');render();
 })();

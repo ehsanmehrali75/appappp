@@ -475,7 +475,7 @@ if ($project && isset($_POST['ajax_action'])) {
     header('Content-Type: application/json');
     $action = $_POST['ajax_action'];
 
-    if (in_array($action, ['website_catalog_set_preference','website_catalog_category_rule','website_catalog_set_issue','website_catalog_upload_begin','website_catalog_upload_chunk','website_catalog_preview','website_catalog_apply','website_catalog_resolve','website_catalog_request_image'], true)) {
+    if (in_array($action, ['workflow_export','workflow_preview','workflow_apply','website_catalog_bulk_manage','website_catalog_set_preference','website_catalog_category_rule','website_catalog_set_issue','website_catalog_upload_begin','website_catalog_upload_chunk','website_catalog_preview','website_catalog_apply','website_catalog_resolve','website_catalog_request_image'], true)) {
         if (!hasPermission('products')) { http_response_code(403); echo json_encode(['status'=>'failed','msg'=>'دسترسی ویرایش محصولات مجاز نیست.']); exit; }
         if (!isset($_POST['csrf']) || !hash_equals($_SESSION['website_catalog_csrf'] ?? '', (string)$_POST['csrf'])) { http_response_code(403); echo json_encode(['status'=>'failed','msg'=>'نشست معتبر نیست؛ صفحه را تازه کنید.']); exit; }
         $websiteLock = null;
@@ -486,7 +486,42 @@ if ($project && isset($_POST['ajax_action'])) {
             if (!$websiteLock || !flock($websiteLock,LOCK_EX)) throw new RuntimeException('قفل همگام‌سازی پروژه در دسترس نیست.');
             $freshProject = getCurrentProject($project['id'], true);
             if (!$freshProject) throw new RuntimeException('پروژه یافت نشد.');
-            if($action==='website_catalog_set_preference') {
+            require_once __DIR__.'/inc/WorkflowTransfer.php';
+            if($action==='website_catalog_bulk_manage') {
+                $ids=json_decode($_POST['ids']??'null',true);$operation=$_POST['operation']??'';
+                if(!$ids)throw new RuntimeException('ابتدا محصول انتخاب کنید.');
+                WorkflowTransfer::validateIds($freshProject,$ids);$ids=array_values(array_unique($ids));
+                if($operation==='content_request'&&!ImageProduction::canRequest($freshProject))AccessControl::deny();
+                $updated=[];$skipped=0;
+                foreach(array_chunk($ids,100) as $part){$result=WebsiteCatalogSync::bulkManage($freshProject,$part,$operation,$_SESSION['user']['username']??'');$updated=array_merge($updated,$result['products']);$skipped+=$result['skipped'];}
+                if($updated&&!saveProject($freshProject,$updated))throw new RuntimeException('ثبت گروهی ناموفق بود.');
+                echo json_encode(['status'=>'success','updated'=>count($updated),'skipped'=>$skipped,'msg'=>'ثبت شد: '.count($updated).' محصول؛ بدون تغییر: '.$skipped],JSON_UNESCAPED_UNICODE);
+            } elseif($action==='workflow_export') {
+                $scope=$_POST['scope']??'queue';
+                if(!in_array($scope,['queue','images'],true))throw new RuntimeException('بخش خروجی معتبر نیست.');
+                $filters=json_decode($_POST['filters']??'{}',true);if(!is_array($filters))throw new RuntimeException('فیلتر معتبر نیست.');
+                $ids=$scope==='images'?json_decode($_POST['ids']??'null',true):null;
+                if($scope==='images'&&!is_array($ids))throw new RuntimeException('فهرست محصولات لازم است.');
+                $payload=WorkflowTransfer::export($freshProject,$filters,$ids);
+                echo json_encode(['status'=>'success','payload'=>$payload],JSON_UNESCAPED_UNICODE|JSON_INVALID_UTF8_SUBSTITUTE);
+            } elseif($action==='workflow_preview') {
+                require_once __DIR__.'/inc/WebsiteCatalogUpload.php';
+                $owner=hash('sha256',session_id().'|'.($_SESSION['user']['username']??''));
+                $raw=isset($_POST['upload_token'])?WebsiteCatalogUpload::read($_POST['upload_token'],(string)$project['id'],$owner):($_POST['data']??'');
+                if(!is_string($raw)||strlen($raw)>WebsiteCatalogUpload::MAX_BYTES)throw new RuntimeException('حداکثر حجم فایل ده مگابایت است.');
+                $payload=json_decode($raw,true);$result=WorkflowTransfer::plan($freshProject,$payload,$_SESSION['user']['username']??'',ImageProduction::canRequest($freshProject));
+                $token=bin2hex(random_bytes(24));
+                $_SESSION['workflow_preview']=['token'=>$token,'project'=>$project['id'],'expires'=>time()+900,'base'=>WebsiteCatalogSync::fingerprint($freshProject),'payload'=>$payload];
+                echo json_encode(['status'=>'success','token'=>$token,'updated'=>$result['updated'],'unchanged'=>$result['unchanged'],'skipped_requests'=>$result['skipped_requests'],'changes'=>array_slice($result['changes'],0,100)],JSON_UNESCAPED_UNICODE);
+            } elseif($action==='workflow_apply') {
+                $pending=$_SESSION['workflow_preview']??[];
+                if(($pending['project']??'')!==$project['id']||($pending['expires']??0)<time()||empty($_POST['token'])||!is_string($_POST['token'])||!hash_equals($pending['token']??'',$_POST['token']))throw new RuntimeException('پیش‌نمایش منقضی یا متعلق به پروژهٔ دیگری است.');
+                if(!hash_equals($pending['base'],WebsiteCatalogSync::fingerprint($freshProject)))throw new RuntimeException('اطلاعات پس از پیش‌نمایش تغییر کرده؛ دوباره پیش‌نمایش بگیرید.');
+                $result=WorkflowTransfer::plan($freshProject,$pending['payload'],$_SESSION['user']['username']??'',ImageProduction::canRequest($freshProject));
+                if($result['products']&&!saveProject($freshProject,$result['products']))throw new RuntimeException('ذخیرهٔ تغییرات ناموفق بود.');
+                unset($_SESSION['workflow_preview']);
+                echo json_encode(['status'=>'success','updated'=>$result['updated'],'msg'=>'وضعیت '.$result['updated'].' محصول به‌روز شد؛ محصول جدیدی ساخته نشد.'],JSON_UNESCAPED_UNICODE);
+            } elseif($action==='website_catalog_set_preference') {
                 $updated=WebsiteCatalogSync::setContentPreference($freshProject,$_POST['product_id']??'',$_POST['value']??'',$_SESSION['user']['username']??'',$_POST['asset']??'image');
                 if(!saveProject($freshProject,[$updated]))throw new RuntimeException('ثبت تنظیم عکس ناموفق بود.');
                 echo json_encode(['status'=>'success','msg'=>'تنظیم عکس ثبت شد.'],JSON_UNESCAPED_UNICODE);
@@ -8897,7 +8932,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                 <select id="export-filter-status" onchange="filterExportList()" class="bg-transparent text-xs font-black text-slate-700 focus:outline-none cursor-pointer">
                                     <option value="all">همه موارد</option>
                                     <option value="pending_upload">⏳ منتظر آپلود</option>
-                                    <option value="pending_image">📸 منتظر تولید عکس</option><option value="technical_pending">باگ فنی</option><option value="inventory_issue">مشکل موجودی</option>
+                                    <option value="pending_image">📸 منتظر تولید عکس</option><option value="image_not_required">عکس نیاز ندارد</option><option value="technical_pending">باگ فنی</option><option value="inventory_issue">مشکل موجودی</option>
                                     <option value="uploaded">✓ آپلود شده به سایت</option>
                                     <option value="pending_portal">⚠️ منتظر تایید پورتال</option>
                                 </select>
@@ -8916,6 +8951,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         </div>
                     </div>
 
+                    <?php $workflowScope='images';require __DIR__.'/inc/WebsiteWorkflowTools.php'; ?>
                     <!-- Products Grid/List Container -->
                     <div class="overflow-x-auto">
                         <!-- Head Bar -->
@@ -8964,6 +9000,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                         $statusKey = 'pending_upload';
                                     }
                                     
+                                    if(ImageProduction::imageExempt($p))$statusKey='image_not_required';
                                     if(ImageProduction::issueType($p)!=='')$statusKey=ImageProduction::issueType($p)==='technical'?'technical_pending':'inventory_issue';
                                     // Row data attributes for filtering
                                     $rowClasses = "product-export-row flex items-center gap-4 bg-white border border-slate-100 hover:border-slate-200 p-4 rounded-xl transition-all";
@@ -9079,10 +9116,12 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                             $p_status = $websiteQueue['approval_pending']?'pending':'active';
                                             $originallyNoImage = empty(WebsiteCatalogSync::photos($p));
                                             
-                                            if ($originallyNoImage): ?>
-                                                <!-- If it has no image, it must always display "منتظر آپلود تصویر" -->
+                                            if ($websiteQueue['production_blocked']): ?><span class="wc-badge"><?php echo $websiteQueue['issue_type']==='technical'?'در بررسی فنی':'مشکل موجودی'; ?></span>
+                                            <?php elseif($websiteQueue['image_not_required']): ?><span class="wc-badge">عکس نیاز ندارد</span>
+                                            <?php elseif ($originallyNoImage): ?>
+                                                <!-- Photo production is separate from uploading an approved image. -->
                                                 <span class="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-black bg-rose-50 text-rose-700 px-2 sm:px-3 py-1.5 rounded-full ring-1 ring-rose-100/50 animate-pulse">
-                                                    <span>📸</span> <span class="hidden sm:inline">منتظر آپلود تصویر</span><span class="sm:hidden">آپ تصویر</span>
+                                                    <span>📸</span> <span class="hidden sm:inline">منتظر تولید تصویر</span><span class="sm:hidden">تولید عکس</span>
                                                 </span>
                                             <?php elseif ($p_status !== 'active'): ?>
                                                 <!-- If it has an image but is not approved/active yet -->
