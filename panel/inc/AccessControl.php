@@ -61,7 +61,7 @@ class AccessControl {
 
     public static function parentFeature($key) {
         $key = self::featureKey($key);
-        $granular = ['library' => 'products', 'reference_photo' => 'products', 'approve_content' => 'products',
+        $granular = ['ai_connect'=>'products', 'library' => 'products', 'reference_photo' => 'products', 'approve_content' => 'products',
             'approve' => 'products', 'colleague' => 'products', 'prompthub_manage' => 'prompthub', 'layout' => 'vm_studio'];
         if (isset($granular[$key])) return $granular[$key];
         if (strpos($key, 'seo_intel_') === 0) return 'seo_intel';

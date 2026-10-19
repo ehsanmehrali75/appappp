@@ -38,6 +38,7 @@ class FeatureFlags {
      */
     public static function getCatalog() {
         return [
+            'ai_connect'=>['key'=>'ai_connect','title'=>'اتصال ChatGPT و گزارش هوشمند','icon'=>'✨','category'=>'settings_users','category_title'=>'⚙️ مدیریت و دسترسی‌ها','desc'=>'اتصال پروژه‌ای ChatGPT، منابع API، کیف پول و گزارش زمان‌بندی‌شده','url'=>'ai-connect.php','type'=>'page'],
             'support' => ['key'=>'support','title'=>'پشتیبانی','icon'=>'🎫','category'=>'settings_users','category_title'=>'⚙️ مدیریت و دسترسی‌ها','desc'=>'ثبت درخواست، پاسخ ادمین اصلی و تأیید هزینه با مهلت ۴۸ ساعت','url'=>'support.php','type'=>'page'],
             // ==========================================
             // دسته ۱: مدیریت کلان وب‌سایت (Core System)

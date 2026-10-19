@@ -2,6 +2,7 @@
 require_once __DIR__.'/inc/OutputBuffer.php';
 OutputBuffer::start();
 require_once 'inc/functions.php';
+require_once __DIR__.'/inc/ModuleProjectAccess.php';
 require_once __DIR__.'/inc/ProjectPermissions.php';
 require_once 'inc/cors.php';
 
@@ -6560,6 +6561,9 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         <a href="?tab=adv_plan" class="nav-link <?php echo $tab=='adv_plan'?'active':''; ?>"><span>📢</span> <span>پلن تبلیغاتی</span><?php echo getModuleVisibilityBadge('adv_plan', $project); ?></a>
                         <?php endif; ?>
 
+                        <?php if(ModuleProjectAccess::allowed('products','products','ai_connect','view')): ?>
+                        <a href="ai-connect.php?project=<?php echo rawurlencode($project['id']); ?>" class="nav-link"><span>✨</span><span>اتصال و گزارش هوشمند</span></a>
+                        <?php endif; ?>
                         <?php if(canAccessFeature('auto_admin')): ?>
                         <a href="?tab=auto_admin" class="nav-link <?php echo ($tab=='auto_admin' || $tab=='auto_admin_logs')?'active':''; ?>"><span>🤖</span> <span>ادمین خودکار (Auto)</span><?php echo getModuleVisibilityBadge('auto_admin', $project); ?></a>
                         <?php endif; ?>

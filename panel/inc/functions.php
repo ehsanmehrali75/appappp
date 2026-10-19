@@ -7461,7 +7461,7 @@ function enforceFeatureRequestAccess() {
     // These controllers resolve business/store resources to their real project
     // before applying ModuleProjectAccess, including every direct/pretty alias.
     $controller = str_replace('\\', '/', realpath($_SERVER['SCRIPT_FILENAME'] ?? '') ?: '');
-    if (in_array($controller, [realpath(__DIR__.'/../vm/index.php'), realpath(__DIR__.'/../vm/api.php'),
+    if (in_array($controller, [realpath(__DIR__.'/../ai-connect.php'), realpath(__DIR__.'/../vm/index.php'), realpath(__DIR__.'/../vm/api.php'),
         realpath(__DIR__.'/../seo_intel/index.php'), realpath(__DIR__.'/../seo_intel/api.php'),
         realpath(__DIR__.'/../pro/index.php')], true)) return;
     $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';

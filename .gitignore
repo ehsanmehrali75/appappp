@@ -10,3 +10,6 @@ __pycache__/
 /panel/db/database.local.php
 /panel/db/cache/
 *.local.php
+
+# Encrypted AI credentials, OAuth grants and financial/runtime state
+/panel/db/ai-private/

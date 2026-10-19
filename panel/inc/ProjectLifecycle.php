@@ -149,6 +149,8 @@ class ProjectLifecycle {
         } catch(Throwable $e) {
             if(isset($db)&&$db)$db->rollback();foreach($backups as $file=>$raw){if($raw===null)@unlink($file);else file_put_contents($file,$raw,LOCK_EX);}throw $e;
         } finally {flock($lock,LOCK_UN);fclose($lock);}
+        $aiDir=getenv('MAARKSHO_AI_STATE_DIR')?:dirname(__DIR__).'/db/ai-private';
+        if(is_dir($aiDir)){require_once __DIR__.'/ai/Store.php';try{(new AiStore($aiDir))->purgeProject($pid);}catch(Throwable $e){error_log('AI project cleanup failed: '.hash('sha256',$pid));}}
         MaarkshoCache::delete('project_full_'.$pid);
         $failed=0;foreach(array_merge(array_keys($paths),$privateFiles) as $path)if(is_file($path)&&!@unlink($path)){$failed++;error_log('Project asset cleanup failed: '.hash('sha256',$path));}
         foreach($ownedFolders as $folder)if(is_dir($folder)&&!is_link($folder)&&count(scandir($folder))===2)@rmdir($folder);

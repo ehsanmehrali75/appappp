@@ -9,6 +9,9 @@ Options -Indexes
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /
+    RewriteRule ^\.well-known/oauth-protected-resource(?:/panel/ai_mcp\.php)?$ panel/ai_oauth.php?action=resource [END]
+    RewriteRule ^\.well-known/(?:oauth-authorization-server|openid-configuration)(?:/panel/ai_mcp\.php)?$ panel/ai_oauth.php?action=metadata [END]
+
 
     RewriteRule (^|/)(?:\.git|db|inc|tmp|tests|tools)(?:/|$) - [F,L,NC]
     RewriteRule (?:^|/)uploads/.*\.(?:php[0-9]*|phtml|phar|cgi|html?|svg)(?:\.|$) - [F,L,NC]

@@ -11,6 +11,13 @@ if(preg_match('~(?:^|/)(?:\.git|\.env(?:\.[^/]*)?|db|inc|tmp|tests|tools)(?:/|$)
     http_response_code(404);return true;
 }
 
+// OAuth discovery for the project-scoped MCP resource.
+if (preg_match('~^/\.well-known/(oauth-authorization-server|openid-configuration|oauth-protected-resource)(?:/panel/ai_mcp\.php)?$~', $uri, $aiMatch)) {
+    $_GET['action']=$aiMatch[1]==='oauth-protected-resource'?'resource':'metadata';
+    $_SERVER['SCRIPT_FILENAME']=__DIR__.'/panel/ai_oauth.php';
+    require __DIR__.'/panel/ai_oauth.php';return true;
+}
+
 // 1. Direct Static File Check
 $filePath = __DIR__ . $uri;
 if ($uri !== '/' && file_exists($filePath) && !is_dir($filePath)) {
