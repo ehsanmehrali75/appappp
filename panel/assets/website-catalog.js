@@ -59,6 +59,20 @@
         finally {busy=false;byId('preview').disabled=false;byId('apply').disabled=false;['file','price-unit','price','stock','complete'].forEach(name=>byId(name).disabled=false);}
     }
     byId('preview').addEventListener('click',()=>perform('preview'));byId('apply').addEventListener('click',()=>perform('apply'));
+    panel.querySelectorAll('.wc-quick').forEach(button=>button.addEventListener('click',async()=>{
+        const row=button.closest('.wc-product');const controls=row.querySelectorAll('.wc-quick');controls.forEach(item=>item.disabled=true);
+        try {
+            const values={product_id:button.dataset.id};
+            if(button.dataset.action==='website_catalog_set_issue') {values.issue_type=button.dataset.value;values.note='';}
+            else values.value=button.dataset.value;
+            await request(button.dataset.action,values);location.reload();
+        } catch(error){show(error.message);byId('result').focus();controls.forEach(item=>item.disabled=false);}
+    }));
+    panel.querySelectorAll('.website-catalog-category-form').forEach(form=>form.addEventListener('submit',async event=>{
+        event.preventDefault();const button=form.querySelector('button');button.disabled=true;
+        try {await request('website_catalog_category_rule',Object.fromEntries(new FormData(form)));location.reload();}
+        catch(error){show(error.message);byId('result').focus();button.disabled=false;}
+    }));
     panel.querySelectorAll('.website-catalog-issue-form').forEach(form=>form.addEventListener('submit',async event=>{
         event.preventDefault();const button=form.querySelector('button');button.disabled=true;
         try {const values=Object.fromEntries(new FormData(form));await request('website_catalog_set_issue',{product_id:values.product_id,issue_type:values.issue_type,note:values.note});location.reload();}

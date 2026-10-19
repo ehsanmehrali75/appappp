@@ -2,11 +2,11 @@
 /** Shared catalog views; publication evidence remains separate from portal image approval. */
 class ProductWorkflow {
     public static function label($status) {
-        return ['technical_pending'=>'باگ فنی؛ در حال بررسی','inventory_issue'=>'مشکل موجودی؛ در حال بررسی','active'=>'تصاویر تأییدشده','image_request'=>'درخواست تولید تصویر','pending_approval'=>'منتظر تأیید تصویر','out_of_stock'=>'ناموجود؛ در آرشیو',
+        return ['image_not_required'=>'عکس نیاز ندارد','technical_pending'=>'باگ فنی؛ در حال بررسی','inventory_issue'=>'مشکل موجودی؛ در حال بررسی','active'=>'تصاویر تأییدشده','image_request'=>'درخواست تولید تصویر','pending_approval'=>'منتظر تأیید تصویر','out_of_stock'=>'ناموجود؛ در آرشیو',
             'rejected'=>'تصویر ردشده','waiting_reference'=>'منتظر عکس رفرنس','waiting_ai_image'=>'منتظر عکس نهایی','no_image'=>'منتظر تولید عکس'][$status]??'نیازمند بررسی';
     }
     public static function filters() {
-        return ['all'=>'همهٔ محصولات','ready'=>'تصاویر تأییدشده','pending_approval'=>'منتظر تأیید تصویر',
+        return ['image_not_required'=>'عکس نیاز ندارد','all'=>'همهٔ محصولات','ready'=>'تصاویر تأییدشده','pending_approval'=>'منتظر تأیید تصویر',
             'image_request'=>'درخواست تولید تصویر','needs_reference'=>'عکس رفرنس ندارد','reference_ready'=>'رفرنس دارد؛ آمادهٔ تولید',
             'needs_image'=>'گردش تولید تصویر','production_ready'=>'آمادهٔ تولید عکس','pending_upload'=>'منتظر آپلود عکس','needs_size_chart'=>'منتظر تولید جدول سایز',
             'size_chart_upload'=>'منتظر آپلود جدول سایز','needs_description'=>'منتظر تولید توضیحات',
@@ -14,6 +14,7 @@ class ProductWorkflow {
     }
     public static function matches($project,$product,$filter,$state=null,$status=null) {
         if($filter==='all')return true;
+        if($filter==='image_not_required')return ImageProduction::imageExempt($product);
         $issue=ImageProduction::issueType($product);
         if($filter==='inventory_issue')return $issue==='inventory';
         if($filter==='photo_review'){$review=$state??WebsiteCatalogSync::state($project,$product);return $issue!==''||$review['needs_image']||$review['publication']==='technical_pending';}

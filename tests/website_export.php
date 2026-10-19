@@ -38,5 +38,12 @@ $held=$project;WebsiteCatalogSync::setIssue($held,'one','inventory','اختلا�
 $heldExport=(new WebsiteExportPackage($dir))->build($held,['one'],true);
 weCheck($heldExport['exported_ids']===[]&&$heldExport['zip_url']===null,'issue product is not exported before review');
 weCheck(count($heldExport['warnings'])===1,'blocked export reports the review reason');
+$optedOut=$project;WebsiteCatalogSync::setContentPreference($optedOut,'one','not_required','reviewer');
+$optedExport=(new WebsiteExportPackage($dir))->build($optedOut,['one'],true);
+weCheck($optedExport['exported_ids']===[]&&count($optedExport['warnings'])===1,'explicit image opt-out excluded from image export');
+$chartFree=$project;$chartFree['products'][0]['categories']=['group'=>'کفش'];WebsiteCatalogSync::setCategoryRule($chartFree,'کفش','not_required');
+$chartFreeExport=(new WebsiteExportPackage($dir))->build($chartFree,['one']);
+weCheck(!in_array('chart',$chartFreeExport['receipts']['one']['assets'],true),'chart-exempt categories export images without chart');
+weCheck(!(bool)array_filter($chartFreeExport['warnings'],static fn($message)=>strpos($message,'جدول سایز')!==false),'no missing-chart warnings for exempt category');
 $zip->close();foreach(glob($dir.'/*') as $file){if(is_file($file))unlink($file);}unlink($dir.'/one/photo.png');unlink($dir.'/two/photo.png');rmdir($dir.'/one');rmdir($dir.'/two');rmdir($dir);
 echo "$n website export integration checks passed\n";

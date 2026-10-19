@@ -65,3 +65,36 @@ class ProductReview(unittest.TestCase):
         with sqlite3.connect(self.case.database) as db:db.execute('INSERT OR REPLACE INTO products(id,project_id,name) VALUES ("foreign-review","other","Private")')
         code,_=self.case.request(self.opener,'/panel/admin.php?tab=extract',dict(ajax_action='website_catalog_set_issue',csrf=self.site_csrf,product_id='foreign-review',issue_type='technical'),{'X-CSRF-Token':self.token})
         self.assertEqual(code,400)
+
+    def action(self,action,**fields):
+        code,body=self.case.request(self.opener,'/panel/admin.php?tab=extract',dict(ajax_action=action,csrf=self.site_csrf,**fields),{'X-CSRF-Token':self.token})
+        self.assertEqual(code,200,body);self.assertEqual(json.loads(body)['status'],'success')
+
+    def test_image_opt_out_is_persistent_independent_and_reversible(self):
+        self.action('website_catalog_set_preference',product_id='one',value='not_required')
+        self.assertTrue(self.contains('image_not_required'))
+        for queue in ['missing_photo','pending_image','needs_reference']:self.assertFalse(self.contains(queue),queue)
+        self.mark('technical');self.assertTrue(self.contains('technical_pending'))
+        self.mark('none');self.assertTrue(self.contains('image_not_required'));self.assertFalse(self.contains('missing_photo'))
+        self.action('website_catalog_set_preference',product_id='one',value='required')
+        self.assertTrue(self.contains('missing_photo'));self.assertTrue(self.contains('needs_reference'))
+        self.assertEqual(self.case.record()['stock_total'],'10')
+
+    def test_category_rule_excludes_only_matching_project_category_and_reverses(self):
+        with sqlite3.connect(self.case.database) as db:
+            db.execute('UPDATE products SET website_sync=? WHERE id="one"',(json.dumps({'category_labels':['کفش','دویدن']}),))
+        for path in (self.case.app/'panel/db/cache').glob('*.cache'):path.unlink()
+        self.assertTrue(self.contains('needs_size_chart'))
+        self.action('website_catalog_category_rule',category='کفش',value='not_required')
+        self.assertFalse(self.contains('needs_size_chart'));self.assertTrue(self.contains('chart_not_required'))
+        self.assertTrue(self.contains('needs_size_chart','manual'))
+        self.action('website_catalog_category_rule',category='کفش',value='required')
+        self.assertTrue(self.contains('needs_size_chart'));self.assertFalse(self.contains('chart_not_required'))
+
+    def test_preferences_and_category_rules_require_edit_access(self):
+        viewer,token=self.case.login('viewer')
+        for action,fields in [('website_catalog_set_preference',dict(product_id='one',value='not_required')),('website_catalog_category_rule',dict(category='کفش',value='not_required'))]:
+            code,_=self.case.request(viewer,'/panel/admin.php?tab=extract',dict(ajax_action=action,csrf=self.site_csrf,**fields),{'X-CSRF-Token':token});self.assertEqual(code,403)
+            code,_=self.case.request(self.opener,'/panel/admin.php?tab=extract',dict(ajax_action=action,**fields),{'X-CSRF-Token':self.token});self.assertEqual(code,403)
+        code,_=self.case.request(self.opener,'/panel/admin.php?tab=extract',dict(ajax_action='website_catalog_set_preference',csrf=self.site_csrf,product_id='foreign',value='not_required'),{'X-CSRF-Token':self.token});self.assertEqual(code,400)
+        code,_=self.case.request(self.opener,'/panel/admin.php?tab=extract',dict(ajax_action='website_catalog_category_rule',csrf=self.site_csrf,category='unknown',value='not_required'),{'X-CSRF-Token':self.token});self.assertEqual(code,400)

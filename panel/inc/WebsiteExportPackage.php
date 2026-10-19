@@ -68,6 +68,7 @@ class WebsiteExportPackage {
                 $sku=(string)($product['sku']??$id);$state=WebsiteCatalogSync::state($project,$product);
                 if($state['archived']){$warnings[]=$sku.': ناموجود؛ از خروجی اجرایی کنار گذاشته شد.';continue;}
                 if($state['production_blocked']){$warnings[]=$sku.': مشکل فنی یا موجودی ثبت شده؛ ابتدا بررسی را تکمیل کنید.';continue;}
+                if($state['image_not_required']){$warnings[]=$sku.': عکس برای این محصول لازم نیست؛ از خروجی تصویر کنار گذاشته شد.';continue;}
                 $photos=WebsiteCatalogSync::photos($product);
                 if(!$photos||WebsiteCatalogSync::pendingApprovalPhotos($product)){$warnings[]=$sku.': عکس نهایی موجود نیست یا هنوز تأیید نشده است.';continue;}
                 $folder=self::name($sku).' - '.self::name($product['name']??$id).' - '.self::name($product['color']??'');
@@ -75,8 +76,8 @@ class WebsiteExportPackage {
                 try{
                     foreach($photos as $index=>$url){$bytes=$this->read($url);if(!$bytes)throw new RuntimeException('دریافت عکس '.($index+1).' ناموفق بود.');foreach(self::pair($bytes,true) as $ext=>$data)$files[$folder.'/'.($index===0?'main':'gallery_'.$index).'.'.$ext]=$data;}
                     $chart=$state['chart'];
-                    if($chart['image_url']){$bytes=$this->read($chart['image_url']);if(!$bytes)throw new RuntimeException('دریافت جدول سایز ناموفق بود.');foreach(self::pair($bytes,false) as $ext=>$data)$files[$folder.'/size_chart.'.$ext]=$data;$assets[]='chart';}
-                    else $warnings[]=$sku.': جدول سایز در بسته نیست؛ ابتدا در استودیو تولید یا خروجی تصویر بگیرید.';
+                    if(!$state['chart_not_required']&&$chart['image_url']){$bytes=$this->read($chart['image_url']);if(!$bytes)throw new RuntimeException('دریافت جدول سایز ناموفق بود.');foreach(self::pair($bytes,false) as $ext=>$data)$files[$folder.'/size_chart.'.$ext]=$data;$assets[]='chart';}
+                    elseif(!$state['chart_not_required']) $warnings[]=$sku.': جدول سایز در بسته نیست؛ ابتدا در استودیو تولید یا خروجی تصویر بگیرید.';
                     $description=trim((string)($product['description']??''));
                     if($description!==''){$files[$folder.'/توضیحات محصول.txt']=html_entity_decode(strip_tags($description),ENT_QUOTES,'UTF-8');$assets[]='description';}
                     else $warnings[]=$sku.': توضیحات هنوز تولید نشده است.';

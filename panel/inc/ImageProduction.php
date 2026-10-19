@@ -20,12 +20,16 @@ class ImageProduction {
         $type=is_array($meta)?($meta['review_issue']['type']??''):'';
         return in_array($type,['technical','inventory'],true)?$type:'';
     }
+    public static function imageExempt($product) {
+        $meta=$product['website_sync']??[];if(is_string($meta))$meta=json_decode($meta,true);
+        return !empty($meta['content_preferences']['image_not_required']);
+    }
     public static function state($project,$product,$hasFinal,$archived=false) {
         $referenceRequired=!empty($project['settings']['prod_require_reference']);
         $requestRequired=!empty($project['settings']['prod_require_image_request']);
         $references=self::references($product);$requested=!empty($product['content_gen_requested']);
         $issue=self::issueType($product);$blocked=$issue!=='';
-        $eligible=!$archived&&!$hasFinal&&!$blocked;
+        $exempt=self::imageExempt($product);$eligible=!$archived&&!$hasFinal&&!$blocked&&!$exempt;
         $needsRequest=$eligible&&$requestRequired&&!$requested;
         $needsReference=$eligible&&!$needsRequest&&!$references;
         $ready=$eligible&&!$needsRequest&&(!$referenceRequired||$references);
@@ -33,7 +37,7 @@ class ImageProduction {
         return ['request_required'=>$requestRequired,'reference_required'=>$referenceRequired,'requested'=>$requested,
             'has_reference'=>(bool)$references,'reference_urls'=>$references,'needs_image_request'=>$needsRequest,
             'needs_reference'=>$needsReference,'reference_ready'=>$eligible&&!$needsRequest&&(bool)$references,
-            'can_produce_image'=>$ready,'blocked_by_issue'=>$blocked,'stage'=>$stage];
+            'image_not_required'=>$exempt,'can_produce_image'=>$ready,'blocked_by_issue'=>$blocked,'stage'=>$stage];
     }
     public static function canRequest($project,$user=null) {
         return self::allowedOperator($project,'prod_content_gen_users',$user);

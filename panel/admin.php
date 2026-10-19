@@ -475,7 +475,7 @@ if ($project && isset($_POST['ajax_action'])) {
     header('Content-Type: application/json');
     $action = $_POST['ajax_action'];
 
-    if (in_array($action, ['website_catalog_set_issue','website_catalog_upload_begin','website_catalog_upload_chunk','website_catalog_preview','website_catalog_apply','website_catalog_resolve','website_catalog_request_image'], true)) {
+    if (in_array($action, ['website_catalog_set_preference','website_catalog_category_rule','website_catalog_set_issue','website_catalog_upload_begin','website_catalog_upload_chunk','website_catalog_preview','website_catalog_apply','website_catalog_resolve','website_catalog_request_image'], true)) {
         if (!hasPermission('products')) { http_response_code(403); echo json_encode(['status'=>'failed','msg'=>'دسترسی ویرایش محصولات مجاز نیست.']); exit; }
         if (!isset($_POST['csrf']) || !hash_equals($_SESSION['website_catalog_csrf'] ?? '', (string)$_POST['csrf'])) { http_response_code(403); echo json_encode(['status'=>'failed','msg'=>'نشست معتبر نیست؛ صفحه را تازه کنید.']); exit; }
         $websiteLock = null;
@@ -486,7 +486,15 @@ if ($project && isset($_POST['ajax_action'])) {
             if (!$websiteLock || !flock($websiteLock,LOCK_EX)) throw new RuntimeException('قفل همگام‌سازی پروژه در دسترس نیست.');
             $freshProject = getCurrentProject($project['id'], true);
             if (!$freshProject) throw new RuntimeException('پروژه یافت نشد.');
-            if($action==='website_catalog_set_issue') {
+            if($action==='website_catalog_set_preference') {
+                $updated=WebsiteCatalogSync::setContentPreference($freshProject,$_POST['product_id']??'',$_POST['value']??'',$_SESSION['user']['username']??'');
+                if(!saveProject($freshProject,[$updated]))throw new RuntimeException('ثبت تنظیم عکس ناموفق بود.');
+                echo json_encode(['status'=>'success','msg'=>'تنظیم عکس ثبت شد.'],JSON_UNESCAPED_UNICODE);
+            } elseif($action==='website_catalog_category_rule') {
+                WebsiteCatalogSync::setCategoryRule($freshProject,$_POST['category']??'',$_POST['value']??'');
+                if(!saveProject($freshProject))throw new RuntimeException('ثبت قانون دسته‌بندی ناموفق بود.');
+                echo json_encode(['status'=>'success','msg'=>'قانون جدول سایز ثبت شد.'],JSON_UNESCAPED_UNICODE);
+            } elseif($action==='website_catalog_set_issue') {
                 $updated=WebsiteCatalogSync::setIssue($freshProject,$_POST['product_id']??'',$_POST['issue_type']??'',$_POST['note']??'',$_SESSION['user']['username']??'');
                 if(!saveProject($freshProject,[$updated]))throw new RuntimeException('ثبت وضعیت بررسی ناموفق بود.');
                 echo json_encode(['status'=>'success','msg'=>'وضعیت بررسی ثبت شد؛ صف محصول به‌روز شد.'],JSON_UNESCAPED_UNICODE);
@@ -8807,15 +8815,15 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     $p = $item['product'];
                     $allProds[] = $p;
                     $isApproved = !WebsiteCatalogSync::state($project,$p)['approval_pending'];
-                    if ($item['hasManualPhoto'] && !$item['isUploaded'] && $isApproved && ImageProduction::issueType($p)==='') {
+                    if ($item['hasManualPhoto'] && !$item['isUploaded'] && $isApproved && ImageProduction::issueType($p)==='' && !ImageProduction::imageExempt($p)) {
                         $tab2Prods[] = $p;
                     }
                     
                     // Tab 3: Has size chart defect or manual size chart requested
                     $hasSizeChart = ProductSizeChartCatalog::forProduct($project,$p)['exists'];
                     $websiteQueue = WebsiteCatalogSync::state($project,$p);
-                    $isSizeChartIncomplete = !empty($p['size_chart_incomplete']) || $websiteQueue['needs_size_chart'] || $websiteQueue['size_chart_upload_pending'];
-                    $isManualSizeChartRequested = !empty($p['manual_size_chart_requested']);
+                    $isSizeChartIncomplete = !$websiteQueue['chart_not_required'] && (!empty($p['size_chart_incomplete']) || $websiteQueue['needs_size_chart'] || $websiteQueue['size_chart_upload_pending']);
+                    $isManualSizeChartRequested = !$websiteQueue['chart_not_required'] && !empty($p['manual_size_chart_requested']);
                     if ($isSizeChartIncomplete || $isManualSizeChartRequested) {
                         $tab3Prods[] = $p;
                     }
@@ -8962,12 +8970,12 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                     $subtabType = "tab1";
                                     
                                     // If subtab is tab2, but this product does not qualify, we hide it under tab2 active
-                                    $qualifiesForTab2 = $hasManualPhoto && !$isUploaded && $isActive && ImageProduction::issueType($p)==='';
+                                    $qualifiesForTab2 = $hasManualPhoto && !$isUploaded && $isActive && ImageProduction::issueType($p)==='' && !ImageProduction::imageExempt($p);
                                     
                                     $hasSizeChart = ProductSizeChartCatalog::forProduct($project,$p)['exists'];
                                     $websiteQueue = WebsiteCatalogSync::state($project,$p);
-                    $isSizeChartIncomplete = !empty($p['size_chart_incomplete']) || $websiteQueue['needs_size_chart'] || $websiteQueue['size_chart_upload_pending'];
-                                    $isManualSizeChartRequested = !empty($p['manual_size_chart_requested']);
+                    $isSizeChartIncomplete = !$websiteQueue['chart_not_required'] && (!empty($p['size_chart_incomplete']) || $websiteQueue['needs_size_chart'] || $websiteQueue['size_chart_upload_pending']);
+                                    $isManualSizeChartRequested = !$websiteQueue['chart_not_required'] && !empty($p['manual_size_chart_requested']);
                                     $qualifiesForTab3 = ($isSizeChartIncomplete || $isManualSizeChartRequested);
                                     
                                     $isERPWithStock = (

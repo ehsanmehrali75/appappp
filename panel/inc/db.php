@@ -708,7 +708,16 @@ function db_save_project($project, $onlyProducts = null, $onlySchedules = null, 
                             $p_stage2_decision = (string)($p['stage2_decision'] ?? 'pending');
                             $p_size_chart_uploaded = (int)(!empty($p['size_chart_uploaded']) ? 1 : 0);
                             $p_size_chart_uploaded_at = (string)($p['size_chart_uploaded_at'] ?? '');
-                            $p_website_sync = json_encode($p['website_sync'] ?? (object)[], JSON_UNESCAPED_UNICODE);
+                            $websiteMeta=$p['website_sync']??[];
+                            if(is_string($websiteMeta))$websiteMeta=json_decode($websiteMeta,true);
+                            if(!is_array($websiteMeta))$websiteMeta=[];
+                            if(class_exists('WebsiteCatalogSync')) {
+                                // Preserve source categories in the existing per-product metadata column.
+                                $categorySource=array_intersect_key($p,array_flip(['categories','category','category_path']));
+                                $categoryLabels=WebsiteCatalogSync::categories($categorySource);
+                                if($categoryLabels)$websiteMeta['category_labels']=$categoryLabels;
+                            }
+                            $p_website_sync = json_encode($websiteMeta?: (object)[], JSON_UNESCAPED_UNICODE);
                             
                             $stmt->bind_param("ssssssssssiiiissssssssssissssisissssssiisssssssiss",
                                 $p_id, $p_project_id, $p_sku, $p_name, $p_desc, $p_image, $p_social, $gallery, $p_link, 

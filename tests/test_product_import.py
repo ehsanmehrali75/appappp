@@ -5,6 +5,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from urllib.parse import quote
 from unittest.mock import patch
 import test_http_security as fixtures
 
@@ -111,3 +112,13 @@ class ProductImport(unittest.TestCase):
                 self.assertEqual(code,422,body)
                 self.assertIn('بخش ارسالی معتبر نیست',json.loads(body)['error'])
         self.assertEqual(self.call('status',job=job)['uploaded'],0)
+
+    def test_category_labels_survive_sql_save_for_work_queue_rules(self):
+        rows=[dict(sku='one',name='محصول one',color='عمومی',stock_tedad=8,category=['زنانه','کفش','دویدن'])]
+        job,state=self.prepare(rows)
+        while state['state']!='done':state=self.call('apply',job=job)
+        meta=json.loads(self.case.record()['website_sync'])
+        self.assertIn('کفش',meta['category_labels'])
+        code,body=self.case.request(self.opener,'/panel/admin.php?tab=extract&wc_category='+quote('کفش'))
+        self.assertEqual(code,200)
+        self.assertIn('data-product-id="one"',body)

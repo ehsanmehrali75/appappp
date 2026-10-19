@@ -154,6 +154,7 @@ class WebsiteCatalogSync {
         $chart=ProductSizeChartCatalog::forProduct($project,$product);
         $siteChart=($meta['has_size_chart']??null)===true;
         $hasChart=$chart['exists']||$siteChart;
+        $imageExempt=ImageProduction::imageExempt($product);$chartExempt=self::chartExempt($project,$product);
         $localPhotos=self::photos($product,true);$allPhotos=self::photos($product);
         $sitePhotos=($meta['presence']??'')==='missing'?[]:array_values(array_filter($meta['image_urls']??[],fn($url)=>self::url($url)!==''));
         $hasImage=(bool)$allPhotos;
@@ -190,17 +191,18 @@ class WebsiteCatalogSync {
             'site_page_urls'=>($meta['presence']??'')==='seen'?($meta['page_urls']??[]):[],
             'archived'=>$archived,
             'image_production'=>$production,
-            'publication'=>$blocked?($issue==='technical'?'technical_pending':'inventory_issue'):($archived?'archived':$pub),'issue_type'=>$issue,'has_final_image'=>$hasImage,'production_blocked'=>$blocked,'inventory'=>self::inventory($product),
+            'publication'=>$blocked?($issue==='technical'?'technical_pending':'inventory_issue'):($archived?'archived':($imageExempt?'image_not_required':$pub)),'issue_type'=>$issue,'has_final_image'=>$hasImage,'production_blocked'=>$blocked,'inventory'=>self::inventory($product),
             'low_priority'=>self::inventory($product)==='out_of_stock',
             'needs_description'=>!$archived&&!$hasDescription,
-            'needs_size_chart'=>!$archived&&!$hasChart,
+            'image_not_required'=>$imageExempt,'chart_not_required'=>$chartExempt,
+            'needs_size_chart'=>!$archived&&!$chartExempt&&!$hasChart,
             'description_upload_pending'=>!$archived&&$descriptionPending,
-            'size_chart_upload_pending'=>!$archived&&$sizePending,
-            'needs_image'=>!$archived&&!$blocked&&!$hasImage,'has_local_image'=>(bool)$localPhotos,'local_image_urls'=>$localPhotos,'site_image_urls'=>$sitePhotos,
+            'size_chart_upload_pending'=>!$archived&&!$chartExempt&&$sizePending,
+            'needs_image'=>!$archived&&!$blocked&&!$imageExempt&&!$hasImage,'has_local_image'=>(bool)$localPhotos,'local_image_urls'=>$localPhotos,'site_image_urls'=>$sitePhotos,
             'chart'=>$chart,'site_chart_urls'=>($meta['presence']??'')==='missing'?[]:($meta['size_guide_urls']??[]),
             'comparison_available'=>(bool)($localPhotos&&$sitePhotos)||($chart['has_local']&&$siteChart),
-            'image_upload_pending'=>!$archived&&$pub==='pending_upload','approval_pending'=>!$archived&&!$approved&&$hasImage,
-            'size_chart_export_needed'=>!$archived&&$sizePending&&!$chart['export_ready'],
+            'image_upload_pending'=>!$archived&&!$blocked&&!$imageExempt&&$pub==='pending_upload','approval_pending'=>!$archived&&!$approved&&$hasImage,
+            'size_chart_export_needed'=>!$archived&&!$chartExempt&&$sizePending&&!$chart['export_ready'],
         ]);
     }
     public static function fingerprint($project) {
@@ -280,6 +282,7 @@ class WebsiteCatalogSync {
             $siteImages=[];$pageUrls=[];$mainImages=[];$descriptions=[];$charts=[];$prices=[];$descriptionObserved=false;$chartObserved=false;$imageObserved=false;
             foreach($group as $row) {
                 $code=self::code($row['product_code']);
+                if(!self::categories($product)&&empty($meta['category_labels']))$meta['category_labels']=self::categories($row);
                 $pageUrls[self::url($row['url'])]=true;
                 if(self::url($row['main_image']??'')!=='')$mainImages[self::url($row['main_image'])]=true;
                 if($options['update_price']&&array_key_exists('price',$row)&&$row['price']!==null&&$row['price']!=='')$prices[] = self::price($row,$options['price_unit']);
@@ -366,6 +369,39 @@ class WebsiteCatalogSync {
         $project['settings']['website_catalog']['origin']=$origin;
         $project['settings']['website_catalog']['last_sync']=['at'=>$now,'complete'=>(bool)$options['complete'],'rows'=>count($rows),'counts'=>$counts];
         return ['project'=>$project,'counts'=>$counts,'changes'=>$changes,'warnings'=>array_values(array_unique($warnings))];
+    }
+    /** Exact category labels, shared by filtering and project-level size-chart rules. */
+    public static function categories($product) {
+        $values=[];
+        foreach(['categories','category','category_path'] as $field) {
+            $raw=$product[$field]??[];
+            if(is_string($raw)){$decoded=json_decode($raw,true);$raw=is_array($decoded)?$decoded:explode('/',$raw);}
+            foreach((array)$raw as $value)if(is_string($value)&&trim($value)!=='')$values[]=trim($value);
+        }
+        $meta=self::metadata($product);
+        foreach(self::metadataArray($meta['category_labels']??[],true) as $value)if(is_string($value)&&trim($value)!=='')$values[]=trim($value);
+        return array_values(array_unique($values));
+    }
+    public static function chartExempt($project,$product) {
+        return (bool)array_intersect(self::categories($product),$project['settings']['website_catalog']['chart_exempt_categories']??[]);
+    }
+    public static function setContentPreference(&$project,$id,$value,$actor) {
+        if(!is_string($id)||!in_array($value,['required','not_required'],true))throw new RuntimeException('تنظیم عکس معتبر نیست.');
+        foreach($project['products']??[] as $index=>$product)if((string)$product['id']===$id) {
+            $meta=self::metadata($product);
+            $meta['content_preferences']=array_replace(self::metadataArray($meta['content_preferences']??[]),['image_not_required'=>$value==='not_required','at'=>time(),'by'=>$actor]);
+            $project['products'][$index]['website_sync']=$meta;return $project['products'][$index];
+        }
+        throw new RuntimeException('محصول در این پروژه یافت نشد.');
+    }
+    public static function setCategoryRule(&$project,$category,$value) {
+        if(!is_string($category)||!in_array($value,['required','not_required'],true))throw new RuntimeException('قانون دسته‌بندی معتبر نیست.');
+        $known=$project['settings']['website_catalog']['chart_exempt_categories']??[];
+        foreach($project['products']??[] as $product)$known=array_merge($known,self::categories($product));
+        if(!in_array($category,$known,true))throw new RuntimeException('دسته‌بندی در این پروژه یافت نشد.');
+        $rules=$project['settings']['website_catalog']['chart_exempt_categories']??[];
+        $rules=array_values(array_diff($rules,[$category]));if($value==='not_required')$rules[]=$category;
+        $project['settings']['website_catalog']['chart_exempt_categories']=$rules;
     }
     public static function setIssue(&$project,$id,$type,$note,$actor) {
         if(!is_string($id)||!in_array($type,['technical','inventory','none'],true)||!is_string($note)||mb_strlen($note)>1000)throw new RuntimeException('نوع مشکل یا توضیح معتبر نیست؛ حداکثر توضیح ۱۰۰۰ نویسه است.');

@@ -985,7 +985,7 @@ function isValidProductImage($url) {
 
 function isProductNoImage($p) {
     if (empty($p) || !is_array($p)) return false;
-    if(ImageProduction::issueType($p)!=='')return false;
+    if(ImageProduction::issueType($p)!==''||ImageProduction::imageExempt($p))return false;
     
     // اگر کالا بدون موجودی باشد، اولویت قطعی با بدون موجودی است
     if (isProductOutOfStock($p)) {
@@ -1094,6 +1094,7 @@ function getProductWorkflowStatus($p, $project = null) {
     }
     
     $issue=ImageProduction::issueType($p);if($issue!=='')return $issue==='technical'?'technical_pending':'inventory_issue';
+    if(ImageProduction::imageExempt($p))return 'image_not_required';
     $hasFinal = (bool)WebsiteCatalogSync::photos($p);
     $hasRef = hasProductReferenceImages($p) || !empty($p['waiting_final_photo']);
     $hasSizeChart = hasProductSizeChart($p,$project);
