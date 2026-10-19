@@ -9,7 +9,7 @@ class AdminActionAccess {
         return [
             'settings' => ['save_project_settings', 'save_settings', 'save_automation', 'save_test_settings', 'send_test_sms', 'register_bale_webhook', 'register_tg_webhook', 'add_feedback', 'delete_feedback'],
             'users' => ['add_user', 'edit_user', 'delete_user'],
-            'projects' => ['add_project', 'reset_project'],
+            'projects' => ['add_project', 'reset_project', 'delete_project'],
             'main_settings' => ['save_site_settings', 'test_zarinpal_action'],
             'main_plans' => ['save_subscription_plans'],
             'main_orders' => ['update_order_status'],

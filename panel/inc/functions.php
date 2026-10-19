@@ -460,6 +460,7 @@ function getJsonDB() {
 }
 
 function saveJsonDB($data) {
+    $data['projects']=array_values(array_filter($data['projects']??[],static fn($p)=>!ProjectLifecycle::isDeleted($p['id']??'')));
     $fp = @fopen(DB_PATH, 'cb');
     if (!$fp) {
         @file_put_contents(DB_PATH, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
@@ -479,6 +480,7 @@ function getDB() {
 }
 
 function saveDB($data) {
+    $data['projects']=array_values(array_filter($data['projects']??[],static fn($p)=>!ProjectLifecycle::isDeleted($p['id']??'')));
     if (isSqlActive()) {
         $conn = getConn();
         foreach ($data['projects'] as $project) {
@@ -530,6 +532,7 @@ function getVoterId() {
 }
 
 function getCurrentProject($id = null, $forceReload = false) {
+    if(ProjectLifecycle::isDeleted($id??($_SESSION['project_id']??'')))return null;
     if ($id === null && isset($_SESSION['project_id'])) {
         $id = $_SESSION['project_id'];
     }

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/ProjectLifecycle.php';
 require_once __DIR__.'/DatabaseConfig.php';
 $db_config=DatabaseConfig::load();
 
@@ -536,6 +537,7 @@ function db_get_all() {
 }
 
 function db_save_project($project, $onlyProducts = null, $onlySchedules = null, $manageTransaction = true) {
+    if(ProjectLifecycle::isDeleted($project['id']??''))throw new RuntimeException('این پروژه حذف شده است؛ دادهٔ قدیمی ذخیره نمی‌شود.');
     if (class_exists('MaarkshoCache') && isset($project['id'])) {
         MaarkshoCache::delete('project_full_' . $project['id']);
     }
@@ -829,6 +831,7 @@ function db_save_project($project, $onlyProducts = null, $onlySchedules = null, 
  * Save single schedule item directly to database
  */
 function db_save_schedule($s) {
+    if(ProjectLifecycle::isDeleted($s['project_id']??''))throw new RuntimeException('پروژهٔ برنامه حذف شده است.');
     if (defined('USE_MYSQL') && USE_MYSQL) {
         $conn = getDbConnection();
         if (!$conn) return false;

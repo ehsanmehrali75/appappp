@@ -45,6 +45,14 @@ class SupportTickets {
         error_log('Support database failure ref='.$reference.' operation='.$operation.' errno='.$errno.' sqlstate='.$state);
         throw new RuntimeException('عملیات پایگاه دادهٔ پشتیبانی ناموفق بود. کد پیگیری: '.$reference);
     }
+    public static function pendingCount($db) {
+        try {
+            $exists=$db->query($db instanceof SQLite3ToMysqliWrapper?"SELECT name FROM sqlite_master WHERE type='table' AND name='support_tickets'":"SHOW TABLES LIKE 'support_tickets'");
+            if(!$exists||!$exists->fetch_assoc())return 0;
+            $result=$db->query("SELECT COUNT(*) AS total FROM support_tickets WHERE status='pending_review'");return $result?(int)($result->fetch_assoc()['total']??0):0;
+        }
+        catch(Throwable $e){return 0;}
+    }
     public function now() { return ($this->clock)(); }
     public function directory() { return $this->dir; }
     private function statement($sql,$params=[]) {

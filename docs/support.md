@@ -35,3 +35,11 @@ Run `php tests/support_tickets.php` for SQLite workflow checks. An isolated MySQ
 ### Activate the owner on the deployed host
 
 While signed in as an existing main administrator, open `/panel/system-admin-setup.php` (also linked in the main panel header and Support). Enter the desired username, password and password confirmation, then create the account. The account is written to this host's private, Git-ignored administrator file. Sign out and sign in with the new account. Git publishing does not create accounts on a remote host. A non-global or stale session sees only a credential revalidation form. It can proceed only after verifying an actual global account (the private administrator file or `super_users`, never project users). Revalidation rotates the session ID and CSRF token; five failed attempts lock that session for 15 minutes. Account creation requires a verified main administrator session and CSRF token. Passwords are neither prefilled nor sent through Git.
+
+## فرم پروژه و صندوق مدیر اصلی
+
+انتخاب پروژه در فرم ثبت تیکت مستقل از فیلتر فهرست است. شناسهٔ مخفی و قدیمیِ صفحه جایگزین انتخاب کاربر نمی‌شود؛ همین تفاوت قبلاً باعث پیام «پروژهٔ درخواست را انتخاب کنید» می‌شد. موضوع، شرح و دسته‌بندی پس از خطای اعتبارسنجی حفظ می‌شوند. ایجاد موفق، تیکت و اولین پیام/پیوست را در یک تراکنش ثبت و کاربر را به رشتهٔ مکاتبه هدایت می‌کند.
+
+مدیر اصلی در `/panel/support.php` به‌صورت پیش‌فرض صندوق همهٔ پروژه‌ها را می‌بیند؛ لینک هر تیکت، پروژهٔ واقعی همان درخواست را دارد. لینک قدیمیِ بدون پروژه هم در نمای مدیر به پروژهٔ خود تیکت متصل می‌شود تا پاسخ/هزینه به زمینهٔ اشتباه نرود. منوی ادمین عنوان «صندوق پشتیبانی» و تعداد وضعیت «در انتظار بررسی» را نشان می‌دهد. این اعلان داخلی است؛ SMS/ایمیل/تلگرام جدیدی ارسال نمی‌شود. پاسخ مدیر در همان رشته برای درخواست‌کننده قابل مشاهده است. پیوست فقط از مسیر احراز هویت‌شدهٔ تیکت قابل دریافت است.
+
+نمای پشتیبانی، هدر، مسیرهای سریع، فرم ستون‌بندی‌شده، صندوق درخواست‌ها و مکاتبهٔ جدا برای پاسخ مدیر دارد. در نمای ادمین فرم ایجاد درخواست جمع می‌شود تا صندوق در اولویت باشد؛ در موبایل فرم و جدول به یک ستون/کارت تبدیل می‌شوند. CSS با زمان ویرایش نسخه‌گذاری می‌شود تا مرورگر فایل قدیمی را نگه ندارد.

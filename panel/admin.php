@@ -185,26 +185,14 @@ if (isSuperAdmin()) {
         redirect('admin.php?tab=projects&msg=پروژه با موفقیت ایجاد شد.');
     }
 
-    if (isset($_POST['reset_project'])) {
-        $pid = $_POST['pid'] ?? '';
-        foreach ($db['projects'] as &$p) {
-            if ($p['id'] === $pid) {
-                $p['products'] = [];
-                $p['logs'] = [];
-                // Clear SQL too if active
-                if (isSqlActive()) {
-                    $conn = getConn();
-                    $safePid = $conn->real_escape_string($pid);
-                    $conn->query("DELETE FROM products WHERE project_id = '$safePid'");
-                    $conn->query("DELETE FROM logs WHERE project_id = '$safePid'");
-                    $conn->query("DELETE FROM schedules WHERE project_id = '$safePid'");
-                }
-                break;
-            }
-        }
-        saveDB($db);
-        redirect('admin.php?tab=projects&msg=اطناعات عملیاتی پروژه به طور کامل ریست شد.');
+    if (isset($_POST['reset_project']) || isset($_POST['delete_project'])) {
+        $delete=isset($_POST['delete_project']);
+        try {$lifecycle=ProjectLifecycle::run($_POST['pid']??'', $delete, $_POST['confirm_project_name']??'');}
+        catch(RuntimeException $e){redirect('admin.php?tab=projects&error=1&msg='.urlencode($e->getMessage()));exit;}
+        redirect('admin.php?tab=projects&msg='.urlencode($delete?'پروژه و داده‌های اختصاصی آن حذف شدند.':'کالاها، تقویم، گزارش‌ها و صف پروژه ریست شدند؛ اعضا و تنظیمات حفظ شدند.').(!empty($lifecycle['remaining_files'])?' چند فایل به دلیل مجوز هاست باقی مانده‌اند؛ گزارش سرور را بررسی کنید.':''));
+        exit;
     }
+
 }
 
 // Load current project data if available
@@ -6362,7 +6350,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
     <div class="container admin-layout">
         <aside class="admin-sidebar">
             <nav class="sidebar-glass flex-1">
-                <?php if(isFeatureAvailable('support')): ?><a href="/panel/support.php" class="nav-link"><span>🎫</span><span>پشتیبانی</span></a><?php endif; ?>
+                <?php if(isFeatureAvailable('support')): ?><a href="/panel/support.php" class="nav-link"><span>🎫</span><span><?php echo isMainAdmin()?'صندوق پشتیبانی':'پشتیبانی'; ?></span><?php if(isMainAdmin()){require_once __DIR__.'/inc/SupportTickets.php';$pendingSupport=SupportTickets::pendingCount(getConn());if($pendingSupport)echo '<span class="badge">'.$pendingSupport.'</span>';} ?></a><?php endif; ?>
                 <!-- Search Input in Sidebar -->
                 <div class="px-2 mb-3">
                     <div class="relative">
@@ -7664,14 +7652,18 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                     <p class="text-[11px] font-bold text-slate-400"><?php echo $p['activeFrom']; ?> <span class="mx-1 text-slate-200">/</span> <?php echo $p['activeTo']; ?></p>
                                 </div>
                                 
-                                <div class="flex gap-4">
+                                <div class="flex flex-wrap gap-4">
                                     <a href="?switch_project=<?php echo $p['id']; ?>" class="btn btn-primary flex-1 py-4 shadow-xl shadow-primary/20">مدیریت پروژه</a>
-                                    <form method="POST" onsubmit="return confirm('تمامی کالاها و گزارشات این پروژه حذف خواهند شد. مطمئن هستید؟')" class="flex-none">
-                                        <input type="hidden" name="pid" value="<?php echo $p['id']; ?>">
-                                        <button name="reset_project" class="btn btn-outline p-4 border-red-50 text-red-400 hover:bg-red-50 hover:border-red-100 group/btn">
-                                            <svg class="w-6 h-6 group-hover/btn:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                        </button>
+                                    <form method="POST" onsubmit="return confirm('کالاها، تقویم، گزارش‌ها و صف این پروژه پاک شوند؟ اعضا و تنظیمات حفظ می‌شوند.')" class="flex-none">
+                                        <input type="hidden" name="pid" value="<?php echo htmlspecialchars($p['id'],ENT_QUOTES,'UTF-8'); ?>">
+                                        <button name="reset_project" class="btn btn-outline" title="پاک‌سازی داده‌های عملیاتی؛ حفظ تنظیمات و اعضا">ریست داده‌ها</button>
                                     </form>
+                                    <details class="w-full min-w-0"><summary class="btn btn-outline text-red-600">حذف کامل</summary><form method="POST" onsubmit="return confirm('حذف کامل پروژه برگشت‌پذیر نیست. ادامه می‌دهید؟')" class="p-4 space-y-3">
+                                        <p class="text-xs">پروژه، اعضا، تنظیمات و داده‌های اختصاصی آن حذف می‌شوند. نام پروژه را برای تأیید وارد کنید.</p>
+                                        <input type="hidden" name="pid" value="<?php echo htmlspecialchars($p['id'],ENT_QUOTES,'UTF-8'); ?>">
+                                        <input name="confirm_project_name" class="input" required autocomplete="off" aria-label="نام پروژه برای حذف کامل" placeholder="<?php echo htmlspecialchars($p['name'],ENT_QUOTES,'UTF-8'); ?>">
+                                        <button name="delete_project" class="btn btn-outline text-red-600">حذف کامل پروژه</button>
+                                    </form></details>
                                 </div>
                             </div>
                         </div>
