@@ -20,7 +20,7 @@
     byId('file').addEventListener('change', async event => {
         invalidate();rows = null;
         const file = event.target.files[0];if (!file) return;
-        try {if (file.size > 5 * 1024 * 1024) throw new Error('حداکثر اندازهٔ فایل پنج مگابایت است.');window.websiteCatalogLoad(JSON.parse(await file.text()));}
+        try {if (file.size > 10 * 1024 * 1024) throw new Error('حداکثر اندازهٔ فایل ده مگابایت است.');window.websiteCatalogLoad(JSON.parse(await file.text()));}
         catch(error) {show(error.message);}
     });
     ['price-unit','price','stock','complete'].forEach(name => byId(name).addEventListener('change', invalidate));
@@ -36,9 +36,20 @@
         try {
             if (action === 'preview') {
                 invalidate();if (!rows) throw new Error('ابتدا فایل خروجی سایت را انتخاب کنید.');
-                const result = await request('website_catalog_preview',{data:JSON.stringify(rows),complete:byId('complete').checked?'1':'0',update_price:byId('price').checked?'1':'0',update_stock:byId('stock').checked?'1':'0',price_unit:byId('price-unit').value});
+                const bytes=new TextEncoder().encode(JSON.stringify(rows));
+                if(bytes.length>10*1024*1024)throw new Error('حداکثر اندازهٔ JSON ده مگابایت است.');
+                const upload=await request('website_catalog_upload_begin',{bytes:String(bytes.length)});
+                const total=Math.ceil(bytes.length/upload.chunk_bytes);
+                for(let index=0;index<total;index++) {
+                    show(`ارسال خروجی سایت: بخش ${index+1} از ${total}؛ هنوز تغییری ثبت نشده است.`);
+                    const part=bytes.subarray(index*upload.chunk_bytes,(index+1)*upload.chunk_bytes);
+                    let binary='';for(let offset=0;offset<part.length;offset+=8192)binary+=String.fromCharCode(...part.subarray(offset,offset+8192));
+                    await request('website_catalog_upload_chunk',{upload_token:upload.upload_token,index:String(index),chunk:btoa(binary)});
+                }
+                show('فایل کامل دریافت شد؛ در حال تطبیق محصولات…');
+                const result = await request('website_catalog_preview',{upload_token:upload.upload_token,complete:byId('complete').checked?'1':'0',update_price:byId('price').checked?'1':'0',update_stock:byId('stock').checked?'1':'0',price_unit:byId('price-unit').value});
                 token = result.token;const c=result.counts;
-                show(`پیش‌نمایش؛ هنوز ذخیره نشده\nتطبیق: ${c.matched} | نادیده‌گرفته‌شده: ${c.ignored} | تطبیق مبهم: ${c.conflicts}\nمحصول جدید: ۰ | غایب: ${c.missing} | باگ فنی: ${c.technical}\nقیمت: ${c.price} | موجودی صریح: ${c.stock} | عکس افزوده: ${c.images}\n`+(result.warnings.length?result.warnings.join('\n')+'\n':'')+result.changes.map(row=>`${row.name}: ${row.action}`).join('\n'));
+                show(`پیش‌نمایش؛ هنوز ذخیره نشده\nتطبیق: ${c.matched} (با نام مدل: ${c.matched_name||0}) | نادیده‌گرفته‌شده: ${c.ignored} | تطبیق مبهم: ${c.conflicts}\nمحصول جدید: ۰ | غایب: ${c.missing} | باگ فنی: ${c.technical}\nقیمت: ${c.price} | موجودی صریح: ${c.stock} | عکس افزوده: ${c.images}\n`+(result.warnings.length?result.warnings.join('\n')+'\n':'')+result.changes.map(row=>`${row.name}: ${row.action}`).join('\n'));
                 byId('apply').hidden = false;
             } else {
                 if (!token) throw new Error('پیش‌نمایش جدید لازم است.');

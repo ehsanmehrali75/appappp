@@ -487,7 +487,7 @@ if ($project && isset($_POST['ajax_action'])) {
     header('Content-Type: application/json');
     $action = $_POST['ajax_action'];
 
-    if (in_array($action, ['website_catalog_preview','website_catalog_apply','website_catalog_resolve','website_catalog_request_image'], true)) {
+    if (in_array($action, ['website_catalog_upload_begin','website_catalog_upload_chunk','website_catalog_preview','website_catalog_apply','website_catalog_resolve','website_catalog_request_image'], true)) {
         if (!hasPermission('products')) { http_response_code(403); echo json_encode(['status'=>'failed','msg'=>'دسترسی ویرایش محصولات مجاز نیست.']); exit; }
         if (!isset($_POST['csrf']) || !hash_equals($_SESSION['website_catalog_csrf'] ?? '', (string)$_POST['csrf'])) { http_response_code(403); echo json_encode(['status'=>'failed','msg'=>'نشست معتبر نیست؛ صفحه را تازه کنید.']); exit; }
         $websiteLock = null;
@@ -514,14 +514,25 @@ if ($project && isset($_POST['ajax_action'])) {
                 unset($item);
                 if(!$found)throw new RuntimeException('محصول یافت نشد.');
                 echo json_encode(['status'=>'success','msg'=>'درخواست تولید تصویر ثبت شد؛ مرحلهٔ بعد بر اساس رفرنس همین محصول تعیین شد.'],JSON_UNESCAPED_UNICODE);
-            } elseif ($action === 'website_catalog_preview') {
-                if (strlen($_POST['data'] ?? '') > 5*1024*1024) throw new RuntimeException('حداکثر اندازهٔ JSON پنج مگابایت است.');
-                $rows = json_decode($_POST['data'] ?? '', true);
-                $options = ['complete'=>($_POST['complete']??'')==='1','update_price'=>($_POST['update_price']??'1')==='1','update_stock'=>($_POST['update_stock']??'1')==='1','price_unit'=>$_POST['price_unit']??'auto'];
-                $result = WebsiteCatalogSync::reconcile($freshProject,$rows,$options);
-                $token = bin2hex(random_bytes(24));
-                $_SESSION['website_catalog_preview'] = ['token'=>$token,'project'=>$project['id'],'expires'=>time()+900,'base'=>WebsiteCatalogSync::fingerprint($freshProject),'rows'=>$rows,'options'=>$options];
-                echo json_encode(['status'=>'preview','token'=>$token,'counts'=>$result['counts'],'changes'=>array_slice($result['changes'],0,100),'warnings'=>$result['warnings']],JSON_UNESCAPED_UNICODE);
+            } elseif (in_array($action,['website_catalog_upload_begin','website_catalog_upload_chunk','website_catalog_preview'],true)) {
+                require_once __DIR__.'/inc/WebsiteCatalogUpload.php';
+                $owner=hash('sha256',session_id().'|'.($_SESSION['user']['username']??''));
+                if($action==='website_catalog_upload_begin') {
+                    $bytes=filter_var($_POST['bytes']??null,FILTER_VALIDATE_INT);
+                    echo json_encode(['status'=>'success']+WebsiteCatalogUpload::begin((string)$project['id'],$owner,$bytes));
+                } elseif($action==='website_catalog_upload_chunk') {
+                    $index=filter_var($_POST['index']??null,FILTER_VALIDATE_INT);
+                    echo json_encode(['status'=>'success']+WebsiteCatalogUpload::append($_POST['upload_token']??'',(string)$project['id'],$owner,$index,$_POST['chunk']??null));
+                } else {
+                    $raw=isset($_POST['upload_token'])?WebsiteCatalogUpload::read($_POST['upload_token'],(string)$project['id'],$owner):($_POST['data']??'');
+                    if (!is_string($raw)||strlen($raw)>WebsiteCatalogUpload::MAX_BYTES) throw new RuntimeException('حداکثر اندازهٔ JSON ده مگابایت است.');
+                    $rows = json_decode($raw, true);
+                    $options = ['complete'=>($_POST['complete']??'')==='1','update_price'=>($_POST['update_price']??'1')==='1','update_stock'=>($_POST['update_stock']??'1')==='1','price_unit'=>$_POST['price_unit']??'auto'];
+                    $result = WebsiteCatalogSync::reconcile($freshProject,$rows,$options);
+                    $token = bin2hex(random_bytes(24));
+                    $_SESSION['website_catalog_preview'] = ['token'=>$token,'project'=>$project['id'],'expires'=>time()+900,'base'=>WebsiteCatalogSync::fingerprint($freshProject),'rows'=>$rows,'options'=>$options];
+                    echo json_encode(['status'=>'preview','token'=>$token,'counts'=>$result['counts'],'changes'=>array_slice($result['changes'],0,100),'warnings'=>$result['warnings']],JSON_UNESCAPED_UNICODE);
+                }
             } elseif ($action === 'website_catalog_apply') {
                 $pending = $_SESSION['website_catalog_preview'] ?? [];
                 if (($pending['project']??'') !== $project['id'] || ($pending['expires']??0)<time() || !hash_equals($pending['token']??'', (string)($_POST['token']??''))) throw new RuntimeException('پیش‌نمایش منقضی یا متعلق به پروژهٔ دیگری است.');

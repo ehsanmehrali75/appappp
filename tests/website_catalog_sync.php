@@ -65,4 +65,29 @@ wcCheck($mediaChartState['site_chart_urls']===[$mediaRow['size_guide']]&&!$media
 $mediaRow['main_image']=null;$mediaRow['gallery']=[];
 $mediaEmpty=WebsiteCatalogSync::reconcile($mediaWithChart['project'],[$mediaRow]);$mediaEmptyState=WebsiteCatalogSync::state($mediaEmpty['project'],$mediaEmpty['project']['products'][0]);
 wcCheck(!$mediaEmptyState['site_visible_with_images']&&$mediaEmptyState['site_main_image_url']===null,'seen page without current images must not be called visually present');
+// Model phrases remain contiguous; prefixes/suffixes do not change product identity.
+$modelBase=['id'=>'models','settings'=>[],'products'=>[['id'=>'aero','sku'=>'ERP-123','name'=>'Aero   Pro W','color'=>'سفید-سبز','stock_total'=>8,'image'=>'','images_list'=>[]]]];
+$modelRow=['url'=>'https://shop.example/product/987/model','product_code'=>'987','name'=>'نیم تنه ورزشی زنانه اسپورتلند Aero Pro W جدید','color'=>'سفید-سبز','main_image'=>'https://shop.example/main.webp','gallery'=>['https://shop.example/main.webp','https://shop.example/gallery.webp'],'size_guide'=>'https://shop.example/chart.webp'];
+$modelResult=WebsiteCatalogSync::reconcile($modelBase,[$modelRow]);$modelProduct=$modelResult['project']['products'][0];
+wcCheck($modelResult['counts']['matched_name']===1&&$modelResult['counts']['new']===0,'whole model phrase matches despite website prefix/suffix and different codes');
+wcCheck($modelProduct['name']==='Aero   Pro W'&&$modelProduct['sku']==='ERP-123'&&$modelProduct['stock_total']===8,'model matching preserves ERP identity and stock');
+wcCheck($modelProduct['image']==='https://shop.example/main.webp'&&count($modelProduct['images_list'])===2&&$modelProduct['images_list'][0]['approved'],'WebP primary and gallery imported as approved site evidence');
+wcCheck($modelProduct['size_chart']==='https://shop.example/chart.webp','WebP size guide can populate an empty chart');
+foreach(['Aero Extra Pro W','Aero Pro Extra W','Aero Pro Wide','SuperAero Pro W','Aero Pro W2','Aero-Pro-W'] as $wrong) {
+    $bad=WebsiteCatalogSync::reconcile($modelBase,[array_replace($modelRow,['name'=>$wrong])]);
+    wcCheck($bad['counts']['matched']===0,'never fuzzy-match noncontiguous/partial model '.$wrong);
+}
+$case=WebsiteCatalogSync::reconcile($modelBase,[array_replace($modelRow,['name'=>'اسپورتلند AERO PRO W'])]);
+wcCheck($case['counts']['matched_name']===1,'model case and whitespace are normalized');
+$duplicate=$modelBase;$duplicate['products'][]=array_replace($modelBase['products'][0],['id'=>'duplicate','sku'=>'ERP-456']);
+$conflict=WebsiteCatalogSync::reconcile($duplicate,[$modelRow]);
+wcCheck($conflict['counts']['conflicts']===1&&$conflict['counts']['matched']===0&&empty($conflict['project']['products'][0]['website_sync']),'ambiguous model is reported without changing products');
+$colors=$modelBase;$colors['products'][]=array_replace($modelBase['products'][0],['id'=>'white','sku'=>'ERP-456','color'=>'سفید']);
+$colorResult=WebsiteCatalogSync::reconcile($colors,[$modelRow]);
+wcCheck($colorResult['counts']['matched_name']===1&&empty($colorResult['project']['products'][1]['website_sync']),'compound color is one exact color and disambiguates same-model products');
+$exact=WebsiteCatalogSync::reconcile($modelBase,[array_replace($modelRow,['product_code'=>'ERP-123','name'=>'Unrelated website title'])]);
+wcCheck($exact['counts']['matched']===1&&$exact['counts']['matched_name']===0,'exact code has priority over model-name fallback');
+$preserve=$modelBase;$preserve['products'][0]['image']='uploads/own-original.png';
+$kept=WebsiteCatalogSync::reconcile($preserve,[$modelRow]);
+wcCheck($kept['project']['products'][0]['image']==='uploads/own-original.png','WebP website image never replaces existing original');
 echo "$n website catalog checks passed\n";

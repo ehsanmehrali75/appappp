@@ -205,6 +205,23 @@ class WebsiteCatalogSync {
     public static function fingerprint($project) {
         return hash('sha256',json_encode([$project['id'],$project['products']??[],$project['settings']['website_catalog']??[],$project['settings']['size_charts']??[],!empty($project['settings']['prod_require_reference']),!empty($project['settings']['prod_require_image_request'])],JSON_UNESCAPED_UNICODE|JSON_PRESERVE_ZERO_FRACTION));
     }
+    /** Preserve the complete model phrase; only casing and whitespace are normalized. */
+    private static function modelName($value) {
+        return is_string($value)?mb_strtolower(trim(preg_replace('/[\s\x{00a0}]+/u',' ',$value))):'';
+    }
+    private static function nameCandidates($row,$models,$products) {
+        $name=self::modelName($row['name']??'');
+        preg_match_all('/[\p{L}\p{N}]+/u',$name,$tokens);
+        $possible=[];foreach(array_unique($tokens[0]) as $token)foreach($models[$token]??[] as $index=>$model)$possible[$index]=$model;
+        $candidates=[];
+        foreach($possible as $index=>$model)if(preg_match('/(?<![\p{L}\p{N}_])'.preg_quote($model,'/').'(?![\p{L}\p{N}_])/u',$name))$candidates[$index]=true;
+        if(count($candidates)>1) {
+            $color=self::modelName($row['color']??'');$byColor=[];
+            if($color!=='')foreach($candidates as $index=>$_)if(self::modelName($products[$index]['color']??'')===$color)$byColor[$index]=true;
+            if($byColor)$candidates=$byColor;
+        }
+        return $candidates;
+    }
     public static function reconcile($project,$rows,$options=[]) {
         if(!self::isWebsiteRows($rows)||count($rows)>50000)throw new RuntimeException('فایل باید آرایهٔ خروجی سایت با url و product_code باشد (حداکثر ۵۰۰۰۰ ردیف).');
         $options=array_replace(['complete'=>false,'update_price'=>true,'update_stock'=>true,'price_unit'=>'auto'],$options);
@@ -218,19 +235,23 @@ class WebsiteCatalogSync {
         if(count($origins)!==1)throw new RuntimeException('خروجی باید متعلق به یک دامنهٔ سایت باشد.');
         $origin=key($origins);$previousOrigin=$project['settings']['website_catalog']['origin']??'';
         if($previousOrigin!==''&&$origin!==$previousOrigin)throw new RuntimeException('دامنهٔ فایل با سایت ثبت‌شدهٔ این پروژه متفاوت است.');
-        $codes=[];$urls=[];
+        $codes=[];$urls=[];$models=[];
         foreach(($project['products']??[]) as $index=>$product) {
             foreach(['sku','product_code'] as $field)if(isset($product[$field])&&self::code($product[$field])!=='')$codes[self::code($product[$field])][$index]=true;
             foreach(($product['variants']??[]) as $variant)if(is_array($variant))foreach(['sku','product_code'] as $field)if(!empty($variant[$field]))$codes[self::code($variant[$field])][$index]=true;
+            $model=self::modelName($product['name']??'');
+            if($model!==''&&preg_match('/[\p{L}\p{N}]+/u',$model,$first))$models[$first[0]][$index]=$model;
             $u=self::identityUrl($product['link']??$product['url']??'');if($u!=='')$urls[$u][$index]=true;
         }
-        $counts=['matched'=>0,'ignored'=>0,'conflicts'=>0,'missing'=>0,'technical'=>0,'price'=>0,'stock'=>0,'images'=>0,'new'=>0];
+        $counts=['matched'=>0,'matched_name'=>0,'ignored'=>0,'conflicts'=>0,'missing'=>0,'technical'=>0,'price'=>0,'stock'=>0,'images'=>0,'new'=>0];
         $covered=[];$groups=[];$changes=[];$warnings=[];
         foreach($rows as $row) {
             $candidates=($codes[self::code($row['product_code'])]??[])+($urls[self::identityUrl($row['url'])]??[]);
+            $byName=!$candidates;
+            if($byName)$candidates=self::nameCandidates($row,$models,$project['products']??[]);
             foreach($candidates as $index=>$_)$covered[$index]=true;
             if(count($candidates)!==1){$counts[count($candidates)?'conflicts':'ignored']++;if($candidates)$warnings[]='تطبیق مبهم برای کد '.self::code($row['product_code']).'؛ هیچ‌یک تغییر نکردند.';continue;}
-            $groups[key($candidates)][]=$row;$counts['matched']++;
+            $groups[key($candidates)][]=$row;$counts['matched']++;if($byName)$counts['matched_name']++;
         }
         if (!$groups) {
             if ($options['complete']) throw new RuntimeException('هیچ تطبیق قطعی با محصولات پروژه پیدا نشد؛ بررسی غیبت اعمال نشد. ابتدا کدها و دامنه را بررسی کنید.');
@@ -310,7 +331,9 @@ class WebsiteCatalogSync {
             if($siteImages&&!self::pendingApprovalPhotos($approvalProduct,true)&&in_array($product['status']??'',['pending','waiting_approval','rejected'],true))$product['status']='active';
             if($imageObserved)$product['uploaded_to_site']=$siteImages&&!empty($product['has_new_manual_image'])?0:(int)(bool)$siteImages;
             if(!$siteImages)$meta['publication']=self::photos($product)?'pending_upload':'pending_image';
-            // Keep the original primary image, gallery, social image and reference gallery.
+            // Populate an empty primary image from website evidence, including WebP; never replace an existing original.
+            if(empty($product['image'])&&$siteImages)$product['image']=$meta['main_image_url']??key($siteImages);
+            // Keep the original gallery, social image and reference gallery.
             if(empty($product['link']))$product['link']=$group[0]['url'];
             $product['website_sync']=$meta;
             if($descriptionObserved)$meta['local_description_fingerprint']=$unconfirmed['local_description_fingerprint']??hash('sha256',trim((string)($product['description']??'')));
