@@ -49,6 +49,7 @@ jobs:
           python tests/browser_product_import.py
           python tests/browser_website_catalog.py
           python tests/browser_support.py
+          python tests/browser_product_review.py
       - name: Validate deployment package
         run: python tools/build_release.py --output /tmp/maarksho-release.zip
   desktop-scraper:

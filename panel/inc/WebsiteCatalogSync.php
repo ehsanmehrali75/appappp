@@ -182,6 +182,7 @@ class WebsiteCatalogSync {
         if(in_array('description',$receiptAssets,true)&&hash_equals($receipt['description_fingerprint']??'',hash('sha256',trim((string)($product['description']??'')))))$descriptionPending=false;
         $archived=self::inventory($product)==='out_of_stock';
         $production=ImageProduction::state($project,$product,$hasImage,$archived);
+        $issue=ImageProduction::issueType($product);$blocked=$issue!=='';
         if(!$hasImage&&!$archived)$pub=$production['stage'];
         return array_replace($meta,[
             'site_visible_with_images'=>($meta['presence']??'')==='seen'&&(bool)$sitePhotos,
@@ -189,13 +190,13 @@ class WebsiteCatalogSync {
             'site_page_urls'=>($meta['presence']??'')==='seen'?($meta['page_urls']??[]):[],
             'archived'=>$archived,
             'image_production'=>$production,
-            'publication'=>$archived?'archived':$pub,'inventory'=>self::inventory($product),
+            'publication'=>$blocked?($issue==='technical'?'technical_pending':'inventory_issue'):($archived?'archived':$pub),'issue_type'=>$issue,'has_final_image'=>$hasImage,'production_blocked'=>$blocked,'inventory'=>self::inventory($product),
             'low_priority'=>self::inventory($product)==='out_of_stock',
             'needs_description'=>!$archived&&!$hasDescription,
             'needs_size_chart'=>!$archived&&!$hasChart,
             'description_upload_pending'=>!$archived&&$descriptionPending,
             'size_chart_upload_pending'=>!$archived&&$sizePending,
-            'needs_image'=>!$archived&&!$hasImage,'has_local_image'=>(bool)$localPhotos,'local_image_urls'=>$localPhotos,'site_image_urls'=>$sitePhotos,
+            'needs_image'=>!$archived&&!$blocked&&!$hasImage,'has_local_image'=>(bool)$localPhotos,'local_image_urls'=>$localPhotos,'site_image_urls'=>$sitePhotos,
             'chart'=>$chart,'site_chart_urls'=>($meta['presence']??'')==='missing'?[]:($meta['size_guide_urls']??[]),
             'comparison_available'=>(bool)($localPhotos&&$sitePhotos)||($chart['has_local']&&$siteChart),
             'image_upload_pending'=>!$archived&&$pub==='pending_upload','approval_pending'=>!$archived&&!$approved&&$hasImage,
@@ -365,6 +366,17 @@ class WebsiteCatalogSync {
         $project['settings']['website_catalog']['origin']=$origin;
         $project['settings']['website_catalog']['last_sync']=['at'=>$now,'complete'=>(bool)$options['complete'],'rows'=>count($rows),'counts'=>$counts];
         return ['project'=>$project,'counts'=>$counts,'changes'=>$changes,'warnings'=>array_values(array_unique($warnings))];
+    }
+    public static function setIssue(&$project,$id,$type,$note,$actor) {
+        if(!is_string($id)||!in_array($type,['technical','inventory','none'],true)||!is_string($note)||mb_strlen($note)>1000)throw new RuntimeException('نوع مشکل یا توضیح معتبر نیست؛ حداکثر توضیح ۱۰۰۰ نویسه است.');
+        foreach($project['products']??[] as $index=>$product)if((string)$product['id']===$id) {
+            $meta=self::metadata($product);
+            if($type==='none') {
+                $meta['last_review_resolution']=['previous'=>$meta['review_issue']??[],'at'=>time(),'by'=>$actor];unset($meta['review_issue']);
+            } else $meta['review_issue']=['type'=>$type,'note'=>trim($note),'at'=>time(),'by'=>$actor];
+            $project['products'][$index]['website_sync']=$meta;return $project['products'][$index];
+        }
+        throw new RuntimeException('محصول در این پروژه یافت نشد.');
     }
     public static function resolve(&$project,$id,$user,$receipt=null) {
         foreach($project['products'] as &$product)if((string)$product['id']===(string)$id) {

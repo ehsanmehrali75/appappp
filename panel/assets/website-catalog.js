@@ -59,6 +59,11 @@
         finally {busy=false;byId('preview').disabled=false;byId('apply').disabled=false;['file','price-unit','price','stock','complete'].forEach(name=>byId(name).disabled=false);}
     }
     byId('preview').addEventListener('click',()=>perform('preview'));byId('apply').addEventListener('click',()=>perform('apply'));
+    panel.querySelectorAll('.website-catalog-issue-form').forEach(form=>form.addEventListener('submit',async event=>{
+        event.preventDefault();const button=form.querySelector('button');button.disabled=true;
+        try {const values=Object.fromEntries(new FormData(form));await request('website_catalog_set_issue',{product_id:values.product_id,issue_type:values.issue_type,note:values.note});location.reload();}
+        catch(error){show(error.message);button.disabled=false;}
+    }));
     panel.querySelectorAll('.website-catalog-resolve').forEach(button => button.addEventListener('click',async()=>{
         button.disabled=true;
         try {const result=await request('website_catalog_resolve',{product_id:button.dataset.id});show(result.msg);location.reload();}

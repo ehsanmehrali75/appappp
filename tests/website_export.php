@@ -34,5 +34,9 @@ weCheck($observed['project']['products'][0]['status']==='active'&&$observed['pro
 $mixed=$siteProject;$mixed['products'][0]['image']='uploads/manual.jpg';$mixed['products'][0]['images_list']=[['url'=>'uploads/manual.jpg','source'=>'manual','approved'=>false]];
 $mixed=WebsiteCatalogSync::reconcile($mixed,[['url'=>'https://shop.example/product/SITE/name','product_code'=>'SITE','gallery'=>['https://shop.example/site.jpg']]],['update_price'=>false]);
 weCheck($mixed['project']['products'][0]['status']==='pending'&&count(WebsiteCatalogSync::pendingApprovalPhotos($mixed['project']['products'][0]))===1,'website evidence never approves a different manual photo');
+$held=$project;WebsiteCatalogSync::setIssue($held,'one','inventory','اختلاف موجودی','reviewer');
+$heldExport=(new WebsiteExportPackage($dir))->build($held,['one'],true);
+weCheck($heldExport['exported_ids']===[]&&$heldExport['zip_url']===null,'issue product is not exported before review');
+weCheck(count($heldExport['warnings'])===1,'blocked export reports the review reason');
 $zip->close();foreach(glob($dir.'/*') as $file){if(is_file($file))unlink($file);}unlink($dir.'/one/photo.png');unlink($dir.'/two/photo.png');rmdir($dir.'/one');rmdir($dir.'/two');rmdir($dir);
 echo "$n website export integration checks passed\n";

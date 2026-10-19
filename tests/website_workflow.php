@@ -93,4 +93,15 @@ $bad['website_sync']=['presence'=>'missing','manual_upload_receipt'=>['assets'=>
 wfCheck($state['size_chart_upload_pending']&&$state['description_upload_pending'],'recognized receipt assets with malformed fingerprints do not count as upload evidence');
 $bad['website_sync']=['image_urls'=>json_encode([$bad['image'],false,['url'=>$bad['image']],'javascript:alert(1)'])];$state=WebsiteCatalogSync::state($other,$bad);
 wfCheck($state['site_image_urls']===[$bad['image']]&&WebsiteCatalogSync::imageApproved($bad,$bad['image']),'mixed legacy URL lists retain only valid scalar media URLs');
+// An explicit review issue owns its queue until a human clears it.
+$reviewProject=['id'=>'review','settings'=>['prod_require_reference'=>true],'products'=>[['id'=>'review-one','name'=>'Review','sku'=>'REV','stock_total'=>12,'image'=>'','reference_gallery'=>[],'images_list'=>[]]]];
+WebsiteCatalogSync::setIssue($reviewProject,'review-one','technical','خطای فنی','reviewer');
+$reviewState=WebsiteCatalogSync::state($reviewProject,$reviewProject['products'][0]);
+wfCheck($reviewState['publication']==='technical_pending'&&!$reviewState['needs_image']&&!$reviewState['image_production']['can_produce_image'],'technical flag pauses image production even without a final photo');
+WebsiteCatalogSync::setIssue($reviewProject,'review-one','inventory','اختلاف موجودی','reviewer');
+$reviewState=WebsiteCatalogSync::state($reviewProject,$reviewProject['products'][0]);
+wfCheck($reviewState['publication']==='inventory_issue'&&!$reviewState['image_production']['needs_reference']&&$reviewProject['products'][0]['stock_total']===12,'inventory flag has its own queue and never edits stock');
+WebsiteCatalogSync::setIssue($reviewProject,'review-one','none','','reviewer');
+$reviewState=WebsiteCatalogSync::state($reviewProject,$reviewProject['products'][0]);
+wfCheck($reviewState['needs_image']&&$reviewState['image_production']['needs_reference'],'clearing an issue resumes the actual reference prerequisite');
 echo "$n website workflow checks passed\n";

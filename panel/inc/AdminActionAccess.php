@@ -50,7 +50,7 @@ class AdminActionAccess {
             $action = $post[$field] ?? null;
             if (!is_string($action)) continue;
             // Reconciliation is rendered in both extraction and website export.
-            if (in_array($action, ['website_catalog_upload_begin', 'website_catalog_upload_chunk', 'website_catalog_preview', 'website_catalog_apply', 'website_catalog_resolve', 'website_catalog_request_image'], true)) {
+            if (in_array($action, ['website_catalog_set_issue', 'website_catalog_upload_begin', 'website_catalog_upload_chunk', 'website_catalog_preview', 'website_catalog_apply', 'website_catalog_resolve', 'website_catalog_request_image'], true)) {
                 $requirements[] = ['extract', 'website_export'];
                 continue;
             }

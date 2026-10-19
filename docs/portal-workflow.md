@@ -46,3 +46,5 @@ The browser run also passes all 59 checks with the native list helper disabled a
 ## Library pagination
 
 The library footer now uses scoped RTL controls with a visible current page, previous/next, a compact numbered range and ellipses. It preserves project and filter query parameters, with 44px targets and an unclipped layout down to 320px. The library computes its page independently; the pending queue's page clamp can no longer make a library page-two request repeat page one. Isolated HTTP tests and real browser navigation verify distinct product slices, valid status filters, boundaries and retained filters.
+
+بررسی فنی و موجودی از گردش تولید تصویر جداست. وقتی برای محصول در بخش تطبیق، مشکل فنی یا موجودی ثبت شود، در تب «بدون عکس / تولید تصویر» و شمار همان صف نمی‌آید. در کتابخانه، وضعیت بررسی قابل مشاهده و فیلتر است؛ اصل محصول، عکس‌ها و موجودی حذف نمی‌شوند. رفع مشکل، پیش‌نیازهای واقعی درخواست/رفرنس/عکس و تأیید پورتال را دوباره اعمال می‌کند. مشکل به‌صورت خودکار با واردسازی مجدد سایت رفع نمی‌شود.

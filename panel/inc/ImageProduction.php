@@ -15,18 +15,25 @@ class ImageProduction {
         if(is_array($items))foreach($items as $item)if(is_array($item)&&in_array($item['type']??$item['image_type']??'', ['reference','ref'],true))$add($item);
         return array_keys($urls);
     }
+    public static function issueType($product) {
+        $meta=$product['website_sync']??[];if(is_string($meta))$meta=json_decode($meta,true);
+        $type=is_array($meta)?($meta['review_issue']['type']??''):'';
+        return in_array($type,['technical','inventory'],true)?$type:'';
+    }
     public static function state($project,$product,$hasFinal,$archived=false) {
         $referenceRequired=!empty($project['settings']['prod_require_reference']);
         $requestRequired=!empty($project['settings']['prod_require_image_request']);
         $references=self::references($product);$requested=!empty($product['content_gen_requested']);
-        $eligible=!$archived&&!$hasFinal;
+        $issue=self::issueType($product);$blocked=$issue!=='';
+        $eligible=!$archived&&!$hasFinal&&!$blocked;
         $needsRequest=$eligible&&$requestRequired&&!$requested;
         $needsReference=$eligible&&!$needsRequest&&!$references;
         $ready=$eligible&&!$needsRequest&&(!$referenceRequired||$references);
+        $stage=$blocked?($issue==='technical'?'technical_pending':'inventory_issue'):(!$eligible?($archived?'archived':'complete'):($needsRequest?'image_request':($referenceRequired&&!$references?'needs_reference':'pending_image')));
         return ['request_required'=>$requestRequired,'reference_required'=>$referenceRequired,'requested'=>$requested,
             'has_reference'=>(bool)$references,'reference_urls'=>$references,'needs_image_request'=>$needsRequest,
             'needs_reference'=>$needsReference,'reference_ready'=>$eligible&&!$needsRequest&&(bool)$references,
-            'can_produce_image'=>$ready,'stage'=>!$eligible?($archived?'archived':'complete'):($needsRequest?'image_request':($referenceRequired&&!$references?'needs_reference':'pending_image'))];
+            'can_produce_image'=>$ready,'blocked_by_issue'=>$blocked,'stage'=>$stage];
     }
     public static function canRequest($project,$user=null) {
         return self::allowedOperator($project,'prod_content_gen_users',$user);

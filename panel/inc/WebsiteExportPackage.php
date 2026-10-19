@@ -67,6 +67,7 @@ class WebsiteExportPackage {
                 $id=(string)$product['id'];if(!in_array($id,$ids,true))continue;
                 $sku=(string)($product['sku']??$id);$state=WebsiteCatalogSync::state($project,$product);
                 if($state['archived']){$warnings[]=$sku.': ناموجود؛ از خروجی اجرایی کنار گذاشته شد.';continue;}
+                if($state['production_blocked']){$warnings[]=$sku.': مشکل فنی یا موجودی ثبت شده؛ ابتدا بررسی را تکمیل کنید.';continue;}
                 $photos=WebsiteCatalogSync::photos($product);
                 if(!$photos||WebsiteCatalogSync::pendingApprovalPhotos($product)){$warnings[]=$sku.': عکس نهایی موجود نیست یا هنوز تأیید نشده است.';continue;}
                 $folder=self::name($sku).' - '.self::name($product['name']??$id).' - '.self::name($product['color']??'');

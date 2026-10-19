@@ -475,7 +475,7 @@ if ($project && isset($_POST['ajax_action'])) {
     header('Content-Type: application/json');
     $action = $_POST['ajax_action'];
 
-    if (in_array($action, ['website_catalog_upload_begin','website_catalog_upload_chunk','website_catalog_preview','website_catalog_apply','website_catalog_resolve','website_catalog_request_image'], true)) {
+    if (in_array($action, ['website_catalog_set_issue','website_catalog_upload_begin','website_catalog_upload_chunk','website_catalog_preview','website_catalog_apply','website_catalog_resolve','website_catalog_request_image'], true)) {
         if (!hasPermission('products')) { http_response_code(403); echo json_encode(['status'=>'failed','msg'=>'دسترسی ویرایش محصولات مجاز نیست.']); exit; }
         if (!isset($_POST['csrf']) || !hash_equals($_SESSION['website_catalog_csrf'] ?? '', (string)$_POST['csrf'])) { http_response_code(403); echo json_encode(['status'=>'failed','msg'=>'نشست معتبر نیست؛ صفحه را تازه کنید.']); exit; }
         $websiteLock = null;
@@ -486,7 +486,11 @@ if ($project && isset($_POST['ajax_action'])) {
             if (!$websiteLock || !flock($websiteLock,LOCK_EX)) throw new RuntimeException('قفل همگام‌سازی پروژه در دسترس نیست.');
             $freshProject = getCurrentProject($project['id'], true);
             if (!$freshProject) throw new RuntimeException('پروژه یافت نشد.');
-            if($action==='website_catalog_request_image') {
+            if($action==='website_catalog_set_issue') {
+                $updated=WebsiteCatalogSync::setIssue($freshProject,$_POST['product_id']??'',$_POST['issue_type']??'',$_POST['note']??'',$_SESSION['user']['username']??'');
+                if(!saveProject($freshProject,[$updated]))throw new RuntimeException('ثبت وضعیت بررسی ناموفق بود.');
+                echo json_encode(['status'=>'success','msg'=>'وضعیت بررسی ثبت شد؛ صف محصول به‌روز شد.'],JSON_UNESCAPED_UNICODE);
+            } elseif($action==='website_catalog_request_image') {
                 if(!ImageProduction::canRequest($freshProject))AccessControl::deny();
                 $found=false;
                 foreach($freshProject['products'] as &$item)if((string)$item['id']===(string)($_POST['product_id']??'')) {
@@ -8803,7 +8807,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     $p = $item['product'];
                     $allProds[] = $p;
                     $isApproved = !WebsiteCatalogSync::state($project,$p)['approval_pending'];
-                    if ($item['hasManualPhoto'] && !$item['isUploaded'] && $isApproved) {
+                    if ($item['hasManualPhoto'] && !$item['isUploaded'] && $isApproved && ImageProduction::issueType($p)==='') {
                         $tab2Prods[] = $p;
                     }
                     
@@ -8885,7 +8889,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                 <select id="export-filter-status" onchange="filterExportList()" class="bg-transparent text-xs font-black text-slate-700 focus:outline-none cursor-pointer">
                                     <option value="all">همه موارد</option>
                                     <option value="pending_upload">⏳ منتظر آپلود</option>
-                                    <option value="pending_image">📸 منتظر آپلود عکس</option>
+                                    <option value="pending_image">📸 منتظر تولید عکس</option><option value="technical_pending">باگ فنی</option><option value="inventory_issue">مشکل موجودی</option>
                                     <option value="uploaded">✓ آپلود شده به سایت</option>
                                     <option value="pending_portal">⚠️ منتظر تایید پورتال</option>
                                 </select>
@@ -8952,12 +8956,13 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                         $statusKey = 'pending_upload';
                                     }
                                     
+                                    if(ImageProduction::issueType($p)!=='')$statusKey=ImageProduction::issueType($p)==='technical'?'technical_pending':'inventory_issue';
                                     // Row data attributes for filtering
                                     $rowClasses = "product-export-row flex items-center gap-4 bg-white border border-slate-100 hover:border-slate-200 p-4 rounded-xl transition-all";
                                     $subtabType = "tab1";
                                     
                                     // If subtab is tab2, but this product does not qualify, we hide it under tab2 active
-                                    $qualifiesForTab2 = $hasManualPhoto && !$isUploaded && $isActive;
+                                    $qualifiesForTab2 = $hasManualPhoto && !$isUploaded && $isActive && ImageProduction::issueType($p)==='';
                                     
                                     $hasSizeChart = ProductSizeChartCatalog::forProduct($project,$p)['exists'];
                                     $websiteQueue = WebsiteCatalogSync::state($project,$p);
@@ -9011,6 +9016,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                                 <?php elseif ($hasSizeChart): ?>
                                                     <span class="inline-flex items-center bg-emerald-50 border border-emerald-100 text-emerald-700 font-extrabold text-[9px] px-1.5 py-0.5 rounded">📐 دارای جدول سایز</span>
                                                 <?php endif; ?>
+                                                <?php if($websiteQueue['production_blocked']): ?><span class="inline-flex items-center bg-amber-50 text-amber-800 font-bold text-xs px-2 py-1 rounded"><?php echo $websiteQueue['issue_type']==='technical'?'باگ فنی؛ در انتظار بررسی':'مشکل موجودی؛ در انتظار بررسی'; ?></span><?php endif; ?>
                                                 <?php if ($isERPWithStock): ?>
                                                     <span class="inline-flex items-center bg-indigo-50 border border-indigo-100 text-indigo-700 font-extrabold text-[9px] px-1.5 py-0.5 rounded">⚠️ دارای موجودی ERP / جامانده</span>
                                                 <?php endif; ?>
