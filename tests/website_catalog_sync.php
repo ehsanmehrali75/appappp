@@ -90,4 +90,14 @@ wcCheck($exact['counts']['matched']===1&&$exact['counts']['matched_name']===0,'e
 $preserve=$modelBase;$preserve['products'][0]['image']='uploads/own-original.png';
 $kept=WebsiteCatalogSync::reconcile($preserve,[$modelRow]);
 wcCheck($kept['project']['products'][0]['image']==='uploads/own-original.png','WebP website image never replaces existing original');
+// The unavailable lead size has a different SKU from the grouped ERP product.
+$grandBase=['id'=>'grand','settings'=>[],'products'=>[['id'=>'grand-white','sku'=>'37976','name'=>'Grand Court 2.0 M - سفید','color'=>'سفيد','stock_total'=>37,'sizes'=>['41','42','43','44','45','46','47'],'variants'=>[['sku'=>'37976','size'=>'41']],'image'=>'','images_list'=>[]]]];
+$grandRow=['url'=>'https://www.sportland.ir/product/37975/example','product_code'=>'37975','name'=>'کتونی روزانه مردانه آدیداس Adidas Grand Court 2.0 M','color'=>'سفید','main_image'=>'https://www.sportland.ir/content/media/product/37975/pro_57948.webp','gallery'=>[],'size_availability'=>[['size'=>'40','available'=>false],['size'=>'41','available'=>true]]];
+$grand=WebsiteCatalogSync::reconcile($grandBase,[$grandRow],['complete'=>true]);$gp=$grand['project']['products'][0];$gs=WebsiteCatalogSync::state($grand['project'],$gp);
+wcCheck($grand['counts']['matched_name']===1&&$grand['counts']['missing']===0&&$gs['site_visible_with_images'],'lead size unavailable still matches exact model and color with approved images');
+wcCheck($gp['sku']==='37976'&&$gp['stock_total']===37&&$gp['sizes']===$grandBase['products'][0]['sizes']&&$gp['variants']===$grandBase['products'][0]['variants'],'site availability cannot replace ERP quantities, identity or sizes');
+wcCheck($gs['site_size_availability'][$grandRow['url']][0]['available']===false,'site size availability retained separately');
+foreach(['سیاه','سفید-سبز',null] as $wrongColor){$bad=WebsiteCatalogSync::reconcile($grandBase,[array_replace($grandRow,['color'=>$wrongColor])]);wcCheck($bad['counts']['matched']===0,'suffix removal requires exact observed color');}
+$otherModel=WebsiteCatalogSync::reconcile($grandBase,[array_replace($grandRow,['name'=>'Adidas Grand Court Extra 2.0 M'])]);wcCheck($otherModel['counts']['matched']===0,'color suffix never enables fuzzy model matching');
+$allOut=$grandRow;$allOut['size_availability']=[['size'=>'40','available'=>false],['size'=>'41','available'=>false]];$sold=WebsiteCatalogSync::reconcile($grandBase,[$allOut]);wcCheck(WebsiteCatalogSync::state($sold['project'],$sold['project']['products'][0])['site_visible_with_images'],'sold-out sizes never erase website photos');
 echo "$n website catalog checks passed\n";

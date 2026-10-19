@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError, async_playwright
 
 OUTPUT = 'output/products.json'
-SCRAPER_VERSION = '2.2.2'
+SCRAPER_VERSION = '2.2.3'
 DEFAULT_SIZE_GUIDE_WAIT_MS = 8000
 CHROME_PATHS = [
     r'C:\Program Files\Google\Chrome\Application\chrome.exe',
@@ -321,7 +321,7 @@ def product_schema(soup):
                 continue
             kinds = node.get('@type', [])
             kinds = [kinds] if isinstance(kinds, str) else kinds
-            if isinstance(kinds, list) and 'Product' in kinds:
+            if isinstance(kinds, list) and any(kind in kinds for kind in ('Product', 'ProductGroup')):
                 return node
     return {}
 
@@ -429,6 +429,49 @@ def product_categories(soup, url):
     return []
 
 
+def product_size_availability(soup, schema):
+    """A page's lead SKU may be sold out while other sizes remain purchasable."""
+    def offer_available(offers):
+        offers = offers if isinstance(offers, list) else [offers]
+        states = []
+        for offer in offers:
+            if not isinstance(offer, dict):
+                continue
+            status = str(offer.get('availability', '')).rstrip('/').rsplit('/', 1)[-1]
+            if status in ('InStock', 'LimitedAvailability', 'OnlineOnly', 'PreOrder', 'PreSale'):
+                states.append(True)
+            elif status in ('OutOfStock', 'SoldOut', 'Discontinued'):
+                states.append(False)
+        return True if True in states else (False if states and all(v is False for v in states) else None)
+
+    variants = schema.get('hasVariant', [])
+    variants = variants if isinstance(variants, list) else [variants]
+    sizes = {}
+    for variant in variants:
+        if isinstance(variant, dict) and isinstance(variant.get('size'), (str, int, float)):
+            label = str(variant['size']).strip()
+            if label:
+                sizes[label] = offer_available(variant.get('offers', []))
+    for node in soup.select(SELECTORS['sizes']):
+        label = node.get_text(' ', strip=True)
+        if not label:
+            continue
+        disabled = (node.has_attr('disabled') or node.get('aria-disabled') == 'true'
+                    or bool(set(node.get('class', [])) & {'disabled', 'disabled-size', 'out-of-stock', 'sold-out'})
+                    or node.find('del') is not None)
+        sizes[label] = not disabled
+    states = list(sizes.values())
+    available = True if True in states else (False if states and all(v is False for v in states) else None)
+    if not states:
+        available = offer_available(schema.get('offers', []))
+    return {
+        'size_availability': [{'size': size, 'available': state} for size, state in sizes.items()],
+        'available_sizes': [size for size, state in sizes.items() if state is True],
+        'unavailable_sizes': [size for size, state in sizes.items() if state is False],
+        'website_available': available,
+    }
+
+
 def parse_html(html, url, fields):
     soup = soup_from(html)
 
@@ -455,7 +498,9 @@ def parse_html(html, url, fields):
         elif field == 'category':
             continue  # Category hierarchy is always exported, including refresh mode.
         elif field == 'sizes':
-            data[field] = [node.get_text(strip=True) for node in soup.select(selector)]
+            availability = product_size_availability(soup, schema)
+            data[field] = [item['size'] for item in availability['size_availability']]
+            data.update(availability)
         elif field == 'description':
             element = soup.select_one(selector)
             data[field] = element.get_text(' ', strip=True) if element else ''

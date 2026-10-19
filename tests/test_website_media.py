@@ -50,6 +50,17 @@ class WebsiteMedia(unittest.TestCase):
         self.assertNotIn('href="javascript:unsafe',body)
         self.assertNotIn('data-product-id="one"',self.page('needs_size_chart'))
 
+    def test_site_size_stock_is_distinct_from_erp_and_photo_presence(self):
+        with sqlite3.connect(self.case.database) as db:
+            meta=json.loads(db.execute('SELECT website_sync FROM products WHERE id="one"').fetchone()[0])
+            meta['size_availability_by_page']={self.page_url:[{'size':'40','available':False},{'size':'41','available':True}]}
+            db.execute('UPDATE products SET website_sync=? WHERE id="one"',(json.dumps(meta),))
+        body=self.page('site_visible')
+        self.assertIn('سایزهای مشاهده‌شده در سایت',body)
+        self.assertIn('موجود: 41',body)
+        self.assertIn('ناموجود: 40',body)
+        self.assertIn('href="'+self.main+'"',body)
+
     def test_unknown_is_distinct_from_confirmed_missing(self):
         body=self.page('site_unknown')
         self.assertIn('data-product-id="manual"',body)

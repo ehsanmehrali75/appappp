@@ -188,6 +188,7 @@ class WebsiteCatalogSync {
         return array_replace($meta,[
             'site_visible_with_images'=>($meta['presence']??'')==='seen'&&(bool)$sitePhotos,
             'site_main_image_url'=>in_array($meta['main_image_url']??'', $sitePhotos,true)?$meta['main_image_url']:($sitePhotos[0]??null),
+            'site_size_availability'=>($meta['presence']??'')==='seen'?self::metadataArray($meta['size_availability_by_page']??[]):[],
             'site_page_urls'=>($meta['presence']??'')==='seen'?($meta['page_urls']??[]):[],
             'archived'=>$archived,
             'image_production'=>$production,
@@ -212,17 +213,27 @@ class WebsiteCatalogSync {
     private static function modelName($value) {
         return is_string($value)?mb_strtolower(trim(preg_replace('/[\s\x{00a0}]+/u',' ',$value))):'';
     }
+    private static function colorName($value) {
+        return str_replace(['ي','ك'],['ی','ک'],self::modelName($value));
+    }
+    /** Strip only this product's explicit color suffix, never arbitrary model words. */
+    private static function productModel($product) {
+        $name=self::modelName($product['name']??'');$color=self::colorName($product['color']??'');
+        if($color!=='') {
+            $normalized=self::colorName($name);
+            if(preg_match('/^(.*?)\s+[-–—]\s*'.preg_quote($color,'/').'$/u',$normalized,$parts)&&trim($parts[1])!=='')return trim($parts[1]);
+        }
+        return $name;
+    }
     private static function nameCandidates($row,$models,$products) {
         $name=self::modelName($row['name']??'');
         preg_match_all('/[\p{L}\p{N}]+/u',$name,$tokens);
         $possible=[];foreach(array_unique($tokens[0]) as $token)foreach($models[$token]??[] as $index=>$model)$possible[$index]=$model;
         $candidates=[];
         foreach($possible as $index=>$model)if(preg_match('/(?<![\p{L}\p{N}_])'.preg_quote($model,'/').'(?![\p{L}\p{N}_])/u',$name))$candidates[$index]=true;
-        if(count($candidates)>1) {
-            $color=self::modelName($row['color']??'');$byColor=[];
-            if($color!=='')foreach($candidates as $index=>$_)if(self::modelName($products[$index]['color']??'')===$color)$byColor[$index]=true;
-            if($byColor)$candidates=$byColor;
-        }
+        $color=self::colorName($row['color']??'');$byColor=[];
+        foreach($candidates as $index=>$_){$productColor=self::colorName($products[$index]['color']??'');if(($color===''&&self::productModel($products[$index])!==self::modelName($products[$index]['name']??''))||($color!==''&&$productColor!==''&&$color!==$productColor))unset($candidates[$index]);elseif($color!==''&&$productColor===$color)$byColor[$index]=true;}
+        if($byColor)$candidates=$byColor;
         return $candidates;
     }
     public static function reconcile($project,$rows,$options=[]) {
@@ -242,7 +253,7 @@ class WebsiteCatalogSync {
         foreach(($project['products']??[]) as $index=>$product) {
             foreach(['sku','product_code'] as $field)if(isset($product[$field])&&self::code($product[$field])!=='')$codes[self::code($product[$field])][$index]=true;
             foreach(($product['variants']??[]) as $variant)if(is_array($variant))foreach(['sku','product_code'] as $field)if(!empty($variant[$field]))$codes[self::code($variant[$field])][$index]=true;
-            $model=self::modelName($product['name']??'');
+            $model=self::productModel($product);
             if($model!==''&&preg_match('/[\p{L}\p{N}]+/u',$model,$first))$models[$first[0]][$index]=$model;
             $u=self::identityUrl($product['link']??$product['url']??'');if($u!=='')$urls[$u][$index]=true;
         }
@@ -279,13 +290,19 @@ class WebsiteCatalogSync {
                 $unconfirmed[$field]=$meta[$field];
             }
             $meta=array_replace($meta,['presence'=>'seen','origin'=>$origin,'checked_at'=>$now,'publication'=>'uploaded']);
-            $siteImages=[];$pageUrls=[];$mainImages=[];$descriptions=[];$charts=[];$prices=[];$descriptionObserved=false;$chartObserved=false;$imageObserved=false;
+            $siteImages=[];$pageUrls=[];$mainImages=[];$descriptions=[];$charts=[];$prices=[];$descriptionObserved=false;$chartObserved=false;$imageObserved=false;$availabilityObserved=false;$availabilityByPage=[];
             foreach($group as $row) {
                 $code=self::code($row['product_code']);
                 if(array_key_exists('category',$row)||array_key_exists('category_path',$row)) {
                     $meta['site_category_labels']=self::categories($row);
                     $meta['site_category_path']=implode('/',$meta['site_category_labels']);
                     $meta['site_primary_category']=$meta['site_category_labels']?end($meta['site_category_labels']):null;
+                }
+                // Website availability is observation only; never replace ERP quantities or variants.
+                if(array_key_exists('size_availability',$row)) {
+                    if(!is_array($row['size_availability'])||count($row['size_availability'])>300)throw new RuntimeException('ساختار موجودی سایزهای سایت معتبر نیست.');
+                    $availability=[];foreach($row['size_availability'] as $entry){if(!is_array($entry)||!is_string($entry['size']??null)||strlen($entry['size'])>100||(!is_bool($entry['available']??null)&&($entry['available']??null)!==null))throw new RuntimeException('وضعیت موجودی سایز باید بله، خیر یا نامشخص باشد.');$availability[]=['size'=>$entry['size'],'available'=>$entry['available']??null];}
+                    $availabilityObserved=true;$availabilityByPage[$row['url']]=$availability;
                 }
                 $pageUrls[self::url($row['url'])]=true;
                 if(self::url($row['main_image']??'')!=='')$mainImages[self::url($row['main_image'])]=true;
@@ -307,6 +324,7 @@ class WebsiteCatalogSync {
                 if(!empty($row['main_image']))array_unshift($images,$row['main_image']);
                 foreach($images as $image)if(self::url($image)!=='')$siteImages[$image]=true;
             }
+            if($availabilityObserved)$meta['size_availability_by_page']=$availabilityByPage;
             if($prices) {
                 $unique=array_unique($prices,SORT_REGULAR);
                 if(count($unique)===1){$product['price']=rtrim(rtrim(number_format($prices[0],4,'.',''),'0'),'.').' تومان';if($prices[0]===0.0)$product['price']='0 تومان';$counts['price']++;}
