@@ -282,7 +282,11 @@ class WebsiteCatalogSync {
             $siteImages=[];$pageUrls=[];$mainImages=[];$descriptions=[];$charts=[];$prices=[];$descriptionObserved=false;$chartObserved=false;$imageObserved=false;
             foreach($group as $row) {
                 $code=self::code($row['product_code']);
-                if(!self::categories($product)&&empty($meta['category_labels']))$meta['category_labels']=self::categories($row);
+                if(array_key_exists('category',$row)||array_key_exists('category_path',$row)) {
+                    $meta['site_category_labels']=self::categories($row);
+                    $meta['site_category_path']=implode('/',$meta['site_category_labels']);
+                    $meta['site_primary_category']=$meta['site_category_labels']?end($meta['site_category_labels']):null;
+                }
                 $pageUrls[self::url($row['url'])]=true;
                 if(self::url($row['main_image']??'')!=='')$mainImages[self::url($row['main_image'])]=true;
                 if($options['update_price']&&array_key_exists('price',$row)&&$row['price']!==null&&$row['price']!=='')$prices[] = self::price($row,$options['price_unit']);
@@ -379,20 +383,48 @@ class WebsiteCatalogSync {
             foreach((array)$raw as $value)if(is_string($value)&&trim($value)!=='')$values[]=trim($value);
         }
         $meta=self::metadata($product);
-        foreach(self::metadataArray($meta['category_labels']??[],true) as $value)if(is_string($value)&&trim($value)!=='')$values[]=trim($value);
+        foreach(['category_labels','site_category_labels'] as $field)foreach(self::metadataArray($meta[$field]??[],true) as $value)if(is_string($value)&&trim($value)!=='')$values[]=trim($value);
         return array_values(array_unique($values));
     }
     public static function chartExempt($project,$product) {
+        $meta=self::metadata($product);
+        if(!empty($meta['content_preferences']['chart_not_required']))return true;
         return (bool)array_intersect(self::categories($product),$project['settings']['website_catalog']['chart_exempt_categories']??[]);
     }
-    public static function setContentPreference(&$project,$id,$value,$actor) {
-        if(!is_string($id)||!in_array($value,['required','not_required'],true))throw new RuntimeException('تنظیم عکس معتبر نیست.');
+    public static function setContentPreference(&$project,$id,$value,$actor,$asset='image') {
+        if(!is_string($id)||!in_array($asset,['image','chart'],true)||!in_array($value,['required','not_required'],true))throw new RuntimeException('تنظیم محتوای محصول معتبر نیست.');
         foreach($project['products']??[] as $index=>$product)if((string)$product['id']===$id) {
             $meta=self::metadata($product);
-            $meta['content_preferences']=array_replace(self::metadataArray($meta['content_preferences']??[]),['image_not_required'=>$value==='not_required','at'=>time(),'by'=>$actor]);
+            $meta['content_preferences']=array_replace(self::metadataArray($meta['content_preferences']??[]),[$asset.'_not_required'=>$value==='not_required','at'=>time(),'by'=>$actor]);
             $project['products'][$index]['website_sync']=$meta;return $project['products'][$index];
         }
         throw new RuntimeException('محصول در این پروژه یافت نشد.');
+    }
+    /** Validate the whole selection before changing anything; callers save one batch. */
+    public static function bulkManage(&$project,$ids,$operation,$actor) {
+        $operations=['content_request','technical','inventory','clear_issue','image_not_required','image_required','chart_not_required','chart_required'];
+        if(!is_string($operation)||!in_array($operation,$operations,true)||!is_array($ids)||!$ids||count($ids)>100)throw new RuntimeException('حداکثر ۱۰۰ محصول و یک اقدام معتبر انتخاب کنید.');
+        foreach($ids as $id)if(!is_string($id)||$id==='')throw new RuntimeException('شناسهٔ محصول معتبر نیست.');
+        $ids=array_values(array_unique($ids));$known=[];
+        foreach($project['products']??[] as $product)$known[(string)$product['id']]=$product;
+        foreach($ids as $id)if(!isset($known[$id]))throw new RuntimeException('یکی از محصولات در این پروژه یافت نشد؛ تغییری ثبت نشد.');
+        $updated=[];$skipped=0;
+        foreach($ids as $id) {
+            if($operation==='content_request') {
+                $product=$known[$id];$state=self::state($project,$product);
+                if(!$state['needs_image']||!empty($product['content_gen_requested'])){$skipped++;continue;}
+                $product['content_gen_requested']=true;$product['website_sync']=self::metadata($product);
+                $product['website_sync']['image_request']=['at'=>time(),'by'=>$actor];
+                foreach($project['products'] as $index=>$candidate)if((string)$candidate['id']===$id){$project['products'][$index]=$product;break;}
+            } elseif(in_array($operation,['technical','inventory','clear_issue'],true)) {
+                $product=self::setIssue($project,$id,$operation==='clear_issue'?'none':$operation,'',$actor);
+            } else {
+                $asset=strpos($operation,'chart_')===0?'chart':'image';
+                $product=self::setContentPreference($project,$id,strpos($operation,'not_required')!==false?'not_required':'required',$actor,$asset);
+            }
+            $updated[]=$product;
+        }
+        return ['products'=>$updated,'updated'=>count($updated),'skipped'=>$skipped];
     }
     public static function setCategoryRule(&$project,$category,$value) {
         if(!is_string($category)||!in_array($value,['required','not_required'],true))throw new RuntimeException('قانون دسته‌بندی معتبر نیست.');

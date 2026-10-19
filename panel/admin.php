@@ -487,7 +487,7 @@ if ($project && isset($_POST['ajax_action'])) {
             $freshProject = getCurrentProject($project['id'], true);
             if (!$freshProject) throw new RuntimeException('پروژه یافت نشد.');
             if($action==='website_catalog_set_preference') {
-                $updated=WebsiteCatalogSync::setContentPreference($freshProject,$_POST['product_id']??'',$_POST['value']??'',$_SESSION['user']['username']??'');
+                $updated=WebsiteCatalogSync::setContentPreference($freshProject,$_POST['product_id']??'',$_POST['value']??'',$_SESSION['user']['username']??'',$_POST['asset']??'image');
                 if(!saveProject($freshProject,[$updated]))throw new RuntimeException('ثبت تنظیم عکس ناموفق بود.');
                 echo json_encode(['status'=>'success','msg'=>'تنظیم عکس ثبت شد.'],JSON_UNESCAPED_UNICODE);
             } elseif($action==='website_catalog_category_rule') {

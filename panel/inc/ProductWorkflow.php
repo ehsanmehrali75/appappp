@@ -6,7 +6,7 @@ class ProductWorkflow {
             'rejected'=>'تصویر ردشده','waiting_reference'=>'منتظر عکس رفرنس','waiting_ai_image'=>'منتظر عکس نهایی','no_image'=>'منتظر تولید عکس'][$status]??'نیازمند بررسی';
     }
     public static function filters() {
-        return ['image_not_required'=>'عکس نیاز ندارد','all'=>'همهٔ محصولات','ready'=>'تصاویر تأییدشده','pending_approval'=>'منتظر تأیید تصویر',
+        return ['chart_not_required'=>'جدول سایز نیاز ندارد','image_not_required'=>'عکس نیاز ندارد','all'=>'همهٔ محصولات','ready'=>'تصاویر تأییدشده','pending_approval'=>'منتظر تأیید تصویر',
             'image_request'=>'درخواست تولید تصویر','needs_reference'=>'عکس رفرنس ندارد','reference_ready'=>'رفرنس دارد؛ آمادهٔ تولید',
             'needs_image'=>'گردش تولید تصویر','production_ready'=>'آمادهٔ تولید عکس','pending_upload'=>'منتظر آپلود عکس','needs_size_chart'=>'منتظر تولید جدول سایز',
             'size_chart_upload'=>'منتظر آپلود جدول سایز','needs_description'=>'منتظر تولید توضیحات',
@@ -14,6 +14,7 @@ class ProductWorkflow {
     }
     public static function matches($project,$product,$filter,$state=null,$status=null) {
         if($filter==='all')return true;
+        if($filter==='chart_not_required')return WebsiteCatalogSync::chartExempt($project,$product);
         if($filter==='image_not_required')return ImageProduction::imageExempt($product);
         $issue=ImageProduction::issueType($product);
         if($filter==='inventory_issue')return $issue==='inventory';

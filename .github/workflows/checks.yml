@@ -50,6 +50,7 @@ jobs:
           python tests/browser_website_catalog.py
           python tests/browser_support.py
           python tests/browser_product_review.py
+          python tests/browser_portal_bulk.py
       - name: Validate deployment package
         run: python tools/build_release.py --output /tmp/maarksho-release.zip
   desktop-scraper:
@@ -68,6 +69,7 @@ jobs:
           python app/verify_size_guide.py
           python app/verify_media.py
           python app/verify_color.py
+          python app/verify_categories.py
       - name: Desktop settings reach the scraper
         env:
           QT_QPA_PLATFORM: offscreen

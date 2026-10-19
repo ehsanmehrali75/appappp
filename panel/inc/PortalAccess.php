@@ -25,7 +25,7 @@ class PortalAccess {
         if (in_array($action, ['approve', 'reject'], true)) return canAccessFeature('approve_content', 'use');
         if (in_array($action, ['quick_action', 'vote'], true))
             return canAccessFeature('products', 'use') || canAccessFeature('approve_content', 'use');
-        return in_array($action, ['create_couple_set', 'bulk_request_content_gen', 'reset_content_gen_priority', 'bulk_request_publish_priority', 'reset_publish_priority', 'comment', 'feedback'], true)
+        return in_array($action, ['bulk_manage_products', 'create_couple_set', 'bulk_request_content_gen', 'reset_content_gen_priority', 'bulk_request_publish_priority', 'reset_publish_priority', 'comment', 'feedback'], true)
             && canAccessFeature('products', 'use');
     }
 }

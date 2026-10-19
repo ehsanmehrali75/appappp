@@ -35,3 +35,46 @@
     // Preserve normal link behavior and all project/filter query parameters.
     window.switchTab=id=>{const url=new URL(location.href);url.searchParams.set('tab',id);url.searchParams.set('p','1');location.assign(url);};
 })();
+
+/* Delegated events survive the portal's AJAX tab and pagination replacement. */
+(() => {
+    'use strict';
+    const boxes=()=>[...document.querySelectorAll('#tab-library input[name="selected_library_products[]"]')];
+    const selected=()=>boxes().filter(box=>box.checked);
+    const sync=()=>{
+        const all=boxes(),checked=selected(),master=document.getElementById('portal-batch-select-all'),count=document.getElementById('portal-batch-count'),apply=document.getElementById('portal-batch-apply');
+        if(master){master.checked=all.length>0&&checked.length===all.length;master.indeterminate=checked.length>0&&checked.length<all.length;}
+        if(count)count.textContent=checked.length+' محصول انتخاب شده';
+        if(apply)apply.disabled=checked.length===0;
+        all.forEach(box=>box.closest('.portal-product-card')?.classList.toggle('is-batch-selected',box.checked));
+    };
+    document.addEventListener('portal-library-selection',sync);
+    document.addEventListener('change',event=>{
+        if(event.target.id==='portal-batch-select-all'){
+            boxes().forEach(box=>box.checked=event.target.checked);
+            window.updateSelectedLibraryCount?.();sync();
+        } else if(event.target.matches('input[name="selected_library_products[]"]'))sync();
+    });
+    document.addEventListener('click',event=>{
+        if(!event.target.closest('#portal-batch-clear'))return;
+        boxes().forEach(box=>box.checked=false);window.updateSelectedLibraryCount?.();sync();
+    });
+    document.addEventListener('submit',async event=>{
+        const form=event.target;if(form.id!=='portal-library-batch-form')return;
+        event.preventDefault();const ids=selected().map(box=>box.value),result=document.getElementById('portal-batch-result'),button=document.getElementById('portal-batch-apply');
+        if(!ids.length){result.textContent='ابتدا محصول انتخاب کنید.';return;}
+        button.disabled=true;const data=new FormData(form);data.set('action','bulk_manage_products');ids.forEach(id=>data.append('product_ids[]',id));
+        try {
+            const response=await fetch(window.location.href,{method:'POST',headers:{'X-Requested-With':'XMLHttpRequest','X-CSRF-Token':document.querySelector('meta[name="app-csrf"]')?.content||''},body:data});
+            const body=await response.json();if(!response.ok||body.status!=='success')throw new Error(body.msg||'ثبت وضعیت ناموفق بود.');
+            result.textContent=body.msg;
+            if(body.updated){try{sessionStorage.setItem('portal-batch-feedback',JSON.stringify({project:form.closest('[data-project]').dataset.project,message:body.msg}));}catch(_){}location.reload();}
+        } catch(error){result.textContent=error.message;result.focus();}
+        finally{sync();}
+    });
+    sync();
+    try {
+        const saved=JSON.parse(sessionStorage.getItem('portal-batch-feedback')||'null'),bar=document.querySelector('.portal-library-batch');
+        if(saved&&bar&&saved.project===bar.dataset.project){bar.querySelector('#portal-batch-result').textContent=saved.message;sessionStorage.removeItem('portal-batch-feedback');}
+    } catch(_){}
+})();

@@ -107,11 +107,18 @@ $missingSizeChartProducts = [];
 $pendingUploadSizeChartProducts = [];
 
 foreach (($project['products'] ?? []) as $p) {
-    if (isProductMissingSizeChart($p)) {
+    $studioQueue=WebsiteCatalogSync::state($project,$p);
+    if ($studioQueue['needs_size_chart']) {
         $missingSizeChartProducts[] = $p;
-    } elseif (isProductSizeChartPendingUpload($p)) {
+    } elseif ($studioQueue['size_chart_upload_pending']) {
         $pendingUploadSizeChartProducts[] = $p;
     }
+}
+$studioProducts=[];
+foreach($project['products']??[] as $studioProduct) {
+    $studioProduct['_chart_not_required']=WebsiteCatalogSync::chartExempt($project,$studioProduct);
+    $studioProduct['_inventory_archived']=WebsiteCatalogSync::inventory($studioProduct)==='out_of_stock';
+    $studioProducts[]=$studioProduct;
 }
 $missingChartsCount = count($missingSizeChartProducts);
 $pendingUploadChartsCount = count($pendingUploadSizeChartProducts);
@@ -4913,7 +4920,7 @@ if (empty($active_presets)) {
         var app_presets = <?php echo json_encode($active_presets, JSON_UNESCAPED_UNICODE); ?>;
         var app_desc_presets = <?php echo json_encode($project['settings']['size_chart_desc_presets'] ?? [], JSON_UNESCAPED_UNICODE); ?>;
         var app_charts = <?php echo json_encode($project['settings']['size_charts'] ?? [], JSON_UNESCAPED_UNICODE); ?>;
-        var app_products = <?php echo json_encode($project['products'] ?? [], JSON_UNESCAPED_UNICODE); ?>;
+        var app_products = <?php echo json_encode($studioProducts, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
         var selected_chart = null;
         var scs_settings = <?php echo json_encode($scs_settings, JSON_UNESCAPED_UNICODE); ?>;
 
@@ -11362,7 +11369,7 @@ if (empty($active_presets)) {
          var targetDirectUploadProductId = null;
 
          function isProductMissingSizeChart(p) {
-             if (!p) return false;
+             if (!p || p._chart_not_required || p._inventory_archived) return false;
              
              // 1. Check template ID: must be non-empty and not '0', 'null', 'none', etc.
              var tId = p.size_chart_template_id;
@@ -11391,7 +11398,7 @@ if (empty($active_presets)) {
          }
 
          function isProductSizeChartPendingUpload(p) {
-             if (!p) return false;
+             if (!p || p._chart_not_required || p._inventory_archived) return false;
              var hasChart = !isProductMissingSizeChart(p);
              var isUploaded = p.size_chart_uploaded === true || p.size_chart_uploaded === 1 || p.size_chart_uploaded === '1' || p.size_chart_uploaded === 'true';
              return hasChart && !isUploaded;

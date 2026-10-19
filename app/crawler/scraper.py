@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError, async_playwright
 
 OUTPUT = 'output/products.json'
-SCRAPER_VERSION = '2.2.1'
+SCRAPER_VERSION = '2.2.2'
 DEFAULT_SIZE_GUIDE_WAIT_MS = 8000
 CHROME_PATHS = [
     r'C:\Program Files\Google\Chrome\Application\chrome.exe',
@@ -402,6 +402,33 @@ def product_color(soup, code=None):
     return None
 
 
+def product_categories(soup, url):
+    """One ordered product breadcrumb; omit navigation scaffolding and the product itself."""
+    trails = soup.select('.product-navigation .breadcrumb') or soup.select('.breadcrumb')
+    if not trails:
+        return []
+    ignored = {'دستهبندیکالاها', 'محصولات', 'خانه', 'صفحه اصلی'.replace(' ', ''), 'home', 'products'}
+    name = soup.select_one('h1.product-name, h1.product_title, h1[itemprop="name"]')
+    product_name = ' '.join(name.get_text(' ', strip=True).split()) if name else ''
+    for trail in trails:
+        labels = []
+        for item in trail.select('li') or trail.select('a'):
+            node = item.find('a') if item.name != 'a' else item
+            label = ' '.join((node or item).get_text(' ', strip=True).split())
+            normalized = label.replace(' ', '').replace('\u200c', '').replace('ي', 'ی').replace('ك', 'ک').lower()
+            href = node.get('href', '') if node else ''
+            path = urlparse(urljoin(url, href)).path.rstrip('/') if href else ''
+            if not label or normalized in ignored or label == product_name:
+                continue
+            if node and href and (path == '' or path.startswith('/product/')):
+                continue
+            if label not in labels:
+                labels.append(label)
+        if labels:
+            return labels
+    return []
+
+
 def parse_html(html, url, fields):
     soup = soup_from(html)
 
@@ -415,7 +442,8 @@ def parse_html(html, url, fields):
         code = str(code)
     if not code and not text(SELECTORS['name']) and not schema.get('name'):
         raise ValueError('Product markers missing; refusing to save a blank/challenge page')
-    data = {'url': url, 'product_code': code}
+    categories = product_categories(soup, url)
+    data = {'url': url, 'product_code': code, 'category': categories, 'category_path': '/'.join(categories), 'primary_category': categories[-1] if categories else None}
     for field in fields:
         selector = SELECTORS[field]
         if field == 'color':
@@ -424,7 +452,9 @@ def parse_html(html, url, fields):
             data[field] = text(selector)
             if field == 'name' and not data[field]:
                 data[field] = schema.get('name')
-        elif field in ('sizes', 'category'):
+        elif field == 'category':
+            continue  # Category hierarchy is always exported, including refresh mode.
+        elif field == 'sizes':
             data[field] = [node.get_text(strip=True) for node in soup.select(selector)]
         elif field == 'description':
             element = soup.select_one(selector)
@@ -466,17 +496,23 @@ async def parse_product_page(page, url, fields, controller, log, timeout_ms, dyn
     # Optional fields share bounded waits. Size-guide links are populated by a
     # later request on this site: wait for their URL, not just an empty anchor.
     # Both waits start together, so unrelated missing fields do not add delays.
+    fields = list(dict.fromkeys([*fields, 'category']))
+
     async def wait_optional_fields():
-        requested = [{'selector': SELECTORS[field], 'gallery': field == 'gallery', 'color': field == 'color'}
+        requested = [{'selector': SELECTORS[field], 'gallery': field == 'gallery', 'color': field == 'color', 'category': field == 'category'}
                      for field in fields if field != 'size_guide']
         if not dynamic_wait_ms or not requested:
             return
         try:
             await page.wait_for_function(
-                '''fields => fields.every(field =>
+                r'''fields => fields.every(field =>
                     Array.from(document.querySelectorAll(field.selector)).some(element =>
                         field.gallery
                             ? ['data-zoom-image', 'data-src', 'src'].some(name => element.getAttribute(name)?.trim())
+                            : field.category ? (() => {
+                                const label=element.textContent.trim().replace(/[\s\u200c]/g,'').replace(/ي/g,'ی').replace(/ك/g,'ک').toLowerCase();
+                                return label && !['دستهبندیکالاها','محصولات','خانه','صفحهاصلی','home','products'].includes(label) && element.getAttribute('href')!=='/';
+                              })()
                             : field.color ? (element.getAttribute('data-tooltip')?.trim() || element.textContent.trim()) : element.textContent.trim()
                     )
                 )''',

@@ -261,6 +261,7 @@ if (!isset($_SESSION['display_name'])) {
 $current_p_username = $_SESSION['user']['username'] ?? $_SESSION['display_name'] ?? 'guest';
 $content_gen_users_raw = $project['settings']['prod_content_gen_users'] ?? '';
 $content_gen_users = array_filter(array_map('trim', preg_split('/[,\x{060c}]+/u', strtolower($content_gen_users_raw))));
+$can_bulk_manage_products=PortalAccess::canAction('bulk_manage_products');
 $can_request_content_gen = PortalAccess::canAction('bulk_request_content_gen') && ImageProduction::canRequest($project);
 
 $couples_users_raw = $project['settings']['prod_couples_users'] ?? '';
@@ -278,6 +279,24 @@ if ($isAjax && isset($_POST['action'])) {
     $response = ['status' => 'error', 'msg' => 'درخواست نامعتبر'];
     
     // هندلر اختصاصی ثبت پروفایل کاربری
+    if (in_array($_POST['action'],['bulk_manage_products','bulk_request_content_gen'],true)) {
+        $bulkLock=null;
+        try {
+            $lockDir=sys_get_temp_dir().'/maarksho-website-'.substr(hash('sha256',__DIR__),0,16);
+            if(!is_dir($lockDir)&&!mkdir($lockDir,0700,true)&&!is_dir($lockDir))throw new RuntimeException('آماده‌سازی قفل پروژه ناموفق بود.');
+            $bulkLock=fopen($lockDir.'/'.hash('sha256',(string)$project['id']).'.lock','c');
+            if(!$bulkLock||!flock($bulkLock,LOCK_EX))throw new RuntimeException('ثبت وضعیت هم‌اکنون ممکن نیست.');
+            $freshProject=getCurrentProject($project['id'],true);
+            if(!$freshProject)throw new RuntimeException('پروژه یافت نشد.');
+            $operation=$_POST['action']==='bulk_request_content_gen'?'content_request':($_POST['operation']??'');
+            if($operation==='content_request'&&!ImageProduction::canRequest($freshProject))AccessControl::deny();
+            $result=WebsiteCatalogSync::bulkManage($freshProject,$_POST['product_ids']??null,$operation,$_SESSION['user']['username']??'');
+            if($result['updated']&&!saveProject($freshProject,$result['products']))throw new RuntimeException('ذخیرهٔ وضعیت محصولات ناموفق بود.');
+            echo json_encode(['status'=>'success','updated'=>$result['updated'],'skipped'=>$result['skipped'],'msg'=>'ثبت شد: '.$result['updated'].' محصول؛ بدون تغییر: '.$result['skipped'].' محصول.'],JSON_UNESCAPED_UNICODE);
+        } catch(RuntimeException $e) {http_response_code(400);echo json_encode(['status'=>'error','msg'=>$e->getMessage()],JSON_UNESCAPED_UNICODE);}
+        finally {if(is_resource($bulkLock)){flock($bulkLock,LOCK_UN);fclose($bulkLock);}}
+        exit;
+    }
     if ($_POST['action'] === 'update_profile') {
         $displayName = trim($_POST['display_name'] ?? '');
         if ($displayName) {
@@ -387,6 +406,9 @@ if ($isAjax && isset($_POST['action'])) {
             echo json_encode(['status' => 'error', 'msg' => 'یکی از محصولات انتخاب شده یافت نشد.']);
             exit;
         }
+        if(getProductWorkflowStatus($p1,$project)!=='active'||getProductWorkflowStatus($p2,$project)!=='active') {
+            echo json_encode(['status'=>'error','msg'=>'برای ساخت ست، فقط دو محصول با تصاویر تأییدشده انتخاب کنید.'],JSON_UNESCAPED_UNICODE);exit;
+        }
 
         $new_id = 'set_' . time() . '_' . mt_rand(100, 999);
         $new_sku = 'SET-' . sprintf("%06d", mt_rand(1, 999999));
@@ -457,58 +479,6 @@ if ($isAjax && isset($_POST['action'])) {
             echo json_encode(['status' => 'error', 'msg' => 'خطا در ذخیره‌سازی محصول جدید در پایگاه داده.']);
         }
         exit;
-    }
-
-    if ($_POST['action'] === 'bulk_request_content_gen') {
-        $content_gen_users_raw = $project['settings']['prod_content_gen_users'] ?? '';
-        $content_gen_users = array_filter(array_map('trim', preg_split('/[,\x{060c}]+/u', strtolower($content_gen_users_raw))));
-        $current_user = $_SESSION['user']['username'] ?? $_SESSION['display_name'] ?? 'unknown';
-        if (!ImageProduction::canRequest($project)) {
-            echo json_encode(['status' => 'error', 'msg' => 'دسترسی غیرمجاز 🚫 شما اجازه ندارید برای کالاهای بدون تصویر درخواست تولید محتوا ثبت کنید.']);
-            exit;
-        }
-
-        $product_ids = isset($_POST['product_ids']) ? (array)$_POST['product_ids'] : [];
-        if (empty($product_ids)) {
-            echo json_encode(['status' => 'error', 'msg' => 'هیچ محصولی انتخاب نشده است.']);
-            exit;
-        }
-        
-        $count = 0;
-        $updatedProducts = [];
-        $skippedCount = 0;
-        foreach ($project['products'] ?? [] as &$prod) {
-            if (in_array((string)$prod['id'], $product_ids)) {
-                $productionState=WebsiteCatalogSync::state($project,$prod);
-                if($productionState['archived']||!$productionState['needs_image']){$skippedCount++;continue;}
-                if (!empty($prod['content_gen_requested'])) {
-                    $skippedCount++;
-                    continue;
-                }
-                $prod['content_gen_requested'] = true;
-                $prod['website_sync']['image_request']=['at'=>time(),'by'=>$_SESSION['user']['username']??''];
-                $updatedProducts[] = $prod;
-                $count++;
-            }
-        }
-        unset($prod);
-        
-        if ($count > 0) {
-            saveProject($project, $updatedProducts);
-            $msg = "درخواست تولید تصویر برای {$count} محصول با موفقیت ثبت شد ✅";
-            if ($skippedCount > 0) {
-                $msg .= " ({$skippedCount} کالا قبلاً در اولویت تولید بودند و نادیده گرفته شدند)";
-            }
-            echo json_encode(['status' => 'success', 'msg' => $msg]);
-            exit;
-        } else {
-            if ($skippedCount > 0) {
-                echo json_encode(['status' => 'error', 'msg' => 'تمامی کالاهای انتخاب شده از قبل دارای وضعیت «اولویت تولید محتوا» می‌باشند ⚠️']);
-            } else {
-                echo json_encode(['status' => 'error', 'msg' => 'کالای معتبری یافت نشد.']);
-            }
-            exit;
-        }
     }
 
     if ($_POST['action'] === 'reset_content_gen_priority') {
@@ -1715,7 +1685,7 @@ if (!PortalAccess::canProducts()) {
 </head>
 <body class="portal-workspace" data-portal-tab="<?php echo htmlspecialchars($active_tab,ENT_QUOTES,'UTF-8'); ?>">
 <style id="portal-action-permissions">
-<?php foreach (['vote','comment','vote_schedule','comment_schedule','cast_occasion_vote','bulk_request_content_gen','bulk_request_publish_priority','reset_publish_priority','reset_content_gen_priority','create_couple_set','approve','reject','quick_action'] as $portalAction): if (!PortalAccess::canAction($portalAction)): ?>
+<?php foreach (['vote','comment','vote_schedule','comment_schedule','cast_occasion_vote','bulk_manage_products','bulk_request_content_gen','bulk_request_publish_priority','reset_publish_priority','reset_content_gen_priority','create_couple_set','approve','reject','quick_action'] as $portalAction): if (!PortalAccess::canAction($portalAction)): ?>
 [data-portal-action="<?php echo $portalAction; ?>"] { display: none !important; }
 <?php endif; endforeach; ?>
 </style>
@@ -2225,6 +2195,8 @@ $familyStockMap = buildProductFamilyStockMap($raw_all_project_products);
 
 $catalogAnalyticsData = [];
 $all_categories = [];
+$portalCategoryLabels=[];
+$f_category=is_string($_GET['f_category']??null)?trim($_GET['f_category']):'';
 $all_creators = [];
 
 $count_pending = 0;
@@ -2235,6 +2207,7 @@ $count_no_image = 0;
 $isProdSplit = !empty($project['settings']['prod_approval_split_enabled']);
 
 foreach ($raw_all_project_products as $_p) {
+    foreach(WebsiteCatalogSync::categories($_p) as $category)$portalCategoryLabels[$category]=true;
     $catName = trim($_p['color'] ?? '');
     if ($catName !== '' && !in_array($catName, $all_categories, true)) {
         $all_categories[] = $catName;
@@ -2313,19 +2286,20 @@ foreach ($raw_all_project_products as $_p) {
     }
 }
 
+ksort($portalCategoryLabels);
 sort($all_categories);
 sort($all_creators);
 
 // اعمال فیلتر هوشمند متقاطع بر روی کالاها
 if (!empty($raw_all_project_products)) {
-    $project['products'] = array_filter($raw_all_project_products, function($p) use ($f_q, $f_cat, $f_price, $f_stock, $f_stock_min, $f_likes, $f_creator, $familyStockMap) {
+    $project['products'] = array_filter($raw_all_project_products, function($p) use ($f_q, $f_cat, $f_category, $f_price, $f_stock, $f_stock_min, $f_likes, $f_creator, $familyStockMap) {
         // ۱. فیلتر متنی (جستجوی مستقل یا تلفیقی از عنوان، SKU، رنگ، دسته‌بندی و ثبت‌کننده)
         if ($f_q !== '') {
             $q = normalizeSearchText($f_q);
             $nameNorm = normalizeSearchText($p['name'] ?? '');
             $skuNorm = normalizeSearchText($p['sku'] ?? '');
             $colorNorm = normalizeSearchText($p['color'] ?? '');
-            $catNorm = normalizeSearchText($p['category_path'] ?? '');
+            $catNorm = normalizeSearchText(implode(' ',WebsiteCatalogSync::categories($p)));
             $creatorNorm = normalizeSearchText($p['uploaded_by'] ?? '');
             
             $nameMatch = (mb_strpos($nameNorm, $q) !== false);
@@ -2335,7 +2309,8 @@ if (!empty($raw_all_project_products)) {
             $creatorMatch = (mb_strpos($creatorNorm, $q) !== false);
             if (!$nameMatch && !$skuMatch && !$colorMatch && !$catMatch && !$creatorMatch) return false;
         }
-        // ۲. فیلتر دسته‌بندی
+        if($f_category!==''&&!in_array($f_category,WebsiteCatalogSync::categories($p),true))return false;
+        // ۲. فیلتر رنگ
         if ($f_cat !== '' && ($p['color'] ?? '') !== $f_cat) {
             return false;
         }
@@ -2438,15 +2413,16 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                 </div>
 
                 <div>
-                    <label class="text-[10px] font-black text-slate-400 block mb-1.5 uppercase">دسته بندی/رنگ کالا</label>
+                    <label class="text-[10px] font-black text-slate-400 block mb-1.5 uppercase">رنگ کالا</label>
                     <select name="f_cat" class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-brand-500">
-                        <option value="">همه رنگ‌ها / دسته‌ها</option>
+                        <option value="">همهٔ رنگ‌ها</option>
                         <?php foreach ($all_categories as $col): ?>
                             <option value="<?php echo htmlspecialchars($col); ?>" <?php echo $f_cat === $col ? 'selected' : ''; ?>><?php echo htmlspecialchars($col); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
 
+                <div><label class="text-[10px] font-black text-slate-400 block mb-1.5 uppercase">دسته‌بندی محصول</label><select name="f_category" class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"><option value="">همهٔ دسته‌بندی‌ها</option><?php foreach($portalCategoryLabels as $category=>$unused): ?><option value="<?php echo htmlspecialchars($category,ENT_QUOTES,'UTF-8'); ?>" <?php echo $f_category===$category?'selected':''; ?>><?php echo htmlspecialchars($category); ?></option><?php endforeach; ?></select></div>
                 <div>
                     <label class="text-[10px] font-black text-slate-400 block mb-1.5 uppercase">محدوده قیمت</label>
                     <select name="f_price" class="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-brand-500">
@@ -3371,6 +3347,14 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
         </div>
 
         </details>
+        <?php if($can_bulk_manage_products): ?>
+        <section class="portal-library-batch" data-project="<?php echo htmlspecialchars((string)$project['id'],ENT_QUOTES,'UTF-8'); ?>" aria-label="مدیریت گروهی محصولات">
+            <div class="portal-batch-selection"><label><input type="checkbox" id="portal-batch-select-all" aria-label="انتخاب محصولات همین صفحه"> انتخاب همین صفحه</label><strong id="portal-batch-count" aria-live="polite">۰ محصول انتخاب شده</strong><button type="button" id="portal-batch-clear">لغو انتخاب</button></div>
+            <form id="portal-library-batch-form"><label for="portal-batch-operation">اقدام روی محصولات انتخاب‌شده</label><div class="portal-batch-controls"><select id="portal-batch-operation" name="operation" required><option value="">انتخاب اقدام…</option><?php if($can_request_content_gen): ?><option value="content_request">درخواست تولید محتوا / تصویر</option><?php endif; ?><option value="technical">ارجاع برای بررسی باگ فنی</option><option value="inventory">مشکل موجودی</option><option value="image_not_required">عکس نیاز ندارد</option><option value="chart_not_required">جدول سایز نیاز ندارد</option><optgroup label="بازگردانی"><option value="clear_issue">مشکل فنی / موجودی رفع شد</option><option value="image_required">عکس نیاز دارد؛ بازگشت به صف</option><option value="chart_required">جدول سایز؛ بازگشت به قانون دسته‌بندی</option></optgroup></select><button type="submit" id="portal-batch-apply" disabled>اعمال روی انتخاب‌ها</button></div></form>
+            <p>انتخاب فقط برای همین صفحه است. درخواست تولید برای محصولات بدون عکسِ نیازمند تولید ثبت می‌شود؛ موارد ناموجود، متوقف یا مستثنا تغییری نمی‌کنند. وضعیت‌ها در ادمین و پورتال مشترک‌اند.</p><div id="portal-batch-result" role="status" aria-live="polite" tabindex="-1"></div>
+        </section>
+        <?php endif; ?>
+        <?php if($can_request_content_gen||$can_create_couples): ?><details class="portal-bulk-actions"><summary>ابزارهای بیشتر: اولویت انتشار و ساخت ست</summary>
         <?php if ($can_request_content_gen): ?>
         <!-- Bulk Action Header Bar for Publish/Calendar Priority -->
         <div class="portal-bulk-bar flex flex-wrap items-center justify-between gap-4 p-5 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-[2rem] border border-indigo-100/60 mb-6 shadow-sm">
@@ -3419,6 +3403,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
         </div>
         <?php endif; ?>
 
+        </details><?php endif; ?>
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             <?php 
             $active_products = array_filter((array)($project['products'] ?? []), fn($p)=>ProductWorkflow::matches($project,$p,$portalLibraryFilter));
@@ -3556,10 +3541,10 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                         <?php renderCardImageCarousel($p); ?>
                         
                         <!-- Bulk Selection Checkbox for Library -->
-                        <?php if (($can_request_content_gen||$can_create_couples)&&getProductWorkflowStatus($p,$project)==='active'): ?>
-                            <div class="absolute top-4 left-4 z-30" onclick="event.stopPropagation();">
-                                <input type="checkbox" name="selected_library_products[]" value="<?php echo $p['id']; ?>" class="w-6 h-6 rounded-lg border-slate-200 text-indigo-600 focus:ring-indigo-500 cursor-pointer shadow-md bg-white/90 backdrop-blur-md transition-all duration-200 transform hover:scale-110" onchange="updateSelectedLibraryCount()">
-                            </div>
+                        <?php if ($can_bulk_manage_products): ?>
+                            <label class="portal-library-check" onclick="event.stopPropagation();">
+                                <input type="checkbox" aria-label="انتخاب محصول" name="selected_library_products[]" value="<?php echo $p['id']; ?>" class="w-6 h-6 rounded-lg border-slate-200 text-indigo-600 focus:ring-indigo-500 cursor-pointer shadow-md bg-white/90 backdrop-blur-md transition-all duration-200 transform hover:scale-110" onchange="updateSelectedLibraryCount()">
+                            </label>
                         <?php endif; ?>
 
                         <!-- Top Badges -->
@@ -3593,6 +3578,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                     
                     <div class="p-5 flex-1 flex flex-col bg-white" onclick="event.stopPropagation()">
                         <div class="font-bold text-sm text-slate-800 line-clamp-2 h-10 mb-2"><?php echo htmlspecialchars($p['name']); ?></div>
+                        <?php $portalTrail=$p['website_sync']['site_category_labels']??[];if(!is_array($portalTrail)||!$portalTrail)$portalTrail=WebsiteCatalogSync::categories($p);$portalTrail=array_values(array_filter($portalTrail,'is_string'));if($portalTrail): ?><p class="portal-category-trail"><?php echo htmlspecialchars(implode(' ← ',$portalTrail),ENT_QUOTES,'UTF-8'); ?></p><?php endif; ?><?php if(WebsiteCatalogSync::chartExempt($project,$p)): ?><span class="wc-badge portal-chart-exempt">جدول سایز نیاز ندارد</span><?php endif; ?>
                         <div class="flex items-center justify-between gap-2 mb-4">
                             <div class="text-xs font-black text-brand-600"><?php echo $p['price']; ?></div>
                             <div class="flex items-center gap-1">
@@ -6803,6 +6789,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
 
     function updateSelectedLibraryCount() {
         const checked = document.querySelectorAll('input[name="selected_library_products[]"]:checked');
+        document.dispatchEvent(new Event('portal-library-selection'));
         const selectAll = document.getElementById('library-select-all');
         const boxes = document.querySelectorAll('input[name="selected_library_products[]"]');
         
@@ -6817,7 +6804,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
     }
 
     function submitBulkPublishPriorityRequest() {
-        const checkedBoxes = document.querySelectorAll('input[name="selected_library_products[]"]:checked');
+        const checkedBoxes = Array.from(document.querySelectorAll('input[name="selected_library_products[]"]:checked')).filter(box=>box.closest('[data-workflow]')?.dataset.workflow==='active');
         if (checkedBoxes.length === 0) {
             alert('لطفاً ابتدا حداقل یک محصول تایید شده را انتخاب نمایید.');
             return;

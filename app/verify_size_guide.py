@@ -191,7 +191,8 @@ async def main(base, root):
         use_system_proxy=False, output=str(refresh_output), size_guide_wait_ms=3200,
         refresh_existing=True,
     )
-    expected_refresh = dict(existing, size_guide=base + '/fallback.jpg')
+    # Category hierarchy is now a mandatory export even for a guide-only refresh.
+    expected_refresh = dict(existing, size_guide=base + '/fallback.jpg', category=[], category_path='', primary_category=None)
     assert json.loads(refresh_output.read_text(encoding='utf-8')) == [expected_refresh]
     assert product_request_count() == before + 1
     checks.append('true update fills blank guide and preserves unselected fields')

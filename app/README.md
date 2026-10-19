@@ -24,3 +24,6 @@ python app.py
 
 
 اصلاح رنگ در نسخهٔ ۲.۲.۱: مقدار برچسب مستقیم رنگ در اسپورت‌لند و `data-tooltip` گزینهٔ فعال (`color-active`) خوانده می‌شود. اگر نشانگر فعال موجود نباشد، کد همان محصول یا گزینهٔ یکتای بدون لینک بررسی می‌شود؛ اولین رنگِ محصولات دیگر به‌جای رنگ جاری انتخاب نمی‌شود. ساختار قبلی تندرست حفظ شده است. برای اصلاح `color: null` در فایل قدیمی، حالت به‌روزرسانی با بازخوانی محصولات قبلی و تیک «رنگ» را اجرا کنید.
+
+
+Version 2.2.2 always exports the product breadcrumb hierarchy as `category` (ordered array), `category_path` (slash-separated path), and `primary_category` (the final category). It omits home, generic catalog scaffolding and the product itself, and keeps one product trail instead of mixing duplicate breadcrumbs. Use Update with “refresh existing products” to repair an existing JSON, then preview/apply it in the panel. Website categories are stored separately from central ERP categories and are available to both portal and admin filters and chart rules.

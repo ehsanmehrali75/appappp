@@ -64,7 +64,7 @@
         try {
             const values={product_id:button.dataset.id};
             if(button.dataset.action==='website_catalog_set_issue') {values.issue_type=button.dataset.value;values.note='';}
-            else values.value=button.dataset.value;
+            else {values.value=button.dataset.value;values.asset=button.dataset.asset||'image';}
             await request(button.dataset.action,values);location.reload();
         } catch(error){show(error.message);byId('result').focus();controls.forEach(item=>item.disabled=false);}
     }));

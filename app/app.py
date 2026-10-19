@@ -122,6 +122,10 @@ class Window(QWidget):
 
         for key, label in FIELDS:
             cb = QCheckBox(label)
+            if key == 'category':
+                cb.setChecked(True)
+                cb.setEnabled(False)
+                cb.setToolTip('مسیر کامل دسته‌بندی همیشه در خروجی ثبت می‌شود')
             cb.setChecked(True)
             self.checks[key] = cb
             grid.addWidget(cb, row, col)

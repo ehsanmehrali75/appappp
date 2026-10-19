@@ -48,7 +48,7 @@ async def main():
  before=json.loads((ROOT/'original.json').read_text());
  for item in before:
   if item.get('size_guide'):item['size_guide']=base+item['size_guide']
- assert {r['url']:r for r in before}=={r['url']:r for r in data};checks.append('all 12 fixture rows match original, with intentional absolute size-guide URLs')
+ assert {r['url']:r for r in before}=={r['url']:{k:v for k,v in r.items() if k not in ('category_path','primary_category')} for r in data};checks.append('all 12 fixture rows match original, excluding the added explicit category hierarchy fields and absolute size-guide URLs')
  hits.clear();out=ROOT/'batch.json'
  await fast.run_scraper(base+'/search','fresh',['name'],logs.append,lambda p:None,batch_size=3,use_system_proxy=False,output=str(out));assert len(json.loads(out.read_text()))==3;assert sum(h.startswith('/search?') for h in hits)==1;checks.append('batch stops discovery after first sufficient category page')
  await fast.run_scraper(base+'/search','continue',['name'],logs.append,lambda p:None,batch_size=3,use_system_proxy=False,output=str(out));assert len(json.loads(out.read_text()))==6;checks.append('continue appends next unsaved products')

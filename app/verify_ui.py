@@ -32,6 +32,7 @@ def main():
     assert len(calls) == 1 and calls[0]['size_guide_wait_ms'] == 12000
     assert calls[0]['refresh_existing'] and calls[0]['mode'] == 'update'
     assert 'size_guide' in calls[0]['fields']
+    assert 'category' in calls[0]['fields'] and window.checks['category'].isChecked() and not window.checks['category'].isEnabled()
     window.checks['size_guide'].setChecked(False)
     assert not window.size_guide_wait.isEnabled()
     window.mode.setCurrentIndex(window.mode.findData('continue'))
