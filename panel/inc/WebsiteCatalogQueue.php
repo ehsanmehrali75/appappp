@@ -40,7 +40,7 @@ class WebsiteCatalogQueue {
     if(!$ws['archived']&&$ws['site_visible_with_images'])$tasks[]='site_visible';
     if(!$ws['archived']&&($ws['presence']??'')==='missing')$tasks[]='site_missing';
     if(!$ws['archived']&&!in_array($ws['presence']??'',['seen','missing'],true))$tasks[]='site_unknown';
-    
+
 
 
     $tasks=array_values(array_unique($tasks));if($work)$tasks[]='work';$tasks[]='all';
