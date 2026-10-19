@@ -115,3 +115,10 @@ metadata تطبیق در ستون متنی website_sync با محتوای JSON �
 
 
 راهنمای [انتخاب گروهی و رفت‌وبرگشت فایل وضعیت اکسل و JSON](workflow-transfer.md) شامل ستون‌های قابل ویرایش، خروجی همهٔ نتایج فیلترشده و تأیید پیش‌نمایش است.
+
+
+### Model/color identity safeguards
+
+A product represents one model and one color. Size-specific SKUs remain variants of that color; each color retains its own photos, descriptions, size chart and workflow. Website name fallback requires both sides to have the same known color, with Arabic/Persian character normalization; it cannot infer a color from the model alone. A contradictory known color on an exact website code is reported as a conflict without transferring content. Existing exact codes without reported website color remain usable.
+
+TIAM sync rejects ambiguous existing model/color identities, reused SKUs pointing to a different color, missing colors that would erase an established color, and a color code carrying contradictory color labels. These cases require fixing the source identity; existing products and media are not automatically merged or deleted.

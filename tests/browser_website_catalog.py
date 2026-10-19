@@ -29,9 +29,9 @@ try:
         page.on('request',lambda r:requests.append(len(r.post_data_buffer or b'')) if r.method=='POST' else None)
         page.goto(base+'/');page.evaluate('openLoginModal();switchLoginTab("admin")');page.fill('[name=user]','fixture_owner');page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state()
         page.goto(base+'/panel/admin.php?switch_project=p')
-        with sqlite3.connect(case.database) as db:db.execute('UPDATE products SET name="Aero   Pro W",image="",images_list="[]",gallery="[]",status="no_image" WHERE id="one"')
+        with sqlite3.connect(case.database) as db:db.execute('UPDATE products SET name="Aero   Pro W",color="سفید",image="",images_list="[]",gallery="[]",status="no_image" WHERE id="one"')
         page.goto(base+'/panel/admin.php?tab=extract')
-        row=dict(url='https://shop.example/product/74634/aero',product_code='74634',name='نیم تنه ورزشی زنانه اسپورتلند Aero Pro W',main_image='https://shop.example/main.webp',gallery=['https://shop.example/main.webp','https://shop.example/gallery.webp'],description='')
+        row=dict(url='https://shop.example/product/74634/aero',product_code='74634',color='سفید',name='نیم تنه ورزشی زنانه اسپورتلند Aero Pro W',main_image='https://shop.example/main.webp',gallery=['https://shop.example/main.webp','https://shop.example/gallery.webp'],description='')
         encode=lambda:json.dumps([row],ensure_ascii=False,separators=(',',':')).encode()
         row['description']='X'*(10*1024*1024-len(encode()));raw=encode();assert len(raw)==10*1024*1024
         page.locator('#website-catalog-file').set_input_files(dict(name='website-10MiB.json',mimeType='application/json',buffer=raw))

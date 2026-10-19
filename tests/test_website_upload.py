@@ -38,8 +38,8 @@ class WebsiteUpload(unittest.TestCase):
 
     def test_exact_ten_mib_file_matches_model_and_imports_webp_through_preview_apply(self):
         with sqlite3.connect(self.case.database) as db:
-            db.execute('UPDATE products SET name="Aero   Pro W",image="",images_list="[]",gallery="[]",status="no_image" WHERE id="one"')
-        row=dict(url='https://shop.example/product/74634/aero',product_code='74634',name='نیم تنه ورزشی زنانه اسپورتلند Aero Pro W',main_image='https://shop.example/main.webp',gallery=['https://shop.example/main.webp','https://shop.example/gallery.webp'],description='')
+            db.execute('UPDATE products SET name="Aero   Pro W",color="سفید",image="",images_list="[]",gallery="[]",status="no_image" WHERE id="one"')
+        row=dict(url='https://shop.example/product/74634/aero',product_code='74634',color='سفید',name='نیم تنه ورزشی زنانه اسپورتلند Aero Pro W',main_image='https://shop.example/main.webp',gallery=['https://shop.example/main.webp','https://shop.example/gallery.webp'],description='')
         raw=json.dumps([row],ensure_ascii=False,separators=(',',':')).encode()
         row['description']='X'*(10*1024*1024-len(raw))
         raw=json.dumps([row],ensure_ascii=False,separators=(',',':')).encode()

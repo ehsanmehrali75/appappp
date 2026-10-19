@@ -95,7 +95,8 @@ class TiamInventory {
         }
         return $out;
     }
-    public static function productKey($name, $color) { return mb_strtolower(trim(preg_replace('/\s+/u', ' ', $name))) . '|' . mb_strtolower(trim($color)); }
+    public static function productKey($name, $color) { return self::identityText($name) . '|' . self::identityText($color); }
+    private static function identityText($value) { return mb_strtolower(trim(preg_replace('/[\s\x{00a0}]+/u',' ',str_replace(['ي','ك'],['ی','ک'],(string)$value)))); }
     public static function restoreProduct($product) {
         $warehouses=[]; $key=null;
         foreach (($product['variants']??[]) as $variant) {
@@ -132,14 +133,22 @@ class TiamInventory {
         foreach($products as $i=>$product){
             foreach(array_merge([['sku'=>$product['sku']??'']],$product['variants']??[]) as $variant)if((string)($variant['sku']??'')!=='')$skuIndices[(string)$variant['sku']][$i]=true;
         }
-        foreach ($products as $i => $p) $indices[$p['tiam_key'] ?? self::productKey($p['name'] ?? '', $p['color'] ?? '')] = $i;
+        foreach ($products as $i => $p) $indices[$p['tiam_key'] ?? self::productKey($p['name'] ?? '', $p['color'] ?? '')][$i] = true;
         $touched = []; $matchedIndices = [];
         foreach ($groups as $key => $rows) {
+            $colors=[];foreach($rows as $row){$color=self::identityText($row['color']??'');if($color!=='')$colors[$color]=true;}
+            if(count($colors)>1)throw new RuntimeException('یک کد رنگ در منبع به چند رنگ متفاوت اشاره دارد؛ برای جلوگیری از ادغام اشتباه، نگاشت رنگ را اصلاح کنید.');
             $skuMatches=[];
             foreach($rows as $record)foreach(($skuIndices[$record['sku']]??[]) as $candidate=>$yes)$skuMatches[$candidate]=true;
             if(count($skuMatches)>1)throw new RuntimeException('کدهای این مدل به چند محصول قدیمی تعلق دارند؛ ادغام نیاز به بررسی دستی دارد.');
-            $index=$indices[$key]??($skuMatches?array_key_first($skuMatches):($indices[self::productKey($rows[0]['name'],$rows[0]['color']??'')]??null));
+            $identityMatches=$indices[$key]??[];
+            if(!$identityMatches&&!$skuMatches)$identityMatches=$indices[self::productKey($rows[0]['name'],$rows[0]['color']??'')]??[];
+            $matches=$identityMatches+$skuMatches;
+            if(count($matches)>1)throw new RuntimeException('مدل و رنگ یا کدهای منبع به چند محصول می‌رسند؛ پیش از همگام‌سازی هویت کالاها را اصلاح کنید.');
+            $index=$matches?array_key_first($matches):null;
             $old=$index!==null?$products[$index]:[];
+            $oldColor=self::identityText($old['color']??'');$newColor=self::identityText($rows[0]['color']??'');
+            if($old&&$oldColor!==''&&$oldColor!==$newColor)throw new RuntimeException('کد کالا به رنگ متفاوتی در پنل تعلق دارد؛ برای حفظ عکس و داده‌های هر رنگ، همگام‌سازی متوقف شد.');
             if ($index !== null) {
                 if (isset($matchedIndices[$index])) throw new RuntimeException('چند کد مستقل به یک محصول قدیمی با نام یکسان می‌رسند؛ قبل از اعمال، هویت کالاها را اصلاح کنید.');
                 $matchedIndices[$index] = true;

@@ -232,7 +232,7 @@ class WebsiteCatalogSync {
         $candidates=[];
         foreach($possible as $index=>$model)if(preg_match('/(?<![\p{L}\p{N}_])'.preg_quote($model,'/').'(?![\p{L}\p{N}_])/u',$name))$candidates[$index]=true;
         $color=self::colorName($row['color']??'');$byColor=[];
-        foreach($candidates as $index=>$_){$productColor=self::colorName($products[$index]['color']??'');if(($color===''&&self::productModel($products[$index])!==self::modelName($products[$index]['name']??''))||($color!==''&&$productColor!==''&&$color!==$productColor))unset($candidates[$index]);elseif($color!==''&&$productColor===$color)$byColor[$index]=true;}
+        foreach($candidates as $index=>$_){$productColor=self::colorName($products[$index]['color']??'');if($color===''||$productColor===''||($color!==''&&$productColor!==''&&$color!==$productColor))unset($candidates[$index]);elseif($color!==''&&$productColor===$color)$byColor[$index]=true;}
         if($byColor)$candidates=$byColor;
         return $candidates;
     }
@@ -261,6 +261,10 @@ class WebsiteCatalogSync {
         $covered=[];$groups=[];$changes=[];$warnings=[];
         foreach($rows as $row) {
             $candidates=($codes[self::code($row['product_code'])]??[])+($urls[self::identityUrl($row['url'])]??[]);
+            // An exact code is not permission to move content between known colors.
+            $rowColor=self::colorName($row['color']??'');$colorConflict=false;
+            foreach($candidates as $index=>$_){$localColor=self::colorName($project['products'][$index]['color']??'');if($rowColor!==''&&$localColor!==''&&$rowColor!==$localColor)$colorConflict=true;}
+            if($colorConflict){$counts['conflicts']++;foreach($candidates as $index=>$_)$covered[$index]=true;$warnings[]='رنگ کد '.self::code($row['product_code']).' با رنگ محصول پنل متفاوت است؛ اطلاعات منتقل نشد.';continue;}
             $byName=!$candidates;
             if($byName)$candidates=self::nameCandidates($row,$models,$project['products']??[]);
             foreach($candidates as $index=>$_)$covered[$index]=true;

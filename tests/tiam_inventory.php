@@ -65,4 +65,17 @@ $compat=$input;$compat['sql_security']='compatibility';$compatCfg=TiamInventory:
 check($compatCfg['sql_security']==='compatibility','explicit SQL compatibility mode saved');
 check(TiamInventory::fingerprint($compatCfg)!==TiamInventory::fingerprint($cfg),'security change changes connection fingerprint');
 $compat['sql_security']='invalid';rejects(fn()=>TiamInventory::config($cfg,$compat),'invalid security mode rejected');
+// Same model/color groups sizes; different colors own separate content and identity.
+$colorItems=[['sku'=>'WHITE-40','name'=>'Court','model'=>'COURT','color'=>'سفید','size'=>'40','stock'=>0],['sku'=>'WHITE-41','name'=>'Court','model'=>'COURT','color'=>'سفید','size'=>'41','stock'=>5],['sku'=>'BLACK-40','name'=>'Court','model'=>'COURT','color'=>'سیاه','size'=>'40','stock'=>2]];
+$colorProject=['id'=>'colors','settings'=>[],'products'=>[]];$colorMerge=TiamInventory::merge($colorProject,$colorItems,$cfg);
+check(count($colorMerge['products'])===2,'same model with two colors creates two products');
+$whiteIndex=array_search('سفید',array_column($colorMerge['products'],'color'));$blackIndex=array_search('سیاه',array_column($colorMerge['products'],'color'));
+check(count($colorMerge['products'][$whiteIndex]['variants'])===2&&$colorMerge['products'][$whiteIndex]['stock_total']==5,'sizes share one color and zero size does not zero other sizes');
+$colorProject['products']=$colorMerge['products'];$colorProject['products'][$whiteIndex]['image']='uploads/white.png';$colorProject['products'][$whiteIndex]['description']='White details';$colorProject['products'][$blackIndex]['image']='uploads/black.png';$colorProject['products'][$blackIndex]['description']='Black details';
+$updatedColors=TiamInventory::merge($colorProject,$colorItems,$cfg);check($updatedColors['products'][$whiteIndex]['image']==='uploads/white.png'&&$updatedColors['products'][$blackIndex]['image']==='uploads/black.png'&&$updatedColors['products'][$blackIndex]['description']==='Black details','inventory sync preserves independent color content');
+$wrongColor=$colorItems[0];$wrongColor['color']='سیاه';rejects(fn()=>TiamInventory::merge($colorProject,[$wrongColor],$cfg),'reused SKU cannot transfer content across colors');
+$duplicates=$colorProject;$duplicates['products'][]=array_replace($duplicates['products'][$whiteIndex],['id'=>'duplicate-white']);rejects(fn()=>TiamInventory::merge($duplicates,$colorItems,$cfg),'duplicate model/color is ambiguous rather than last-one-wins');
+check(TiamInventory::productKey(' Court  ','سفيد')===TiamInventory::productKey('Court','سفید'),'Arabic and Persian spelling denote the same color');
+$missingColor=$colorItems[0];unset($missingColor['color']);rejects(fn()=>TiamInventory::merge($colorProject,[$missingColor],$cfg),'missing source color cannot erase an established color');
+$mixedColorCode=$colorItems;foreach($mixedColorCode as &$item)$item['color_code']='ONE-CODE';unset($item);rejects(fn()=>TiamInventory::merge(['id'=>'fresh','products'=>[]],$mixedColorCode,$cfg),'one color code with contradictory labels cannot mix stock');
 echo "$count Tiam inventory checks passed\n";

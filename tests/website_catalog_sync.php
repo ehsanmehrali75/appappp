@@ -9,7 +9,7 @@ $base=['id'=>'web-test','settings'=>[],'products'=>[
  ['id'=>'three','sku'=>'NEWERP','name'=>'ERP blank','image'=>'','uploaded_to_site'=>0],
  ['id'=>'four','sku'=>'READY','name'=>'Ready','image'=>'uploads/ready.png','uploaded_to_site'=>0],
 ]];
-$row=['url'=>'https://shop.example/product/59164/name','product_code'=>'59164','name'=>'Website name','price'=>'59,796,000 ریال','sizes'=>['x'],'color'=>'Website color','gallery'=>['https://shop.example/p.jpg'],'main_image'=>'https://shop.example/p.jpg','description'=>'','size_guide'=>null];
+$row=['url'=>'https://shop.example/product/59164/name','product_code'=>'59164','name'=>'Website name','price'=>'59,796,000 ریال','sizes'=>['x'],'color'=>'ERP Blue','gallery'=>['https://shop.example/p.jpg'],'main_image'=>'https://shop.example/p.jpg','description'=>'','size_guide'=>null];
 $unknown=array_replace($row,['product_code'=>'UNKNOWN','url'=>'https://shop.example/product/999/no','price'=>'bad price ignored']);
 $r=WebsiteCatalogSync::reconcile($base,[$row,$unknown]);$p=$r['project']['products'][0];
 wcCheck(count($r['project']['products'])===4&&$r['counts']['new']===0,'never create unknown products');
@@ -100,4 +100,11 @@ wcCheck($gs['site_size_availability'][$grandRow['url']][0]['available']===false,
 foreach(['سیاه','سفید-سبز',null] as $wrongColor){$bad=WebsiteCatalogSync::reconcile($grandBase,[array_replace($grandRow,['color'=>$wrongColor])]);wcCheck($bad['counts']['matched']===0,'suffix removal requires exact observed color');}
 $otherModel=WebsiteCatalogSync::reconcile($grandBase,[array_replace($grandRow,['name'=>'Adidas Grand Court Extra 2.0 M'])]);wcCheck($otherModel['counts']['matched']===0,'color suffix never enables fuzzy model matching');
 $allOut=$grandRow;$allOut['size_availability']=[['size'=>'40','available'=>false],['size'=>'41','available'=>false]];$sold=WebsiteCatalogSync::reconcile($grandBase,[$allOut]);wcCheck(WebsiteCatalogSync::state($sold['project'],$sold['project']['products'][0])['site_visible_with_images'],'sold-out sizes never erase website photos');
+// Different colors are independent products even when the model is identical.
+$colorless=WebsiteCatalogSync::reconcile($modelBase,[array_replace($modelRow,['color'=>null])]);wcCheck($colorless['counts']['matched']===0,'model alone cannot select a known color');
+$crossCode=WebsiteCatalogSync::reconcile($modelBase,[array_replace($modelRow,['product_code'=>'ERP-123','color'=>'سیاه'])]);
+wcCheck($crossCode['counts']['conflicts']===1&&empty($crossCode['project']['products'][0]['images_list'])&&empty($crossCode['project']['products'][0]['website_sync']),'contradictory exact code cannot move photos or mark the original color absent');
+$twoColors=$grandBase;$twoColors['products'][]=array_replace($grandBase['products'][0],['id'=>'grand-black','sku'=>'BLACK-41','name'=>'Grand Court 2.0 M - سیاه','color'=>'سیاه','image'=>'uploads/black-original.png','description'=>'Black description','variants'=>[['sku'=>'BLACK-41','size'=>'41']]]);
+$whiteOnly=WebsiteCatalogSync::reconcile($twoColors,[$grandRow]);wcCheck($whiteOnly['project']['products'][1]===$twoColors['products'][1],'white website data leaves black images, description and workflow untouched');
+$unknownColors=$modelBase;unset($unknownColors['products'][0]['color']);$unknown=WebsiteCatalogSync::reconcile($unknownColors,[array_replace($modelRow,['color'=>null])]);wcCheck($unknown['counts']['matched']===0,'two unknown colors do not establish product identity from model alone');
 echo "$n website catalog checks passed\n";
