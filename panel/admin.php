@@ -2009,6 +2009,7 @@ $sections_json
             }
             
             $res = ($isSilent || $isRelayConfirm) ? true : sendToPlatform($product, $plat, $project['settings'], $customCaption, null, $custom_media_url);
+            if(is_array($res)&&!empty($res['queued'])){echo json_encode(['status'=>'success','queued'=>true,'msg'=>'در صف ابزار ChatGPT ثبت شد؛ هنوز منتشر نشده است.','job'=>$res['id']]);exit();}
             if ($res === true) {
                 if (!isset($product['platformsSent']) || !is_array($product['platformsSent'])) $product['platformsSent'] = ['telegram'=>0, 'bale'=>0, 'rubika'=>0, 'instagram'=>0];
                 $product['platformsSent'][$plat] = ($product['platformsSent'][$plat] ?? 0) + 1;
@@ -2876,8 +2877,15 @@ $sections_json
         $scheduledAtTs = is_numeric($scheduledAtRaw) ? (int)$scheduledAtRaw : (strtotime($scheduledAtRaw) ?: 0);
         $schedule_date = ($scheduledAtTs > time() + 10) ? $scheduledAtTs : null;
 
+        require_once __DIR__.'/inc/ai/Social.php';
+        if(!$isRelayConfirm&&AiSocial::route($project['settings'],$plat)){
+            $job=AiSocial::legacy($product?:[],$plat,$project['settings'],$schedule['caption']??'',$schedule['media_url']??$schedule['mediaUrl']??($product['social_image']??$product['image']??''),$schedule_date,(string)$sid);
+            foreach($project['schedules'] as &$chatSchedule)if((string)$chatSchedule['id']===(string)$sid)$chatSchedule['status']='awaiting_chatgpt';unset($chatSchedule);saveProject($project);
+            echo json_encode(['status'=>'success','queued'=>true,'msg'=>'در صف انتشار ChatGPT قرار گرفت؛ منتظر رسید سرویس.','job'=>$job['id']]);exit();
+        }
         if ($plat === 'instagram' && class_exists('InstagramPublishHandler') && !$isRelayConfirm) {
             $igRes = InstagramPublishHandler::handle($schedule, $project, $product);
+            if(!empty($igRes['queued'])){echo json_encode(['status'=>'success','queued'=>true,'msg'=>'در صف ChatGPT؛ منتظر رسید انتشار.']);exit();}
             if ($igRes['ok']) {
                 foreach ($project['schedules'] as &$s) {
                     if (($s['id'] ?? '') === $sid) {
@@ -2915,6 +2923,7 @@ $sections_json
         }
 
         $sent = $isRelayConfirm ? true : sendToPlatform($product, $plat, $project['settings'], $schedule['caption'] ?? '', $schedule_date);
+        if(is_array($sent)&&!empty($sent['queued'])){echo json_encode(['status'=>'success','queued'=>true,'msg'=>'در صف ChatGPT؛ هنوز منتشر نشده است.']);exit();}
         if ($sent === true) {
             // Update the status of this schedule in the project
             foreach ($project['schedules'] as &$s) {
@@ -3051,6 +3060,7 @@ $sections_json
 
         if (class_exists('InstagramPublishHandler')) {
             $res = InstagramPublishHandler::handle($schedule, $project, $product);
+            if(!empty($res['queued'])){echo json_encode(['status'=>'success','queued'=>true,'msg'=>'در صف ChatGPT؛ منتظر رسید سرویس.']);exit();}
             if ($res['ok']) {
                 foreach ($project['schedules'] as &$s) {
                     if (($s['id'] ?? '') === $sid) {
@@ -4144,6 +4154,11 @@ if ($project) {
                 ];
             }
 
+            require_once __DIR__.'/inc/ai/Social.php';
+            if(AiSocial::route($project['settings'],$platform)){
+                $job=AiSocial::legacy($product,$platform,$project['settings'],$sched['caption']??'',$sched['mediaUrl']??$sched['media_url']??($product['image']??''),(int)($sched['scheduledAt']??time()),(string)($sched['id']??('custom-'.$idx)),'post',$project);
+                $sched['status']='awaiting_chatgpt';saveProject($project,null,[$sched]);echo json_encode(['status'=>'success','queued'=>true,'msg'=>'در صف ChatGPT؛ هنوز منتشر نشده است.']);exit();
+            }
             $res = sendToPlatform($product, $platform, $project['settings'], $sched['caption']);
             
             if ($res === true) {
@@ -6562,8 +6577,9 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         <?php endif; ?>
 
                         <?php if(ModuleProjectAccess::allowed('products','products','ai_connect','view')): ?>
-                        <a href="ai-connect.php?project=<?php echo rawurlencode($project['id']); ?>" class="nav-link"><span>✨</span><span>اتصال و گزارش هوشمند</span></a>
+                        <a href="ai-connect.php?project=<?php echo rawurlencode($project['id']); ?>" class="nav-link"><span>✨</span><span>اتصال و مرکز داده هوشمند</span></a>
                         <?php endif; ?>
+                        <?php if(ModuleProjectAccess::allowed('products','products','ai_connect','view')): ?><a href="data-hub.php?project=<?php echo rawurlencode($project['id']); ?>#hub-social" class="nav-link"><span>🗓️</span><span>تقویم و ادمین ChatGPT</span></a><?php endif; ?>
                         <?php if(canAccessFeature('auto_admin')): ?>
                         <a href="?tab=auto_admin" class="nav-link <?php echo ($tab=='auto_admin' || $tab=='auto_admin_logs')?'active':''; ?>"><span>🤖</span> <span>ادمین خودکار (Auto)</span><?php echo getModuleVisibilityBadge('auto_admin', $project); ?></a>
                         <?php endif; ?>
@@ -15897,6 +15913,9 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             } else {
                                 throw new Error(resConf.msg || 'عدم ثبت تاییدیه پل مرورگر در سرور');
                             }
+                        } else if (res.status === 'success' && res.queued) {
+                            if(statusCell)statusCell.textContent='در صف ChatGPT؛ هنوز منتشر نشده است.';
+                            row.setAttribute('data-status','awaiting_chatgpt');btn.innerHTML='در انتظار ابزار ChatGPT';alert(res.msg || 'در صف ChatGPT ثبت شد؛ منتظر رسید انتشار.');
                         } else if (res.status === 'success') {
                             if (statusCell) {
                                 statusCell.innerHTML = `<span class="inline-flex items-center gap-1.5 text-emerald-600 font-black"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> با موفقیت ارسال شد ✅</span>`;
@@ -16041,6 +16060,8 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                         failCount++;
                                         markRowAsFailedInBulk(row, resC.msg);
                                     }
+                                } else if (res.status === 'success' && res.queued) {
+                                    row.setAttribute('data-status','awaiting_chatgpt');row.title='در صف ChatGPT؛ هنوز منتشر نشده است.';
                                 } else if (res.status === 'success') {
                                     successCount++;
                                     markRowAsSuccessInBulk(row);
@@ -19295,6 +19316,7 @@ export default function CampaignLanding() {
                                                 <option value="v2ray_sub" <?php echo $tg_method === 'v2ray_sub' ? 'selected' : ''; ?>>روش سوم: لینک اشتراک V2Ray (انتخاب پویای سریع‌ترین گره SOCKS5/HTTP)</option>
                                                 <option value="hybrid" <?php echo $tg_method === 'hybrid' ? 'selected' : ''; ?>>ترکیب هوشمند (بک‌آپ زنجیره‌ای با اولویت پایداری)</option>
                                                 <option value="browser_relay" <?php echo $tg_method === 'browser_relay' ? 'selected' : ''; ?>>روش ششم: پل ارتباطی مرورگر کاربر (ارسال مستقیم، آنی و زمان‌بندی شده از مرورگر بدون فیلترینگ) 🌐</option>
+                                                <option value="chatgpt" <?php echo $tg_method === 'chatgpt' ? 'selected' : ''; ?>>مدیریت و زمان‌بندی از طریق ChatGPT (ابزار متصل)</option>
                                                 <option value="novinhub" <?php echo $tg_method === 'novinhub' ? 'selected' : ''; ?>>روش هفتم: ارسال مستقیم از طریق پنل نوین هاب (NovinHub API)</option>
                                             </select>
                                         </div>
@@ -19702,6 +19724,7 @@ async function handleRequest(request) {
                                                 <option value="v2ray_sub" <?php echo $ig_method === 'v2ray_sub' ? 'selected' : ''; ?>>روش سوم: لینک اشتراک V2Ray (انتخاب پویای سریع‌ترین گره SOCKS5/HTTP)</option>
                                                 <option value="hybrid" <?php echo $ig_method === 'hybrid' ? 'selected' : ''; ?>>ترکیب هوشمند (بک‌آپ زنجیره‌ای با اولویت پایداری)</option>
                                                 <option value="browser_relay" <?php echo $ig_method === 'browser_relay' ? 'selected' : ''; ?>>روش ششم: پل ارتباطی مرورگر کاربر (ارسال مستقیم، آنی و زمان‌بندی شده از مرورگر بدون فیلترینگ) 🌐</option>
+                                                <option value="chatgpt" <?php echo $ig_method === 'chatgpt' ? 'selected' : ''; ?>>مدیریت پست و استوری از طریق ChatGPT (ابزار متصل)</option>
                                                 <option value="novinhub" <?php echo $ig_method === 'novinhub' ? 'selected' : ''; ?>>روش هفتم: ارسال مستقیم از طریق پنل نوین هاب (NovinHub API)</option>
                                             </select>
                                         </div>
@@ -22683,7 +22706,7 @@ async function handleRequest(request) {
                 
                 hideLoader();
                 if(res.status === 'success') {
-                    alert('با موفقیت ارسال شد ✅');
+                    alert(res.queued ? (res.msg || 'در صف ChatGPT ثبت شد؛ هنوز منتشر نشده است.') : 'با موفقیت ارسال شد ✅');
                     location.reload();
                 }
                 else alert('خطا: ' + (res.msg || 'نامشخص'));
@@ -25071,7 +25094,7 @@ ${desc2}
                 const res = await r.json();
                 hideLoader();
                 if(res.status === 'success') {
-                    alert('با موفقیت ارسال شد ✅');
+                    alert(res.queued ? (res.msg || 'در صف ChatGPT ثبت شد؛ هنوز منتشر نشده است.') : 'با موفقیت ارسال شد ✅');
                     location.reload();
                 } else {
                     alert('خطا: ' + (res.msg || 'ارسال ناموفق بود'));

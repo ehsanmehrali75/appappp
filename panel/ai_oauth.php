@@ -2,8 +2,8 @@
 require_once __DIR__.'/inc/ai/Bootstrap.php';
 header('Cache-Control: no-store');header('Referrer-Policy: no-referrer');header('X-Frame-Options: DENY');
 $base=AiOAuth::base();$action=$_GET['action']??'';
-if($action==='metadata')AiTools::respond(['issuer'=>$base,'authorization_endpoint'=>$base.'/panel/ai_oauth.php?action=authorize','token_endpoint'=>$base.'/panel/ai_oauth.php?action=token','response_types_supported'=>['code'],'grant_types_supported'=>['authorization_code','refresh_token'],'token_endpoint_auth_methods_supported'=>['client_secret_post','client_secret_basic','none'],'code_challenge_methods_supported'=>['S256'],'scopes_supported'=>['project.read','content.write','reports.write','datasets.write']]);
-if($action==='resource')AiTools::respond(['resource'=>$base.'/panel/ai_mcp.php','authorization_servers'=>[$base],'bearer_methods_supported'=>['header'],'scopes_supported'=>['project.read','content.write','reports.write','datasets.write'],'resource_name'=>'Maarksho project data']);
+if($action==='metadata')AiTools::respond(['issuer'=>$base,'authorization_endpoint'=>$base.'/panel/ai_oauth.php?action=authorize','token_endpoint'=>$base.'/panel/ai_oauth.php?action=token','response_types_supported'=>['code'],'grant_types_supported'=>['authorization_code','refresh_token'],'token_endpoint_auth_methods_supported'=>['client_secret_post','client_secret_basic','none'],'code_challenge_methods_supported'=>['S256'],'scopes_supported'=>['project.read','content.write','reports.write','datasets.write','social.write']]);
+if($action==='resource')AiTools::respond(['resource'=>$base.'/panel/ai_mcp.php','authorization_servers'=>[$base],'bearer_methods_supported'=>['header'],'scopes_supported'=>['project.read','content.write','reports.write','datasets.write','social.write'],'resource_name'=>'Maarksho project data']);
 $store=new AiStore();$oauth=new AiOAuth($store);
 if($action==='token'){
     if(($_SERVER['REQUEST_METHOD']??'GET')!=='POST')AiTools::respond(['error'=>'invalid_request'],405);

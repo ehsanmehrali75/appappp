@@ -2518,7 +2518,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                 </div>
                 
                 <div class="flex flex-wrap items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
-                    <?php if(ModuleProjectAccess::allowed('products','products','ai_connect','view')): ?><a href="/panel/ai-connect.php?project=<?php echo rawurlencode($project['id']); ?>" class="px-4 py-3 bg-white text-slate-900 rounded-xl font-bold text-xs">✨ اتصال و گزارش هوشمند</a><?php endif; ?>
+                    <?php if(ModuleProjectAccess::allowed('products','products','ai_connect','view')): ?><a href="/panel/ai-connect.php?project=<?php echo rawurlencode($project['id']); ?>" class="px-4 py-3 bg-white text-slate-900 rounded-xl font-bold text-xs">✨ اتصال و مرکز داده هوشمند</a><?php endif; ?>
                     <a href="#quick-launchpad" class="px-4 sm:px-5 py-2.5 sm:py-3 bg-white hover:bg-slate-100 text-slate-900 font-black text-xs rounded-xl sm:rounded-2xl shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2 w-full sm:w-auto">
                         <span>⚡ دسترسی سریع</span>
                     </a>

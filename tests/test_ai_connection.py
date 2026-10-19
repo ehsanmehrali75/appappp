@@ -172,6 +172,30 @@ class AiConnection(unittest.TestCase):
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(json.loads(result.stdout)['api_charge'],140)
 
+    def test_wordpress_plugin_contract(self):
+        result=subprocess.run([PHP,str(fixture.ROOT/'tests/wordpress_bridge_fixture.php'),str(self.app)],capture_output=True,text=True,timeout=20)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertTrue(json.loads(result.stdout)['variations'])
+
+    def test_warehouse_social_calendar_and_google_adapters(self):
+        self.connect()
+        result=subprocess.run([PHP,str(fixture.ROOT/'tests/hub_social_fixture.php'),str(self.app)],capture_output=True,text=True,timeout=30)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertTrue(json.loads(result.stdout)['calendar'])
+
+    def test_data_hub_page_and_ingestion_bearer_are_project_scoped(self):
+        opener,csrf,t,*_=self.connect()
+        fields=[('app_csrf',csrf),('action','source'),('name','HTTP ERP source'),('origin','fixture'),('store_id','branch-1'),('kinds[]','inventory')]
+        code,page=self.request(opener,'/panel/data-hub.php?project=p',raw=urllib.parse.urlencode(fields).encode(),headers={'Content-Type':'application/x-www-form-urlencoded'})
+        self.assertEqual(code,200,page);match=re.search(r'<code>([a-f0-9]{64})</code>',page);self.assertIsNotNone(match,page[-500:]);token=match[1]
+        payload=dict(kind='inventory',batch_id='http-fixture-123',rows=[dict(id='sku-1',sku='SKU1',stock=4)])
+        def ingest(body,auth=token):return self.request(urllib.request.build_opener(),'/panel/integration_ingest.php',headers={'Authorization':'Bearer '+auth,'Content-Type':'application/json'},raw=json.dumps(body).encode())
+        code,body=ingest(payload);self.assertEqual(code,200,body);self.assertEqual(json.loads(body)['total'],1)
+        code,body=ingest(payload);self.assertEqual(json.loads(body)['total'],1)
+        self.assertEqual(ingest(payload|{'project_id':'other'})[0],422)
+        self.assertEqual(ingest(payload,'f'*64)[0],401)
+        self.assertEqual(self.request(opener,'/panel/data-hub.php?project=p',{'action':'source'})[0],403)
+
     def test_all_tabs_and_shared_source_acl(self):
         opener,csrf=self.login()
         fields=dict(app_csrf=csrf,action='provider',name='Synthetic personal key',model='fixture-model',key='sk-synthetic-fixture-key-12345',max_output='500',daily_tokens='200000')

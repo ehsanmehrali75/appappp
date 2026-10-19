@@ -200,6 +200,12 @@ if ($stmt) {
             
             $plat = $task['platform'];
             
+            require_once __DIR__.'/inc/ai/Social.php';
+            if(AiSocial::route($proj['settings'],$plat)){
+                try{$job=AiSocial::legacy($product?:[],$plat,$proj['settings'],$task['caption']??'',$task['media_url']??($product['social_image']??$product['image']??''),(int)($task['scheduledAt']??(strtotime($task['scheduled_at']??'')?:time())),(string)$tid,'post',$proj);
+                    foreach($proj['schedules'] as &$chatSchedule)if((string)$chatSchedule['id']===(string)$tid)$chatSchedule['status']='awaiting_chatgpt';unset($chatSchedule);saveProject($proj);
+                }catch(Throwable $e){logSystem('[ChatGPT] Queue preparation failed for scheduled publication.');}continue;
+            }
             if ($plat === 'instagram_story') {
                 logSystem("[Scheduler] Instagram Story ID: $tid is manual-only. Skipping auto-publish on server.");
                 

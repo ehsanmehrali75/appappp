@@ -2843,6 +2843,10 @@ function sendToPlatform($product, $platform, $settings, $customCaption = '', $sc
         $accountId = $conn['novinhub_account_id'] ?? '';
     }
     
+    if ($method === 'chatgpt') {
+        require_once __DIR__.'/ai/Social.php';
+        return AiSocial::legacy($product,$platform,$settings,$customCaption,$custom_media_url?:($product['social_image']??$product['image']??''),$schedule_date);
+    }
     if ($method !== 'novinhub') {
         if (empty($conn['token']) || empty($conn['chatId'])) {
             addDebugLog('SEND', "Missing token/chatId for $platform");

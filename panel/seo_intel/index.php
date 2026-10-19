@@ -109,6 +109,8 @@ if (!function_exists('buildSeoUrl')) {
     </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+<?php require_once __DIR__.'/../inc/ai/HubSummary.php';maarkshoHubSummary(ModuleProjectAccess::businessProject($currentBusiness),'seo'); ?>
+<?php $dataProject=ModuleProjectAccess::businessProject($currentBusiness);if($dataProject): ?><div style="padding:16px;background:#e5eee8;text-align:center"><a href="/panel/data-hub.php?project=<?php echo rawurlencode($dataProject['id']); ?>">داشبورد دادهٔ واقعی: WordPress / Rank Math / GA4 / Search Console ←</a><p style="font-size:12px">گزارش جدید بر اساس منبع و تاریخ دریافت است؛ داده‌های نمایشی قدیمی، شاهد اتصال واقعی محسوب نمی‌شوند.</p></div><?php endif; ?>
 
     <!-- Top Navigation Bar -->
     <header class="bg-white border-b border-slate-200/80 sticky top-0 z-40 no-print">

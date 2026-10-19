@@ -793,6 +793,8 @@ $custom_metrics = $current_store['custom_metrics'] ?? [];
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen">
+<?php require_once __DIR__.'/inc/ai/HubSummary.php';maarkshoHubSummary($project,'sales'); ?>
+<div style="padding:16px;background:#e5eee8;text-align:center"><a href="/panel/data-hub.php?project=<?php echo rawurlencode($project['id']); ?>&kind=sales">فروش تجمیعی ووکامرس، CRM، اکسل و JSON با تفکیک منبع، فروشگاه و تاریخ ←</a></div>
 
 <!-- Top Navigation Header -->
 <header class="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-100 px-6 py-4 shadow-sm">

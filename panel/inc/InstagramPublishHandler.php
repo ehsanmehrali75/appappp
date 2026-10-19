@@ -67,6 +67,12 @@ class InstagramPublishHandler {
             }
         }
 
+        require_once __DIR__.'/ai/Social.php';
+        if(AiSocial::route($project['settings'],'instagram')){
+            $job=AiSocial::legacy($product?:[],'instagram',$project['settings'],$caption,$mediaUrl,(int)($scheduleItem['scheduledAt']??time()),(string)$sid,$postType==='story'?'story':($postType==='reel'?'reel':($postType==='carousel'?'carousel':'post')),$project);
+            $scheduleItem['status']='awaiting_chatgpt';$scheduleItem['publish_status']='awaiting_chatgpt';self::updateScheduleInProjectAndDb($scheduleItem,$project);
+            return ['ok'=>false,'queued'=>true,'job'=>$job['id'],'error'=>'در صف ChatGPT؛ هنوز منتشر نشده است.'];
+        }
         // Update status to 'publishing'
         $scheduleItem['status'] = 'publishing';
         $scheduleItem['publish_status'] = 'publishing';

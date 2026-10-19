@@ -8,6 +8,7 @@ class AiData {
         $sources=[];
         foreach(['products'=>'محصولات، موجودی و صف تولید','sales'=>'فروش شعبات ثبت‌شده در پنل','calendar'=>'تقویم و انتشار محتوا'] as $id=>$name)if(canAccessFeature(self::feature($id),'view'))$sources[]=['id'=>$id,'name'=>$name,'origin'=>'panel','supports_pagination'=>true];
         $state=$this->store->read();foreach($state['datasets']??[] as $id=>$d)if($d['project']===$project['id']&&canAccessFeature(self::feature($d['kind']),'view'))$sources[]=['id'=>'dataset:'.$id,'name'=>$d['name'],'kind'=>$d['kind'],'origin'=>$d['origin'],'rows'=>$d['count'],'updated_at'=>$d['at'],'unit'=>$d['unit'],'date_field'=>$d['date_field']];
+        if(class_exists('AiHub'))foreach((new AiHub($this->store))->sources($project) as $source)foreach($source['kinds'] as $kind)$sources[]=['id'=>'hub:'.$source['id'].':'.$kind,'name'=>$source['name'].' / '.$kind,'origin'=>$source['origin'],'store_id'=>$source['store_id'],'updated_at'=>$source['last_received'][$kind]??null];
         return $sources;
     }
     public function context($project) {
@@ -34,11 +35,12 @@ class AiData {
             foreach($project['settings']['stores']??[] as $store)foreach($store['sales_data']??[] as $sale){$row=array_intersect_key($sale,array_flip(['id','date','start_date','end_date','date_start','date_end','sales_amount','sales_count','invoice_count','visits','notes']));$row['store_id']=$store['id'];$row['store_name']=$store['name'];$all[]=$row;}
             $all=self::dateFilter($all,$filters);$total=count($all);$rows=array_slice($all,$offset,$limit);$meta['unit']='واحد مبلغ و تعریف بازه را از تنظیمات پروژه/گزارش منبع تأیید کنید؛ بازه‌های هم‌پوشان را جمع نکنید.';
         } elseif($source==='calendar') {
-            AiAccess::need('calendar');$all=[];foreach($project['schedules']??[] as $s)$all[]=array_intersect_key($s,array_flip(['id','product_id','platform','scheduled_at','date','status','caption']));$total=count($all);$rows=array_slice($all,$offset,$limit);
+            AiAccess::need('calendar');$all=[];foreach($project['schedules']??[] as $s)$all[]=array_intersect_key($s,array_flip(['id','product_id','productId','platform','scheduled_at','scheduledAt','date','status','approvalStatus','caption','mediaUrl','media_url']));$total=count($all);$rows=array_slice($all,$offset,$limit);
         } elseif(strpos($source,'dataset:')===0) {
             $id=substr($source,8);$state=$this->store->read();$index=$state['datasets'][$id]??null;
             if(!$index||$index['project']!==$project['id'])throw new RuntimeException('منبع در این پروژه یافت نشد.');AiAccess::need(self::feature($index['kind']));
             $doc=$this->store->document($project['id'],$id);$all=self::dateFilter($doc['rows'],$filters,$index['date_field']);$total=count($all);$rows=array_slice($all,$offset,$limit);$meta+=['origin'=>$index['origin'],'updated_at'=>$index['at'],'unit'=>$index['unit'],'date_field'=>$index['date_field']];
+        } elseif(strpos($source,'hub:')===0){$parts=explode(':',$source);if(count($parts)!==3)throw new RuntimeException('شناسهٔ منبع معتبر نیست.');return (new AiHub($this->store))->read($project,$parts[1],$parts[2],$filters,$offset,$limit);
         } else throw new RuntimeException('منبع پشتیبانی نمی‌شود. از فهرست منابع استفاده کنید.');
         return $meta+['total'=>$total,'offset'=>$offset,'next_offset'=>$offset+count($rows)<$total?$offset+count($rows):null,'complete'=>$offset===0&&count($rows)===$total,'rows'=>$rows];
     }
@@ -64,7 +66,7 @@ class AiData {
     public function snapshot($project,$sources,$filters=[]) {
         $known=array_column($this->sources($project),'id');if(!is_array($sources)||!$sources||count($sources)>8||array_diff($sources,$known))throw new RuntimeException('منابع گزارش معتبر یا قابل دسترس نیستند.');
         $snapshot=['project'=>$this->context($project),'generated_at'=>gmdate(DATE_ATOM),'sources'=>[]];
-        foreach(array_unique($sources) as $source){$data=$this->read($project,$source,$filters,0,100);if($source==='products')$data['exact_counts']=$this->counts($project);$snapshot['sources'][]=$data;}
+        foreach(array_unique($sources) as $source){$data=$this->read($project,$source,$filters,0,100);if($source==='products')$data['exact_counts']=$this->counts($project);if(strpos($source,'hub:')===0){$parts=explode(':',$source);$data['exact_statistics']=(new AiHub($this->store))->stats($project,$parts[1],$parts[2],$filters);}$snapshot['sources'][]=$data;}
         if(strlen(json_encode($snapshot,JSON_UNESCAPED_UNICODE))>120000)throw new RuntimeException('حجم گزارش زیاد است؛ منابع یا بازه را محدود کنید.');return $snapshot;
     }
 }
