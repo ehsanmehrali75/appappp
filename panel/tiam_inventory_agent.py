@@ -209,15 +209,16 @@ def submit_result(url, project, token, job_id, result):
         time.sleep(2 ** (attempt + 1))
 
 
-def main():
+def main(argv=None, configuration=None, stop_event=None, log=print):
     parser = argparse.ArgumentParser()
     parser.add_argument('--once', action='store_true', help='Poll once; can be called by Task Scheduler/cron')
-    args = parser.parse_args()
-    url, project, token = (os.environ.get(k, '') for k in ('TIAM_PANEL_URL', 'TIAM_PROJECT_ID', 'TIAM_AGENT_TOKEN'))
+    args = parser.parse_args(argv)
+    configuration = os.environ if configuration is None else configuration
+    url, project, token = (configuration.get(k, '') for k in ('TIAM_PANEL_URL', 'TIAM_PROJECT_ID', 'TIAM_AGENT_TOKEN'))
     parsed = urllib.parse.urlsplit(url)
     if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password or len(token) < 32 or not project:
         raise SystemExit('Configure an HTTPS TIAM_PANEL_URL, TIAM_PROJECT_ID and TIAM_AGENT_TOKEN in the service environment')
-    print('Agent started; checking panel connection...', flush=True)
+    log('Agent started; checking panel connection...', flush=True)
     last_idle_log = None
     pending = None
     while True:
@@ -225,38 +226,47 @@ def main():
             if pending is None:
                 job = request(url, project, token, 'agent_poll')
                 if job.get('status') == 'job':
-                    print(time.strftime('%Y-%m-%d %H:%M:%S'), 'job received; executing', flush=True)
+                    log(time.strftime('%Y-%m-%d %H:%M:%S'), 'job received; executing', flush=True)
                     last_idle_log = None
                     pending = (job['job'], execute_job(job, project), time.monotonic() + 900)
                 elif job.get('status') == 'idle':
                     now = time.monotonic()
                     if last_idle_log is None or now-last_idle_log >= 300:
-                        print(time.strftime('%Y-%m-%d %H:%M:%S'), 'panel connected; waiting for a queued job', flush=True)
+                        log(time.strftime('%Y-%m-%d %H:%M:%S'), 'panel connected; waiting for a queued job', flush=True)
                         last_idle_log = now
                 else:
-                    print('Panel returned an unexpected status; check endpoint configuration', flush=True)
+                    log('Panel returned an unexpected status; check endpoint configuration', flush=True)
             if pending is not None:
                 job_id, result, deadline = pending
                 if time.monotonic() >= deadline:
-                    print('Result delivery expired; create a new job in the panel', flush=True)
+                    log('Result delivery expired; create a new job in the panel', flush=True)
                     pending = None
                 else:
                     reply = submit_result(url, project, token, job_id, result)
-                    print(time.strftime('%Y-%m-%d %H:%M:%S'), 'job finished:', 'ok' if result['success'] and reply.get('state') != 'error' else 'failed', flush=True)
+                    log(time.strftime('%Y-%m-%d %H:%M:%S'), 'job finished:', 'ok' if result['success'] and reply.get('state') != 'error' else 'failed', flush=True)
                     pending = None
         except urllib.error.HTTPError as exc:
             if exc.code < 500 and exc.code not in (408, 429):
                 pending = None  # Cancelled/expired jobs and invalid credentials are not retried.
             hints = {401: 'check saved agent token', 404: 'check endpoint and project ID', 405: 'check endpoint URL', 403: 'check host firewall or access rules'}
-            print(time.strftime('%Y-%m-%d %H:%M:%S'), 'panel HTTP', exc.code, hints.get(exc.code, 'check panel/server status'), flush=True)
+            log(time.strftime('%Y-%m-%d %H:%M:%S'), 'panel HTTP', exc.code, hints.get(exc.code, 'check panel/server status'), flush=True)
         except Exception as exc:
             # Printing exception text may leak headers, credentials or driver details.
-            print(time.strftime('%Y-%m-%d %H:%M:%S'), 'connection failed:', type(exc).__name__, flush=True)
+            log(time.strftime('%Y-%m-%d %H:%M:%S'), 'connection failed:', type(exc).__name__, flush=True)
         if pending is not None:
-            print('Result delivery pending; retrying the saved result without querying SQL again', flush=True)
+            log('Result delivery pending; retrying the saved result without querying SQL again', flush=True)
         if args.once:
             break
-        time.sleep(30)
+        if stop_event is not None:
+            if stop_event.is_set() and pending is None:
+                break
+            # Finish delivery of an already queried result before stopping.
+            if stop_event.is_set():
+                time.sleep(2)
+            else:
+                stop_event.wait(30)
+        else:
+            time.sleep(30)
 
 
 if __name__ == '__main__':

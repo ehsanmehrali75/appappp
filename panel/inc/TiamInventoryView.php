@@ -59,6 +59,7 @@ $inventoryCfg = $project['settings']['tiam_inventory'] ?? [];
         <?php foreach (['save'=>'ذخیرهٔ تنظیمات', 'vpn_test'=>'تست مسیر شبکه تا SQL', 'view_test'=>'تست اتصال SQL و نمایش ستون‌ها', 'preview'=>'دریافت و پیش‌نمایش تغییرات', 'latest'=>'آخرین وضعیت و لاگ ایجنت'] as $action=>$label): ?>
             <button type="button" onclick="tiamInventoryAction('<?php echo $action; ?>')" class="bg-indigo-600 text-white px-3 py-2 rounded-lg text-xs"><?php echo $label; ?></button>
         <?php endforeach; ?>
+        <a href="https://github.com/ehsanmehrali75/appappp/releases?q=tiam-agent" target="_blank" rel="noopener" class="px-3 py-2 rounded-lg bg-white text-xs">نسخهٔ ویندوز EXE</a>
         <a href="<?php echo htmlspecialchars('/panel/tiam_inventory_agent.py'); ?>" download class="px-3 py-2 rounded-lg bg-white text-xs">دانلود ایجنت SQL</a>
     </div>
     <p class="text-xs"><a href="/panel/tiam_sql_diagnostic.ps1" download class="underline">دانلود ابزار تست مستقیم SQL در ویندوز</a> — بدون نیاز به ایجنت یا ساخت VPN؛ خروجی ساختار ستون‌ها برای بررسی و اصلاح نگاشت. نمونهٔ ردیف‌ها فقط با انتخاب صریح شما دریافت می‌شود.</p>

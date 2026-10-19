@@ -148,6 +148,29 @@ class AgentTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             agent.connect_vpn({'vpn_enabled': True, 'vpn_service': 'arbitrary-service'}, 'p1')
 
+    def test_desktop_configuration_and_graceful_stop(self):
+        import threading
+        event=threading.Event()
+        config={'TIAM_PANEL_URL':'https://example.test/panel/tiam_inventory.php','TIAM_PROJECT_ID':'p1','TIAM_AGENT_TOKEN':'a'*64}
+        def poll(*args,**kwargs):
+            event.set()
+            return {'status':'idle'}
+        with patch.object(agent,'request',side_effect=poll) as request,patch.object(agent.time,'sleep') as sleep:
+            agent.main([],configuration=config,stop_event=event,log=lambda *args,**kwargs:None)
+        self.assertEqual(request.call_count,1)
+        sleep.assert_not_called()
+
+    def test_stop_finishes_claimed_result_delivery(self):
+        import threading
+        event=threading.Event()
+        config={'TIAM_PANEL_URL':'https://example.test/panel/tiam_inventory.php','TIAM_PROJECT_ID':'p1','TIAM_AGENT_TOKEN':'a'*64}
+        def poll(*args,**kwargs):
+            event.set()
+            return {'status':'job','job':'job1'}
+        with patch.object(agent,'request',side_effect=poll),patch.object(agent,'execute_job',return_value=self.result),patch.object(agent,'submit_result',return_value={'state':'preview'}) as submit:
+            agent.main([],configuration=config,stop_event=event,log=lambda *args,**kwargs:None)
+        submit.assert_called_once()
+
 
 if __name__ == '__main__':
     unittest.main()

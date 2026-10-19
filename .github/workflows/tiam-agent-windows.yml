@@ -1,0 +1,43 @@
+name: Build Tiam Windows Agent
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'panel/tiam_inventory_agent.py'
+      - 'app/tiam-agent/**'
+      - '.github/workflows/tiam-agent-windows.yml'
+permissions:
+  contents: write
+jobs:
+  windows-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - run: python -m pip install pyinstaller==6.16.0 pyodbc==5.2.0
+      - run: python -m unittest discover -s tests -p test_tiam_inventory_agent.py
+      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name Maarksho-Tiam-Agent --paths panel --hidden-import pyodbc app/tiam-agent/launcher.py
+      - name: Verify packaged window starts
+        shell: pwsh
+        run: |
+          $app = Start-Process dist/Maarksho-Tiam-Agent.exe -PassThru
+          Start-Sleep -Seconds 8
+          if ($app.HasExited) { throw 'Packaged agent exited before window smoke test' }
+          Stop-Process -Id $app.Id -Force
+          Get-FileHash dist/Maarksho-Tiam-Agent.exe -Algorithm SHA256 | Format-List | Out-File dist/SHA256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Maarksho-Tiam-Agent-Windows-x64
+          path: dist/*
+      - name: Publish downloadable EXE
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="tiam-agent-${GITHUB_SHA:0:12}"
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --target "$GITHUB_SHA" --title "Tiam Windows Agent ${GITHUB_SHA:0:7}" --notes "Windows x64 desktop SQL bridge. Requires Microsoft ODBC Driver 18. Token stays in memory."
+          gh release upload "$TAG" dist/Maarksho-Tiam-Agent.exe dist/SHA256.txt --clobber
