@@ -59,6 +59,8 @@ if (!isModuleActive('sale')) {
     exit;
 }
 
+if(($_SERVER['REQUEST_METHOD']??'GET')==='GET'&&!isset($_GET['legacy'])&&!isset($_GET['action'])){header('Location: /panel/insights.php?'.http_build_query(['domain'=>'sales','project'=>$project['id']]));exit;}
+
 // Handle administrative mutation actions if user holds proper permissions
 $isAdmin = isSuperAdmin() || isProjectAdmin();
 $msg = $_GET['msg'] ?? '';

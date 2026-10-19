@@ -54,6 +54,8 @@ foreach ($validViews as $candidate => $label) {
     if (ModuleProjectAccess::allowed('seo_intel', 'analysis', ModuleProjectAccess::seoFeature($candidate))) $allowedViews[] = $candidate;
 }
 
+if(($_SERVER['REQUEST_METHOD']??'GET')==='GET'&&!isset($_GET['legacy'])){$insightProject=ModuleProjectAccess::businessProject($currentBusiness);if($insightProject){$insightSections=['rank_tracking'=>'keywords','keywords'=>'keywords','pages'=>'pages','traffic'=>'traffic','reports'=>'reports','integrations'=>'integrations','recommendations'=>'recommendations','technical'=>'tools','links'=>'tools','content'=>'pages','social'=>'tools'];header('Location: /panel/insights.php?'.http_build_query(['domain'=>'intelligence','project'=>$insightProject['id'],'section'=>$insightSections[$view]??'overview']));exit;}}
+
 // Calculate summary stats for header
 $stats = SeoDB::calculateScoreAndStats($currentBusiness['id']);
 $trafficData = SeoDB::getTrafficMetrics($currentBusiness['id']);

@@ -167,6 +167,8 @@ if (!$publicReadOnly) {
         exit;
     }
 }
+if(!$publicReadOnly&&($_SERVER['REQUEST_METHOD']??'GET')==='GET'&&!isset($_GET['legacy'])&&!isset($_GET['action'])){header('Location: /panel/insights.php?'.http_build_query(['domain'=>'seo','project'=>$project['id']]));exit;}
+
 
 $isAdmin = $publicReadOnly ? false : (isSuperAdmin() || isProjectAdmin());
 $token = trim($_GET['token'] ?? $_POST['token'] ?? '');

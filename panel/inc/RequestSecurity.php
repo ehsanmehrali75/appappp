@@ -38,7 +38,7 @@ class RequestSecurity {
     public static function protectBrowser() {
         if(PHP_SAPI==='cli')return;
         $path=str_replace('\\','/',$_SERVER['SCRIPT_FILENAME']??'');
-        if(!in_array(basename($path),['data-hub.php','ai-connect.php','admin.php','portal.php','task_manager.php','prompthub.php','system-admin-setup.php','support.php','sale.php','seo.php','wp-crm.php','chat.php','user_chat.php'],true)
+        if(!in_array(basename($path),['insights.php','data-hub.php','ai-connect.php','admin.php','portal.php','task_manager.php','prompthub.php','system-admin-setup.php','support.php','sale.php','seo.php','wp-crm.php','chat.php','user_chat.php'],true)
             &&!preg_match('~/(?:size|vm|seo_intel|pro)/index\.php$~',$path))return;
         self::token();self::enforce();
         if(!empty($_FILES)) {

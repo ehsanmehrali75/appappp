@@ -172,6 +172,17 @@ class AiConnection(unittest.TestCase):
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertEqual(json.loads(result.stdout)['api_charge'],140)
 
+    def test_insights_workspaces_are_project_scoped_and_no_fake_metrics(self):
+        opener,csrf=self.login()
+        for domain in ['sales','seo','intelligence']:
+            for section in ['overview','reports','integrations','recommendations','tools']:
+                code,page=self.request(opener,f'/panel/insights.php?project=p&domain={domain}&section={section}')
+                self.assertEqual(code,200,(domain,section,page[:100]));self.assertIn('insight-app',page);self.assertNotIn('synthetic-sql-secret',page)
+        limited,_=self.login('limited')
+        self.assertEqual(self.request(limited,'/panel/insights.php?project=p&domain=sales')[0],403)
+        self.assertEqual(self.request(limited,'/panel/insights.php?project=other&domain=sales')[0],403)
+        self.assertEqual(self.request(opener,'/panel/insights.php?project=p&domain=sales',{'action':'test','platform':'telegram'})[0],403)
+
     def test_wordpress_plugin_contract(self):
         result=subprocess.run([PHP,str(fixture.ROOT/'tests/wordpress_bridge_fixture.php'),str(self.app)],capture_output=True,text=True,timeout=20)
         self.assertEqual(result.returncode,0,result.stderr)
