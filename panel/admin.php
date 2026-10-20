@@ -4,6 +4,7 @@ OutputBuffer::start();
 require_once 'inc/functions.php';
 require_once __DIR__.'/inc/ModuleProjectAccess.php';
 require_once __DIR__.'/inc/ProjectPermissions.php';
+require_once __DIR__.'/inc/ProjectMembers.php';
 require_once 'inc/cors.php';
 
 // Authentication (Standard UI access)
@@ -4277,37 +4278,8 @@ if ($project) {
     // --- NEW: Multi-Store & Sales / Platform Analytics POST Handlers ---
     if ($project) {
         if (!isset($project['settings']['stores']) || !is_array($project['settings']['stores'])) {
-            // Seed default stores if none exist
-            $project['settings']['stores'] = [
-                [
-                    'id' => 'store_online_default',
-                    'name' => 'فروشگاه اینترنتی مژده',
-                    'type' => 'online',
-                    'custom_metrics' => [
-                        ['name' => 'تعداد کلیک کانال', 'key' => 'channel_clicks'],
-                        ['name' => 'تعداد بازدید فرودگاهی', 'key' => 'landing_visits'],
-                    ],
-                    'targets' => [
-                        ['id' => 'target_1', 'period_name' => 'خرداد ۱۴۰۵', 'target_money' => 150000000, 'target_count' => 500],
-                        ['id' => 'target_2', 'period_name' => 'تیر ۱۴۰۵', 'target_money' => 180000000, 'target_count' => 600]
-                    ],
-                    'sales_data' => []
-                ],
-                [
-                    'id' => 'store_physical_default',
-                    'name' => 'شعبه حضوری سهروردی',
-                    'type' => 'physical',
-                    'custom_metrics' => [
-                        ['name' => 'تعداد مراجعه حضوری روزانه', 'key' => 'daily_visitors'],
-                        ['name' => 'تعداد خریداران حضوری', 'key' => 'daily_buyers']
-                    ],
-                    'targets' => [
-                        ['id' => 'target_3', 'period_name' => 'خرداد ۱۴۰۵', 'target_money' => 120000000, 'target_count' => 400],
-                    ],
-                    'sales_data' => []
-                ]
-            ];
-            saveProject($project);
+            // Missing sales configuration must not write the project on unrelated forms.
+            $project['settings']['stores'] = [];
         }
 
         // 1. Add Store
@@ -5752,7 +5724,13 @@ if ($project) {
             }
         }
         unset($p);
-        saveDB($db);
+        try {
+            $memberProjectsToSave=array_values(array_filter($db['projects'],static fn($p)=>isMainAdmin()||$p['id']===$project['id']));
+            ProjectMembers::save($memberProjectsToSave, [$u_username]);
+        } catch (Throwable $e) {
+            error_log('Project membership write failed: '.get_class($e));
+            redirect('admin.php?tab=users&msg='.rawurlencode('ثبت کاربر انجام نشد؛ تغییری اعمال نشده است. لطفاً دوباره تلاش کنید یا گزارش سرور را بررسی کنید.'));
+        }
         
         // Reload project to reflect in $project
         foreach ($db['projects'] as $p) {
@@ -5843,7 +5821,13 @@ if ($project) {
                 }
             }
             unset($p);
-            saveDB($db);
+            try {
+                $memberProjectsToSave=array_values(array_filter($db['projects'],static fn($p)=>isMainAdmin()||$p['id']===$project['id']));
+                ProjectMembers::save($memberProjectsToSave, [$orig_username,$u_username]);
+            } catch (Throwable $e) {
+                error_log('Project membership write failed: '.get_class($e));
+                redirect('admin.php?tab=users&msg='.rawurlencode('ویرایش کاربر انجام نشد؛ تغییری اعمال نشده است. لطفاً دوباره تلاش کنید یا گزارش سرور را بررسی کنید.'));
+            }
             
             // Reload project to reflect in $project
             foreach ($db['projects'] as $p) {

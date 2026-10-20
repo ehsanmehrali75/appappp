@@ -156,6 +156,47 @@ class AdminActionAccess(unittest.TestCase):
             self.assertEqual(other, ('Other-secret', 'viewer'))
             self.assertIsNotNone(db.execute('SELECT username FROM project_users WHERE project_id="p" AND username="shared-fixture"').fetchone())
 
+    def test_member_creation_does_not_rewrite_products_and_login_succeeds(self):
+        opener,token=self.case.login('limited');self.configure(['users','products'],['users','products'])
+        with sqlite3.connect(self.case.database) as db:
+            db.execute("CREATE TRIGGER reject_unrelated_product_write BEFORE INSERT ON products BEGIN SELECT RAISE(ABORT, 'unexpected product write'); END")
+        try:
+            code,body=self.post(opener,token,{'add_user':'','username':'member-isolated','password':'Fixture-password-123!','role':'manager','assigned_projects[]':'p','perms[]':'products'},'/panel/admin.php?tab=users')
+            self.assertEqual(code,200)
+            with sqlite3.connect(self.case.database) as db:
+                member=db.execute('SELECT password FROM project_users WHERE project_id="p" AND username="member-isolated"').fetchone()
+            self.assertIsNotNone(member,body[-1000:]);self.assertTrue(member[0].startswith('$2'))
+            self.case.login('member-isolated')
+        finally:
+            with sqlite3.connect(self.case.database) as db:db.execute('DROP TRIGGER reject_unrelated_product_write')
+
+    def test_member_edit_preserves_other_members_and_product_data(self):
+        opener,token=self.case.login('limited');self.configure(['users','products'],['users','products'])
+        with sqlite3.connect(self.case.database) as db:
+            names=[r[0] for r in db.execute('SELECT username FROM project_users WHERE project_id="p"')]
+            index=names.index('viewer')
+            db.execute("CREATE TRIGGER reject_edit_product_write BEFORE INSERT ON products BEGIN SELECT RAISE(ABORT, 'unexpected product write'); END")
+        try:
+            code,_=self.post(opener,token,{'edit_user':'1','user_idx':str(index),'username':'viewer','password':'','role':'viewer','mobile':'09120000000','perms[]':'products','assigned_projects[]':'p'},'/panel/admin.php?tab=users')
+            self.assertEqual(code,200)
+            with sqlite3.connect(self.case.database) as db:
+                self.assertEqual(db.execute('SELECT mobile FROM project_users WHERE username="viewer" AND project_id="p"').fetchone()[0],'09120000000')
+                self.assertEqual(db.execute('SELECT username FROM project_users WHERE project_id="p"').fetchall(),[(name,) for name in names])
+            self.assertEqual(self.case.record()['stock_total'],'10')
+        finally:
+            with sqlite3.connect(self.case.database) as db:db.execute('DROP TRIGGER reject_edit_product_write')
+
+    def test_failed_member_write_rolls_back_and_does_not_claim_success(self):
+        opener,token=self.case.login('limited');self.configure(['users','products'],['users','products'])
+        with sqlite3.connect(self.case.database) as db:
+            db.execute("CREATE TRIGGER reject_member_write BEFORE INSERT ON project_users WHEN NEW.username='member-failed' BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END")
+        try:
+            code,body=self.post(opener,token,{'add_user':'1','username':'member-failed','password':'Fixture-password-123!','role':'viewer','assigned_projects[]':'p'},'/panel/admin.php?tab=users')
+            self.assertEqual(code,200);self.assertIn('ثبت کاربر انجام نشد',body)
+            with sqlite3.connect(self.case.database) as db:self.assertIsNone(db.execute('SELECT username FROM project_users WHERE username="member-failed"').fetchone())
+        finally:
+            with sqlite3.connect(self.case.database) as db:db.execute('DROP TRIGGER reject_member_write')
+
 
 if __name__ == '__main__':
     unittest.main()
