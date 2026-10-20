@@ -41,6 +41,31 @@ def identifier(value):
     return '[' + value + ']'
 
 
+def sql_diagnostics(exc):
+    """Return fixed categories/codes only; never emit driver text or a connection string."""
+    details = ' '.join(str(arg) for arg in exc.args).lower()
+    rules = [
+        ('certificate_untrusted', ('certificate chain was issued by an authority that is not trusted', 'certificate verify failed', 'self-signed certificate', 'untrusted root', '-2146893019'), 'SQL server certificate is not trusted; verify the saved security mode or install the trusted certificate.'),
+        ('certificate_hostname', ('target principal name is incorrect', 'hostname mismatch', 'certificate subject name', '-2146893022'), 'The server name does not match its certificate.'),
+        ('invalid_connection_attribute', ('invalid value specified for connection string attribute', 'invalid connection string attribute', 'invalid attribute value'), 'The ODBC driver rejected a connection attribute; inspect the selected driver and security mode.'),
+        ('tls_handshake', ('ssl provider', 'tls', 'handshake', 'unsupported protocol', 'no common algorithm'), 'SQL TLS negotiation failed; check SQL Server TLS support and Windows/ODBC updates.'),
+        ('login_failed', ('login failed', '18456'), 'SQL login was rejected; check the SQL account and authentication mode.'),
+        ('database_access', ('cannot open database', '4060'), 'SQL login cannot open the configured database.'),
+        ('driver_missing', ('data source name not found', 'no default driver specified', 'im002'), 'Microsoft ODBC Driver 18 for SQL Server is missing or unavailable to this application.'),
+        ('sql_object_missing', ('invalid object name', '42s02'), 'The configured schema or view does not exist or is not accessible.'),
+        ('sql_permission', ('permission was denied', 'permission denied'), 'The SQL account does not have permission to read the configured view.'),
+        ('connection_timeout', ('timeout expired', 'hyt00', 'hyt01'), 'SQL connection or query timed out.'),
+        ('connection_reset', ('forcibly closed', '10054', 'connection reset'), 'SQL Server or the network reset the SQL handshake connection.'),
+    ]
+    category, hint = 'sql_connection_failed', 'SQL connection failed; use the fixed diagnostic codes and compare with the direct PowerShell SQL diagnostic.'
+    for name, patterns, message in rules:
+        if any(pattern in details for pattern in patterns):
+            category, hint = name, message
+            break
+    codes = [code for code in ('-2146893019', '-2146893022', '10054', '10060', '10061', '18456', '4060') if re.search(r'(?<![0-9])'+re.escape(code)+r'(?![0-9])', details)]
+    return {'category': category, 'hint': hint, 'native_codes': codes}
+
+
 def stage(logs, name, callback, message):
     start = time.monotonic()
     try:
@@ -49,8 +74,13 @@ def stage(logs, name, callback, message):
         return result
     except Exception as exc:
         # Never return driver errors, DSNs, process output or credential values.
-        code = str(exc.args[0]) if exc.args and re.fullmatch(r'[A-Z0-9_]{3,64}', str(exc.args[0])) else type(exc).__name__
-        logs.append({'stage': name, 'status': 'error', 'message': 'Stage failed: ' + code, 'elapsed_ms': round((time.monotonic() - start) * 1000)})
+        safe_codes = {'INVALID_SQL_IDENTIFIER', 'INVALID_SQL_SECURITY_MODE', 'DUPLICATE_VIEW_COLUMNS', 'ROW_LIMIT_EXCEEDED', 'MISSING_CONNECTION_FIELDS', 'VPN_CONFIGURATION_FAILED'}
+        first = str(exc.args[0]) if exc.args else ''
+        code = first if first in safe_codes or re.fullmatch(r'(?:[0-9]{2}|HY|IM)[A-Z0-9]{3}', first) else type(exc).__name__
+        entry = {'stage': name, 'status': 'error', 'message': 'Stage failed: ' + code, 'elapsed_ms': round((time.monotonic() - start) * 1000)}
+        if name == 'sql_view':
+            entry['diagnostic'] = sql_diagnostics(exc)
+        logs.append(entry)
         raise
 
 
@@ -151,6 +181,7 @@ def execute_job(job, project):
         stage(logs, 'network', probe, 'SQL Server TCP port reachable')
         if job['kind'] == 'vpn_test':
             return {'success': True, 'logs': logs, 'rows': [], 'columns': []}
+        logs.append({'stage': 'sql_settings', 'status': 'info', 'message': 'Agent 1.0.1; driver: ODBC Driver 18 for SQL Server; security mode: ' + ('compatibility' if cfg.get('sql_security', 'verified') == 'compatibility' else 'verified')})
         columns, rows = stage(logs, 'sql_view', lambda: read_view(cfg, job['kind'] == 'view_test'),
                               'SQL authentication and view SELECT completed (security mode: ' + cfg.get('sql_security', 'verified') + ')')
         logs.append({'stage': 'schema', 'status': 'success', 'message': str(len(columns)) + ' columns; ' + str(len(rows)) + ' rows received', 'elapsed_ms': 0})

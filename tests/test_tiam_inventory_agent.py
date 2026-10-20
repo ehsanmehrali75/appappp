@@ -171,6 +171,29 @@ class AgentTests(unittest.TestCase):
             agent.main([],configuration=config,stop_event=event,log=lambda *args,**kwargs:None)
         submit.assert_called_once()
 
+    def test_sql_diagnostics_classify_without_echoing_driver_credentials(self):
+        for message, category in [
+            ('SSL Provider: The certificate chain was issued by an authority that is not trusted (-2146893019)', 'certificate_untrusted'),
+            ("Invalid value specified for connection string attribute 'Encrypt'", 'invalid_connection_attribute'),
+            ('SSL Provider: no common algorithm', 'tls_handshake'),
+            ('Login failed for user private-login (18456)', 'login_failed'),
+            ('Data source name not found IM002', 'driver_missing'),
+            ('TCP Provider: connection forcibly closed 10054', 'connection_reset'),
+        ]:
+            logs=[]
+            with self.assertRaises(Exception):
+                agent.stage(logs,'sql_view',lambda: (_ for _ in ()).throw(Exception('08001',message+' PWD=private-secret;UID=private-login;')),'ok')
+            self.assertEqual(logs[0]['diagnostic']['category'],category)
+            self.assertNotIn('private-secret',str(logs))
+            self.assertNotIn('private-login',str(logs))
+            self.assertNotIn('PWD=',str(logs))
+
+    def test_non_sql_exception_arguments_are_not_printed_as_codes(self):
+        logs=[]
+        with self.assertRaises(ValueError):
+            agent.stage(logs,'test',lambda: (_ for _ in ()).throw(ValueError('SECRET_PASSWORD_123')),'ok')
+        self.assertNotIn('SECRET_PASSWORD_123',str(logs))
+
 
 if __name__ == '__main__':
     unittest.main()
