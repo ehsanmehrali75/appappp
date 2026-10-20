@@ -59,6 +59,7 @@ $inventoryCfg = $project['settings']['tiam_inventory'] ?? [];
         <?php foreach (['save'=>'ذخیرهٔ تنظیمات', 'vpn_test'=>'تست مسیر شبکه تا SQL', 'view_test'=>'تست اتصال SQL و نمایش ستون‌ها', 'preview'=>'دریافت و پیش‌نمایش تغییرات', 'latest'=>'آخرین وضعیت و لاگ ایجنت'] as $action=>$label): ?>
             <button type="button" onclick="tiamInventoryAction('<?php echo $action; ?>')" class="bg-indigo-600 text-white px-3 py-2 rounded-lg text-xs"><?php echo $label; ?></button>
         <?php endforeach; ?>
+        <button type="button" onclick="tiamPairAgent(this)" class="bg-slate-700 text-white px-3 py-2 rounded-lg text-xs">ساخت کلید جدید و کپی اتصال ایجنت</button>
         <a href="https://github.com/ehsanmehrali75/appappp/releases?q=tiam-agent" target="_blank" rel="noopener" class="px-3 py-2 rounded-lg bg-white text-xs">نسخهٔ ویندوز EXE</a>
         <a href="<?php echo htmlspecialchars('/panel/tiam_inventory_agent.py'); ?>" download class="px-3 py-2 rounded-lg bg-white text-xs">دانلود ایجنت SQL</a>
     </div>
@@ -78,6 +79,20 @@ window.tiamInventoryConfigured = <?php echo !empty($inventoryCfg['host'])?'true'
 let tiamInventoryJob = null, tiamInventoryTimer = null, tiamInventoryRequest = 0;
 const tiamInventoryProject = <?php echo json_encode($project['id']); ?>;
 const tiamInventoryCsrf = <?php echo json_encode($_SESSION['tiam_csrf']); ?>;
+async function tiamPairAgent(button) {
+    button.disabled=true;
+    const log=document.getElementById('tiam-inventory-log');
+    try {
+        const response=await fetch('/panel/tiam_inventory.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'pair',project:tiamInventoryProject,csrf:tiamInventoryCsrf})});
+        const result=await response.json();
+        if(!response.ok||!result.connection)throw new Error(result.error||'ثبت اتصال ناموفق بود.');
+        const profile=JSON.stringify(result.connection);
+        try {await navigator.clipboard.writeText(profile);log.textContent='کلید جدید ثبت و اتصال کپی شد. در ایجنت نسخهٔ ۱.۰.۳، «چسباندن اتصال از پنل» و سپس «اتصال و شروع» را بزنید. کلید قبلی جایگزین شد.';}
+        catch(e){window.prompt('کلید جدید ثبت شد؛ اطلاعات زیر را کپی و در ایجنت بچسبانید. این متن محرمانه است.',profile);log.textContent='کلید جدید ثبت شد. اتصال را در ایجنت نسخهٔ ۱.۰.۳ بچسبانید.';}
+        const tokenField=document.querySelector('[data-tiam-field="agent_token"]');if(tokenField)tokenField.value='';
+    } catch(e){log.textContent='ساخت اتصال انجام نشد: '+e.message;}
+    finally{button.disabled=false;}
+}
 function tiamFactInventoryPreset(complete=false) {
     const baseMapping=<?php echo json_encode(TiamInventory::factInventoryMapping(), JSON_UNESCAPED_UNICODE); ?>;
     const mapping=complete?<?php echo json_encode(TiamInventory::factInventoryMapping(true), JSON_UNESCAPED_UNICODE); ?>:baseMapping;

@@ -29,6 +29,16 @@ class TiamInventory {
         unset($cfg['agent_token_hash'], $cfg['enabled'], $cfg['sync_hour'], $cfg['approved'], $cfg['last_success'], $cfg['last_attempt'], $cfg['last_error']);
         return hash('sha256', json_encode($cfg));
     }
+    public static function tokenText($value) {
+        if(!is_string($value))return '';
+        return preg_replace('/^[\s\x{00a0}]+|[\s\x{00a0}]+$/u','',$value)??'';
+    }
+    public static function agentAuthorized($cfg,$header,$body) {
+        $header=self::tokenText($header);$body=self::tokenText($body);
+        if($header!==''&&$body!==''&&!hash_equals($header,$body))return false;
+        $token=$header!==''?$header:$body;
+        return $token!==''&&is_string($cfg['agent_token_hash']??null)&&hash_equals($cfg['agent_token_hash'],hash('sha256',$token));
+    }
     public static function config($old, $input) {
         $cfg = $old;
         $cfg['sql_security'] = $input['sql_security'] ?? ($old['sql_security'] ?? 'verified');
@@ -52,9 +62,10 @@ class TiamInventory {
             if ($column !== '' && !preg_match('/^[\p{L}_][\p{L}\p{N}_ ]{0,127}$/uD', $column)) throw new RuntimeException('نام ستون معتبر نیست.');
             $cfg['mapping'][$field] = $column;
         }
-        if (!empty($input['agent_token'])) {
-            if (strlen($input['agent_token']) < 32) throw new RuntimeException('کلید ایجنت باید حداقل ۳۲ کاراکتر باشد.');
-            $cfg['agent_token_hash'] = hash('sha256', $input['agent_token']);
+        $newToken=self::tokenText($input['agent_token']??'');
+        if ($newToken!=='') {
+            if (strlen($newToken) < 32 || strlen($newToken)>512) throw new RuntimeException('کلید ایجنت باید حداقل ۳۲ کاراکتر باشد.');
+            $cfg['agent_token_hash'] = hash('sha256', $newToken);
         }
         if (self::fingerprint($cfg) !== self::fingerprint($old)) unset($cfg['approved']);
         return $cfg;

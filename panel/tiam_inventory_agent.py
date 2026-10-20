@@ -182,7 +182,7 @@ def execute_job(job, project):
         stage(logs, 'network', probe, 'SQL Server TCP port reachable')
         if job['kind'] == 'vpn_test':
             return {'success': True, 'logs': logs, 'rows': [], 'columns': []}
-        logs.append({'stage': 'sql_settings', 'status': 'info', 'message': 'Agent 1.0.2; driver: ODBC Driver 18 for SQL Server; security mode: ' + ('compatibility' if cfg.get('sql_security', 'verified') == 'compatibility' else 'verified')})
+        logs.append({'stage': 'sql_settings', 'status': 'info', 'message': 'Agent 1.0.3; driver: ODBC Driver 18 for SQL Server; security mode: ' + ('compatibility' if cfg.get('sql_security', 'verified') == 'compatibility' else 'verified')})
         columns, rows = stage(logs, 'sql_view', lambda: read_view(cfg, job['kind'] == 'view_test'),
                               'SQL authentication and view SELECT completed (security mode: ' + cfg.get('sql_security', 'verified') + ')')
         logs.append({'stage': 'schema', 'status': 'success', 'message': str(len(columns)) + ' columns; ' + str(len(rows)) + ' rows received', 'elapsed_ms': 0})
@@ -198,12 +198,15 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def request(url, project, token, action, **data):
     try:
-        payload = json.dumps(dict(data, project=project, action=action), ensure_ascii=False, allow_nan=False).encode('utf-8')
+        payload = json.dumps(dict(data, project=project, action=action, agent_token=token.strip()), ensure_ascii=False, allow_nan=False).encode('utf-8')
     except (TypeError, ValueError) as exc:
         raise PayloadError('Result is not valid JSON') from exc
     if len(payload) > MAX_BYTES:
         raise PayloadError('Payload exceeds server limit')
-    req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json', 'X-Tiam-Token': token})
+    headers = {'Content-Type': 'application/json'}
+    if token.isascii() and not any(c in token for c in '\r\n'):
+        headers['X-Tiam-Token'] = token.strip()
+    req = urllib.request.Request(url, data=payload, headers=headers)
     with urllib.request.build_opener(NoRedirect()).open(req, timeout=45) as response:
         try:
             result = json.load(response)

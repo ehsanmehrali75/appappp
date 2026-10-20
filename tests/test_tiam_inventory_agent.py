@@ -198,6 +198,18 @@ class AgentTests(unittest.TestCase):
             agent.stage(logs,'test',lambda: (_ for _ in ()).throw(ValueError('SECRET_PASSWORD_123')),'ok')
         self.assertNotIn('SECRET_PASSWORD_123',str(logs))
 
+    def test_agent_sends_json_token_and_compatible_header(self):
+        import json
+        for token in ['a'*64, 'کلیدتست'*8]:
+            response=io.BytesIO(b'{"status":"idle"}')
+            with patch.object(agent.urllib.request,'build_opener') as opener:
+                opener.return_value.open.return_value=response
+                self.assertEqual(agent.request('https://example.test','p1',token,'agent_poll')['status'],'idle')
+                req=opener.return_value.open.call_args.args[0]
+                self.assertEqual(json.loads(req.data)['agent_token'],token)
+                if token.isascii():self.assertEqual(req.get_header('X-tiam-token'),token)
+                else:self.assertIsNone(req.get_header('X-tiam-token'))
+
 
 if __name__ == '__main__':
     unittest.main()

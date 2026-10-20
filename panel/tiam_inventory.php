@@ -22,7 +22,7 @@ try {
         $localTest = PHP_SAPI === 'cli-server' && in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true);
         if (!$https && !$localTest) tiamReply(['error' => 'HTTPS required'], 400);
         $token = $_SERVER['HTTP_X_TIAM_TOKEN'] ?? '';
-        if (!$token || empty($cfg['agent_token_hash']) || !hash_equals($cfg['agent_token_hash'], hash('sha256', $token))) tiamReply(['error' => 'Unauthorized agent'], 401);
+        if (!TiamInventory::agentAuthorized($cfg,$token,$body['agent_token']??'')) tiamReply(['error'=>'Unauthorized agent','code'=>'TIAM_AGENT_AUTH_FAILED'],401);
     } else {
         if (!isUser()) tiamReply(['error' => 'Login required'], 401);
         if (!isMainAdmin()) {
@@ -38,6 +38,11 @@ try {
     $response = TiamInventory::locked($id, function() use ($id, $action, $body, $agent) {
         $project = getCurrentProject($id, true); $cfg = $project['settings']['tiam_inventory'] ?? [];
         $job = TiamInventory::read($id);
+        if ($action === 'pair') {
+            $token=bin2hex(random_bytes(32));$project['settings']['tiam_inventory']['agent_token_hash']=hash('sha256',$token);
+            if(!saveProject($project))throw new RuntimeException('ثبت کلید اتصال ناموفق بود.');
+            return ['status'=>'paired','connection'=>['version'=>1,'panel_url'=>'https://maarksho.com/panel/tiam_inventory.php','project_id'=>$id,'agent_token'=>$token]];
+        }
         if ($action === 'save') {
             $project['settings']['tiam_inventory'] = TiamInventory::config($cfg, $body['config'] ?? []);
             if (!empty($project['settings']['tiam_inventory']['enabled'])) $project['settings']['tiam']['enabled'] = 0;

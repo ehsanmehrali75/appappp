@@ -78,4 +78,6 @@ $duplicates=$colorProject;$duplicates['products'][]=array_replace($duplicates['p
 check(TiamInventory::productKey(' Court  ','سفيد')===TiamInventory::productKey('Court','سفید'),'Arabic and Persian spelling denote the same color');
 $missingColor=$colorItems[0];unset($missingColor['color']);rejects(fn()=>TiamInventory::merge($colorProject,[$missingColor],$cfg),'missing source color cannot erase an established color');
 $mixedColorCode=$colorItems;foreach($mixedColorCode as &$item)$item['color_code']='ONE-CODE';unset($item);rejects(fn()=>TiamInventory::merge(['id'=>'fresh','products'=>[]],$mixedColorCode,$cfg),'one color code with contradictory labels cannot mix stock');
+$spaceCfg=TiamInventory::config($cfg,array_replace($input,['agent_token'=>'  '.str_repeat('b',64).'  ']));check($spaceCfg['agent_token_hash']===hash('sha256',str_repeat('b',64)),'token normalization matches desktop trimming');
+check(TiamInventory::agentAuthorized($spaceCfg,'',str_repeat('b',64)),'body token works without custom header');check(!TiamInventory::agentAuthorized($spaceCfg,str_repeat('b',64),str_repeat('c',64)),'conflicting token transports rejected');
 echo "$count Tiam inventory checks passed\n";

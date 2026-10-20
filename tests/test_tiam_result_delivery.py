@@ -71,6 +71,50 @@ class TiamResultDelivery(unittest.TestCase):
         )
         return code, json.loads(raw)
 
+    def test_body_token_authenticates_when_host_strips_custom_header(self):
+        self.seed()
+        body={'action':'agent_poll','project':'p','agent_token':self.token}
+        code,raw=self.fixture.request(self.opener,'/panel/tiam_inventory.php',raw=json.dumps(body).encode(),headers={'Content-Type':'application/json'})
+        self.assertEqual(code,200,raw)
+        self.assertEqual(json.loads(raw)['status'],'idle')
+        self.assertNotIn(self.token,raw)
+        body['agent_token']='wrong-token'
+        code,raw=self.fixture.request(self.opener,'/panel/tiam_inventory.php',raw=json.dumps(body).encode(),headers={'Content-Type':'application/json','X-Tiam-Token':self.token})
+        self.assertEqual(code,401,'Contradictory credentials must fail closed')
+
+    def test_pairing_is_csrf_protected_and_rotates_project_token(self):
+        import re
+        self.seed()
+        opener,csrf=self.fixture.login()
+        code,page=self.fixture.request(opener,'/panel/admin.php?tab=settings')
+        self.assertEqual(code,200)
+        tiam_csrf=re.search(r'const tiamInventoryCsrf = "([a-f0-9]+)"',page).group(1)
+        body={'action':'pair','project':'p','csrf':'bad'}
+        code,raw=self.fixture.request(opener,'/panel/tiam_inventory.php',raw=json.dumps(body).encode(),headers={'Content-Type':'application/json','X-CSRF-Token':csrf})
+        self.assertEqual(code,403)
+        body['csrf']=tiam_csrf
+        code,raw=self.fixture.request(opener,'/panel/tiam_inventory.php',raw=json.dumps(body).encode(),headers={'Content-Type':'application/json','X-CSRF-Token':csrf})
+        self.assertEqual(code,200,raw)
+        profile=json.loads(raw)['connection']
+        self.assertEqual(profile['project_id'],'p')
+        self.assertEqual(len(profile['agent_token']),64)
+        body={'action':'agent_poll','project':'p','agent_token':profile['agent_token']}
+        code,raw=self.fixture.request(self.opener,'/panel/tiam_inventory.php',raw=json.dumps(body).encode(),headers={'Content-Type':'application/json'})
+        self.assertEqual(code,200,raw)
+        code,raw=self.fixture.request(self.opener,'/panel/tiam_inventory.php',raw=json.dumps(dict(body,agent_token=self.token)).encode(),headers={'Content-Type':'application/json'})
+        self.assertEqual(code,401,'Old token must be revoked')
+        code,page=self.fixture.request(opener,'/panel/admin.php?tab=settings')
+        self.assertNotIn(profile['agent_token'],page,'Saved settings cannot reveal the pairing secret')
+
+    def test_pairing_is_not_available_to_anonymous_or_viewer(self):
+        self.seed()
+        body={'action':'pair','project':'p','csrf':'not-a-valid-csrf'}
+        code,raw=self.fixture.request(self.opener,'/panel/tiam_inventory.php',raw=json.dumps(body).encode(),headers={'Content-Type':'application/json'})
+        self.assertEqual(code,401)
+        viewer,csrf=self.fixture.login('viewer')
+        code,raw=self.fixture.request(viewer,'/panel/tiam_inventory.php',raw=json.dumps(body).encode(),headers={'Content-Type':'application/json','X-CSRF-Token':csrf})
+        self.assertEqual(code,403)
+
     def test_completed_view_retry_acknowledges_without_replacing_sample(self):
         job = self.seed()
         self.assertEqual(self.send(job), (200, {'status': 'received', 'state': 'done'}))

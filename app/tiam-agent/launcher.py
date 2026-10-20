@@ -26,7 +26,7 @@ class Launcher:
             if not isinstance(settings, dict): settings = {}
         except (OSError, ValueError):
             settings = {}
-        root.title('Maarksho — Tiam Agent 1.0.2')
+        root.title('Maarksho — Tiam Agent 1.0.3')
         root.geometry('760x560')
         root.minsize(580, 450)
         frame = ttk.Frame(root, padding=18)
@@ -51,6 +51,7 @@ class Launcher:
         self.logs.grid(row=8, sticky='nsew')
         buttons = ttk.Frame(frame)
         buttons.grid(row=9, sticky='ew', pady=(12,0))
+        ttk.Button(buttons, text='چسباندن اتصال از پنل', command=self.paste_connection).pack(side='right', padx=8)
         self.start_button = ttk.Button(buttons, text='اتصال و شروع', command=self.start)
         self.start_button.pack(side='right')
         self.stop_button = ttk.Button(buttons, text='توقف', command=self.stop, state='disabled')
@@ -59,6 +60,23 @@ class Launcher:
         ttk.Label(frame, text='پس از اتصال، تست SQL یا دریافت پیش‌نمایش را از پنل پروژه اجرا کنید. SQL به ODBC Driver 18 نیاز دارد.', wraplength=680).grid(row=10, sticky='e', pady=(12,0))
         root.protocol('WM_DELETE_WINDOW', self.close)
         root.after(100, self.drain)
+
+    def paste_connection(self):
+        if self.thread and self.thread.is_alive():
+            messagebox.showinfo('اتصال فعال', 'ابتدا اتصال فعلی را متوقف کنید.')
+            return
+        try:
+            profile = json.loads(self.root.clipboard_get())
+            if not isinstance(profile, dict) or profile.get('version') != 1:
+                raise ValueError()
+            for key, field in [('TIAM_PANEL_URL','panel_url'), ('TIAM_PROJECT_ID','project_id'), ('TIAM_AGENT_TOKEN','agent_token')]:
+                if not isinstance(profile.get(field), str) or not profile[field] or len(profile[field]) > 2048:
+                    raise ValueError()
+            for key, field in [('TIAM_PANEL_URL','panel_url'), ('TIAM_PROJECT_ID','project_id'), ('TIAM_AGENT_TOKEN','agent_token')]:
+                self.values[key].set(profile[field].strip())
+            self.status.set('اطلاعات اتصال از پنل دریافت شد؛ اتصال و شروع را بزنید.')
+        except (ValueError, tk.TclError):
+            messagebox.showerror('کپی اتصال', 'در تنظیمات تیام پنل، دکمهٔ ساخت کلید و کپی اتصال ایجنت را بزنید و سپس اینجا بچسبانید.')
 
     def emit(self, *items, **kwargs):
         self.messages.put(' '.join(str(item) for item in items))
