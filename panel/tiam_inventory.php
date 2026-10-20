@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/inc/functions.php';
 require_once __DIR__ . '/inc/TiamInventory.php';
+require_once __DIR__ . '/inc/TiamResultUpload.php';
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 function tiamReply($value, $status = 200) { http_response_code($status); echo json_encode($value, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR); exit; }
@@ -16,7 +17,7 @@ try {
     $project = getCurrentProject($id, true);
     if (!$project) tiamReply(['error' => 'Project not found'], 404);
     $cfg = $project['settings']['tiam_inventory'] ?? [];
-    $agent = in_array($action, ['agent_poll', 'agent_result'], true);
+    $agent = in_array($action, ['agent_poll', 'agent_result','agent_result_chunk'], true);
     if ($agent) {
         $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https';
         $localTest = PHP_SAPI === 'cli-server' && in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true);
@@ -90,6 +91,13 @@ try {
             unset($cfg['agent_token_hash'], $cfg['approved']);
             if (empty($cfg['vpn_enabled'])) foreach (['vpn_server','vpn_username','vpn_password','vpn_secret','vpn_service'] as $field) unset($cfg[$field]);
             return ['status' => 'job', 'job' => $job['id'], 'kind' => $job['kind'], 'config' => $cfg];
+        } elseif ($action === 'agent_result_chunk') {
+            if(!is_string($body['job']??null)||!hash_equals($job['id']??'',$body['job']))throw new RuntimeException('درخواست ارسال معتبر نیست.');
+            if(in_array($job['state']??'',['done','error','preview','applied'],true))return ['status'=>'received','state'=>$job['state']];
+            if(($job['state']??'')!=='running'||($job['expires']??0)<=time())throw new RuntimeException('درخواست ارسال منقضی یا لغو شده است.');
+            if(!hash_equals($job['config_hash'],TiamInventory::fingerprint($cfg)))throw new RuntimeException('تنظیمات تغییر کرده است؛ گزارش جدید بگیرید.');
+            $job['agent_last_seen']=time();TiamResultUpload::receive($id,$job,$body);
+            return ['status'=>'chunk_received','index'=>$body['index'],'rows_received'=>$job['result_upload']['rows']];
         } elseif ($action === 'agent_result') {
             if (!hash_equals($job['id'] ?? '', $body['job'] ?? '')) throw new RuntimeException('نتیجهٔ تکراری یا منقضی دریافت شد.');
             if(isSqlActive()){
@@ -100,6 +108,7 @@ try {
             // retries of that same job without revalidating rows or applying again.
             if (in_array($job['state'] ?? '', ['done', 'error', 'preview', 'applied'], true)) return ['status' => 'received', 'state' => $job['state']];
             if (($job['state'] ?? '') !== 'running' || ($job['expires'] ?? 0) <= time()) throw new RuntimeException('نتیجهٔ تکراری یا منقضی دریافت شد.');
+            if(!empty($body['uploaded'])&&!empty($body['success']))$body['rows']=TiamResultUpload::rows($id,$job);
             $logs = [];
             foreach (array_slice($body['logs'] ?? [], 0, 30) as $log) {
                 $message = substr((string)($log['message'] ?? ''), 0, 1500);
@@ -127,13 +136,15 @@ try {
                 }
             }
             TiamInventory::write($id, $job);
+            TiamResultUpload::clear($id,$job);
             return ['status' => 'received', 'state' => $job['state']];
         } else throw new RuntimeException('عملیات ناشناخته است.');
         if (($job['expires'] ?? 0) < time() && in_array($job['state'] ?? '', ['queued','running','preview'], true)) $job['state'] = 'expired';
         $job['can_cancel'] = in_array($job['state']??'', ['queued','running','preview'],true) && (isMainAdmin() || isProjectAdmin() || hash_equals($job['owner']??'', TiamInventory::owner()));
         $job['agent_connected'] = !empty($job['agent_last_seen']) && $job['agent_last_seen'] >= time()-90;
         $job['can_apply'] = ($job['state'] ?? '') === 'preview' && hash_equals($job['owner'] ?? '', TiamInventory::owner());
-        unset($job['products'], $job['erp_items'], $job['owner'], $job['config_hash'], $job['base']);
+        if(($job['state']??'')==='running'&&!empty($job['result_upload']))$job['upload_progress']=['parts'=>count($job['result_upload']['received']),'total_parts'=>$job['result_upload']['chunks'],'rows'=>$job['result_upload']['rows'],'total_rows'=>$job['result_upload']['total_rows']];
+        unset($job['result_upload'],$job['products'], $job['erp_items'], $job['owner'], $job['config_hash'], $job['base']);
         return $job;
     });
     tiamReply($response);

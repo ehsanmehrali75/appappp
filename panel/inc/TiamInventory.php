@@ -2,6 +2,7 @@
 /** Outbound SQL Server bridge for shared hosting. No VPN commands run in PHP. */
 require_once __DIR__.'/ERPInventoryContract.php';
 require_once __DIR__.'/InventoryVersions.php';
+require_once __DIR__.'/TiamResultUpload.php';
 class TiamJobBusy extends RuntimeException {}
 class TiamStateBusy extends RuntimeException {}
 class TiamInventory {
@@ -232,6 +233,7 @@ class TiamInventory {
             if (($old['kind']??'') === $kind && $owner !== '' && hash_equals($old['owner']??'', $owner)) return $old;
             throw new TiamJobBusy(($old['state']==='queued')?'درخواست قبلی در صف و منتظر دریافت توسط ایجنت است.':'ایجنت درخواست قبلی را دریافت کرده؛ منتظر نتیجه است.');
         }
+        TiamResultUpload::clear($project['id'],$old);
         $cfg = $project['settings']['tiam_inventory'] ?? [];
         $job = ['id' => bin2hex(random_bytes(24)), 'kind' => $kind, 'state' => 'queued', 'actor'=>($_SESSION['user']['username']??'scheduler'), 'owner' => $owner, 'created' => time(), 'expires' => time()+900, 'agent_last_seen' => $old['agent_last_seen']??0,
             'config_hash' => self::fingerprint($cfg), 'base' => self::base($project)];
@@ -243,6 +245,7 @@ class TiamInventory {
         if (!$admin && !hash_equals($job['owner']??'', $owner)) throw new RuntimeException('لغو این درخواست به ایجادکننده یا مدیر پروژه نیاز دارد.');
         if (!in_array($job['state']??'', ['queued','running','preview'], true)) throw new RuntimeException('این درخواست دیگر فعال نیست.');
         if(!empty($job['run_id'])&&function_exists('isSqlActive')&&isSqlActive())InventoryVersions::cancel($projectId,$job['run_id']);
+        TiamResultUpload::clear($projectId,$job);
         $job['state']='cancelled'; $job['cancelled_at']=time();
         $job['logs'][]=['stage'=>'queue','status'=>'cancelled','message'=>'درخواست لغو شد؛ نتیجهٔ دیررس ایجنت پذیرفته نمی‌شود.','elapsed_ms'=>0];
         unset($job['products'], $job['erp_items']);

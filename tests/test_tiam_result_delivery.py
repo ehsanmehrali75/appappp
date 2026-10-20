@@ -71,6 +71,44 @@ class TiamResultDelivery(unittest.TestCase):
         )
         return code, json.loads(raw)
 
+    def part(self,job,index,chunks,total,rows,token=None):
+        data=json.dumps(rows,ensure_ascii=False,separators=(',',':'))
+        body=dict(action='agent_result_chunk',project='p',job=job,index=index,chunks=chunks,total_rows=total,data=data,sha256=hashlib.sha256(data.encode()).hexdigest())
+        code,raw=self.fixture.request(self.opener,'/panel/tiam_inventory.php',raw=json.dumps(body).encode(),headers={'Content-Type':'application/json','X-Tiam-Token':token or self.token})
+        return code,json.loads(raw)
+    def finish(self,job):
+        body=dict(action='agent_result',project='p',job=job,uploaded=True,success=True,logs=[])
+        code,raw=self.fixture.request(self.opener,'/panel/tiam_inventory.php',raw=json.dumps(body).encode(),headers={'Content-Type':'application/json','X-Tiam-Token':self.token})
+        return code,json.loads(raw)
+    def test_partial_parts_never_preview_and_retries_are_idempotent(self):
+        job=self.seed(kind='preview');rows=[dict(Code='A',Name='Fixture',Qty=3)]
+        self.assertEqual(self.part(job,0,2,2,rows)[0],200)
+        self.assertEqual(self.part(job,0,2,2,rows)[0],200)
+        self.assertEqual(self.finish(job)[0],400)
+        self.assertEqual(json.loads(self.job_path.read_text())['state'],'running')
+        self.assertEqual(self.part(job,0,2,2,[dict(Code='A',Name='Fixture',Qty=4)])[0],400)
+        self.assertEqual(self.part(job,1,2,2,[dict(Code='B',Name='Second fixture',Qty=2)])[0],200)
+        self.assertEqual(self.finish(job),(200,{'status':'received','state':'preview'}),self.job_path.read_text()[-1500:])
+        self.assertEqual(self.part(job,0,2,2,rows),(200,{'status':'received','state':'preview'}))
+        self.assertEqual(self.fixture.record()['stock_total'],'10')
+    def test_parts_reject_bad_auth_order_cancel_and_expiry(self):
+        job=self.seed(kind='preview');rows=[dict(Code='A',Name='Fixture',Qty=3)]
+        self.assertEqual(self.part(job,0,1,1,rows,token='bad')[0],401)
+        self.assertEqual(self.part(job,1,2,2,rows)[0],400)
+        state=json.loads(self.job_path.read_text());state['state']='cancelled';self.job_path.write_text(json.dumps(state))
+        self.assertEqual(self.part(job,0,1,1,rows)[0],400)
+    def test_real_agent_delivers_more_than_eight_mb_to_preview(self):
+        import importlib.util
+        spec=importlib.util.spec_from_file_location('large_tiam_agent',Path(__file__).resolve().parents[1]/'panel/tiam_inventory_agent.py');agent=importlib.util.module_from_spec(spec);spec.loader.exec_module(agent)
+        job=self.seed(kind='preview')
+        rows=[dict(Code='A'+str(i),Name='Fixture import '+str(i),Qty=1,Padding='x'*120000) for i in range(80)]
+        result=dict(success=True,rows=rows,columns=['Code','Name','Qty'],logs=[])
+        self.assertGreater(len(json.dumps(result)),8*1024*1024)
+        reply=agent.submit_result(self.fixture.base+'/panel/tiam_inventory.php','p',self.token,job,result)
+        self.assertEqual(reply['state'],'preview',self.job_path.read_text()[-1500:]);self.assertEqual(self.fixture.record()['stock_total'],'10')
+        state=json.loads(self.job_path.read_text());self.assertEqual(state['result_upload']['rows'],80)
+        self.assertFalse(list(self.state_dir.glob('*.result-'+job+'-*')))
+
     def test_body_token_authenticates_when_host_strips_custom_header(self):
         self.seed()
         body={'action':'agent_poll','project':'p','agent_token':self.token}

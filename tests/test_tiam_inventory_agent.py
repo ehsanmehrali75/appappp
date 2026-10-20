@@ -1,5 +1,6 @@
 import contextlib
 import io
+import json
 import urllib.error
 import importlib.util
 import pathlib
@@ -50,11 +51,24 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(request.call_args_list[1].kwargs['rows'], self.result['rows'])
         self.assertTrue(request.call_args_list[1].kwargs['success'])
 
-    def test_oversized_local_payload_reports_failure_instead_of_stalling_job(self):
-        with patch.object(agent, 'request', side_effect=[agent.PayloadError('too large'), {'status': 'received', 'state': 'error'}]) as request:
-            agent.submit_result('https://example.test', 'p1', 'a'*64, 'job1', self.result)
+    def test_oversized_local_payload_is_uploaded_in_parts(self):
+        replies=[agent.PayloadError('too large'),{'status':'chunk_received','index':0},{'status':'received','state':'preview'}]
+        with patch.object(agent,'request',side_effect=replies) as request:
+            agent.submit_result('https://example.test','p1','a'*64,'job1',self.result)
+        self.assertEqual(request.call_args_list[1].args[3],'agent_result_chunk')
+        self.assertEqual(json.loads(request.call_args_list[1].kwargs['data']),self.result['rows'])
+        self.assertTrue(request.call_args_list[2].kwargs['success']);self.assertTrue(request.call_args_list[2].kwargs['uploaded'])
+        self.assertNotIn('rows',request.call_args_list[2].kwargs)
+
+    def test_unrepresentable_result_reports_failure_without_truncating(self):
+        with patch.object(agent,'request',side_effect=[agent.PayloadError('large'),{'status':'received','state':'error'}]) as request,patch.object(agent,'upload_result',side_effect=agent.PayloadError('large')):
+            agent.submit_result('https://example.test','p1','a'*64,'job1',self.result)
         self.assertFalse(request.call_args_list[1].kwargs['success'])
-        self.assertNotIn('rows', request.call_args_list[1].kwargs)
+
+    def test_host_413_uses_parts_and_terminal_retry_is_acknowledged(self):
+        with patch.object(agent,'request',side_effect=[urllib.error.HTTPError('u',413,'large',{},None),{'status':'received','state':'preview'}]) as request:
+            reply=agent.submit_result('https://example.test','p1','a'*64,'job1',self.result)
+        self.assertEqual(reply['state'],'preview');self.assertEqual(request.call_args_list[1].args[3],'agent_result_chunk')
 
     def test_idle_connection_is_visible_without_secrets(self):
         output = io.StringIO()

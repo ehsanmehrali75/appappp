@@ -21,6 +21,8 @@ from decimal import Decimal
 
 MAX_ROWS = 50000
 MAX_BYTES = 8 * 1024 * 1024
+MAX_RESULT_BYTES = 32 * 1024 * 1024
+CHUNK_BYTES = 240 * 1024
 
 
 class PayloadError(ValueError):
@@ -182,7 +184,7 @@ def execute_job(job, project):
         stage(logs, 'network', probe, 'SQL Server TCP port reachable')
         if job['kind'] == 'vpn_test':
             return {'success': True, 'logs': logs, 'rows': [], 'columns': []}
-        logs.append({'stage': 'sql_settings', 'status': 'info', 'message': 'Agent 1.0.4; driver: ODBC Driver 18 for SQL Server; security mode: ' + ('compatibility' if cfg.get('sql_security', 'verified') == 'compatibility' else 'verified')})
+        logs.append({'stage': 'sql_settings', 'status': 'info', 'message': 'Agent 1.0.5; driver: ODBC Driver 18 for SQL Server; security mode: ' + ('compatibility' if cfg.get('sql_security', 'verified') == 'compatibility' else 'verified')})
         columns, rows = stage(logs, 'sql_view', lambda: read_view(cfg, job['kind'] == 'view_test'),
                               'SQL authentication and view SELECT completed (security mode: ' + cfg.get('sql_security', 'verified') + ')')
         logs.append({'stage': 'schema', 'status': 'success', 'message': str(len(columns)) + ' columns; ' + str(len(rows)) + ' rows received', 'elapsed_ms': 0})
@@ -219,17 +221,58 @@ def request(url, project, token, action, **data):
     return result
 
 
+def upload_result(url, project, token, job_id, result):
+    rows = result.get('rows', [])
+    if not isinstance(rows, list) or not rows or len(rows) > MAX_ROWS:
+        raise PayloadError('Invalid result row count')
+    chunks, current, size, total = [], [], 2, 0
+    for row in rows:
+        try:
+            encoded = json.dumps(row, ensure_ascii=False, allow_nan=False, separators=(',', ':'))
+        except (TypeError, ValueError) as exc:
+            raise PayloadError('Result is not valid JSON') from exc
+        length = len(encoded.encode('utf-8')) + 1
+        if length > CHUNK_BYTES:
+            raise PayloadError('One result row exceeds part limit')
+        if current and (size + length > CHUNK_BYTES or len(current) >= 1000):
+            chunks.append('[' + ','.join(current) + ']');current, size = [], 2
+        current.append(encoded);size += length;total += length
+    if current:
+        chunks.append('[' + ','.join(current) + ']')
+    if total + 2 * len(chunks) > MAX_RESULT_BYTES or len(chunks) > 1024:
+        raise PayloadError('Complete result exceeds supported limit')
+    for index, data in enumerate(chunks):
+        reply = request(url, project, token, 'agent_result_chunk', job=job_id, index=index,
+                        chunks=len(chunks), total_rows=len(rows), data=data,
+                        sha256=hashlib.sha256(data.encode('utf-8')).hexdigest())
+        if reply.get('status') == 'received' and reply.get('state') in ('done', 'error', 'preview', 'applied'):
+            return reply
+        if reply.get('status') != 'chunk_received' or reply.get('index') != index:
+            raise InvalidPanelResponse('Panel did not acknowledge result part')
+    metadata = {k: v for k, v in result.items() if k != 'rows'}
+    return request(url, project, token, 'agent_result', job=job_id, uploaded=True, **metadata)
+
+
 def submit_result(url, project, token, job_id, result):
     """Retry the same result, never another SQL SELECT, after transport failures."""
     payload = result
     for attempt in range(3):
         try:
             try:
-                reply = request(url, project, token, 'agent_result', job=job_id, **payload)
+                try:
+                    reply = request(url, project, token, 'agent_result', job=job_id, **payload)
+                except urllib.error.HTTPError as exc:
+                    if exc.code != 413:
+                        raise
+                    reply = upload_result(url, project, token, job_id, payload)
             except PayloadError:
-                payload = {'success': False, 'logs': [{'stage': 'upload', 'status': 'error',
-                    'message': 'Result exceeds JSON/server limits; no changes applied'}]}
-                reply = request(url, project, token, 'agent_result', job=job_id, **payload)
+                try:
+                    reply = upload_result(url, project, token, job_id, payload)
+                except PayloadError:
+                    payload = {'success': False, 'logs': [{'stage': 'upload', 'status': 'error',
+                        'message': 'Complete result exceeds supported limits; no changes applied'}]}
+                    reply = request(url, project, token, 'agent_result', job=job_id, **payload)
+            # The full snapshot is acknowledged only after every part is validated.
             if reply.get('status') != 'received' or reply.get('state') not in ('done', 'error', 'preview', 'applied'):
                 raise InvalidPanelResponse('Panel did not acknowledge the result')
             return reply
