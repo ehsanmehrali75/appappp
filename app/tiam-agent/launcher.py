@@ -26,7 +26,7 @@ class Launcher:
             if not isinstance(settings, dict): settings = {}
         except (OSError, ValueError):
             settings = {}
-        root.title('Maarksho — Tiam Agent 1.0.1')
+        root.title('Maarksho — Tiam Agent 1.0.2')
         root.geometry('760x560')
         root.minsize(580, 450)
         frame = ttk.Frame(root, padding=18)

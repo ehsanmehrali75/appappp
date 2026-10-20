@@ -111,6 +111,7 @@ class AgentTests(unittest.TestCase):
     def test_sql_is_readonly_and_encrypted(self):
         calls = {}
         class Cursor:
+            __slots__ = ()  # Real pyodbc Cursor rejects a timeout attribute.
             description = [('Code',), ('Qty',)]
             def execute(self, query):
                 calls['query'] = query
@@ -119,7 +120,9 @@ class AgentTests(unittest.TestCase):
         class Connection:
             def __enter__(self): return self
             def __exit__(self, *args): pass
-            def cursor(self): return Cursor()
+            def cursor(self):
+                calls['query_timeout'] = self.timeout
+                return Cursor()
         def connect(dsn, **kwargs):
             calls['dsn'] = dsn
             return Connection()
@@ -127,6 +130,7 @@ class AgentTests(unittest.TestCase):
         with patch.dict(sys.modules, {'pyodbc': types.SimpleNamespace(connect=connect)}):
             columns, rows = agent.read_view(cfg, True)
         self.assertEqual(calls['query'], 'SELECT TOP (5) * FROM [dbo].[Stock]')
+        self.assertEqual(calls['query_timeout'], 60)
         self.assertIn('Encrypt={yes}', calls['dsn'])
         self.assertIn('TrustServerCertificate={no}', calls['dsn'])
         self.assertEqual(rows[1]['Qty'], 0)
