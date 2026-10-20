@@ -107,4 +107,7 @@ wcCheck($crossCode['counts']['conflicts']===1&&empty($crossCode['project']['prod
 $twoColors=$grandBase;$twoColors['products'][]=array_replace($grandBase['products'][0],['id'=>'grand-black','sku'=>'BLACK-41','name'=>'Grand Court 2.0 M - سیاه','color'=>'سیاه','image'=>'uploads/black-original.png','description'=>'Black description','variants'=>[['sku'=>'BLACK-41','size'=>'41']]]);
 $whiteOnly=WebsiteCatalogSync::reconcile($twoColors,[$grandRow]);wcCheck($whiteOnly['project']['products'][1]===$twoColors['products'][1],'white website data leaves black images, description and workflow untouched');
 $unknownColors=$modelBase;unset($unknownColors['products'][0]['color']);$unknown=WebsiteCatalogSync::reconcile($unknownColors,[array_replace($modelRow,['color'=>null])]);wcCheck($unknown['counts']['matched']===0,'two unknown colors do not establish product identity from model alone');
+$compoundBase=$grandBase;$compoundBase['products'][0]['name']='Grand Court 2.0 M - سياه- سفيد';$compoundBase['products'][0]['color']='سياه- سفيد';
+$compound=WebsiteCatalogSync::reconcile($compoundBase,[array_replace($grandRow,['color'=>'سیاه-سفید'])]);wcCheck($compound['counts']['matched_name']===1,'compound color spacing and Arabic letters normalize without splitting the color');
+$single=WebsiteCatalogSync::reconcile($compoundBase,[array_replace($grandRow,['color'=>'سیاه'])]);wcCheck($single['counts']['matched']===0,'compound color never collapses into a single component color');
 echo "$n website catalog checks passed\n";

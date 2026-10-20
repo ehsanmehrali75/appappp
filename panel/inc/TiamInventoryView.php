@@ -45,13 +45,13 @@ $inventoryCfg = $project['settings']['tiam_inventory'] ?? [];
         </select>
     </label>
     <h4 class="font-bold text-sm">نگاشت ستون‌های ویو به ساختار محصولات</h4>
-    <button type="button" id="tiam-factinventory-preset" onclick="tiamFactInventoryPreset()" class="bg-slate-700 text-white px-4 py-2 rounded-lg text-xs">جایگزینی نگاشت با الگوی FactInventory</button>
-    <button type="button" onclick="tiamFactInventoryPreset(true)" class="bg-slate-700 text-white px-4 py-2 rounded-lg text-xs">الگوی کامل ERP پس از تکمیل گزارش سایز و رنگ</button>
-    <p class="text-xs">الگوی کامل شامل ModelCode، Size، Color، ColorCode، NetItem، AnbarCode، AnbarName و CategoryPath است. تا اضافه‌شدن این ستون‌ها، از الگوی فعلی استفاده کنید.</p>
-    <p class="text-xs">الگو بر اساس ساختار بررسی‌شده: کد ProCode، نام ProDes، موجودی StockTedad و شعبه ShopCode. هویت محصول بر اساس ProCode است. سایز، رنگ و قیمت خالی می‌مانند؛ Grade با نام خودش در اطلاعات منبع حفظ می‌شود. الگو فقط این فرم را تغییر می‌دهد؛ سپس ذخیره کنید و پیش‌نمایش بگیرید.</p>
+    <button type="button" id="tiam-size-color-preset" onclick="tiamFactInventoryPreset()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs">اعمال نگاشت تیام — شرح محصول + شرح رنگ</button>
+    <p class="text-xs">هویت هر محصول، ترکیب شرح محصول ProDes و شرح رنگ Color است. ProCode کد مستقل هر سایز، Size سایز و StockTedad موجودی همان سایز در ShopCode است؛ موجودی شعبه‌ها تجمیع می‌شود. این گزارش کد جداگانهٔ مدل یا رنگ و قیمت ندارد؛ تصاویر و قیمت فعلی حفظ می‌شوند.</p>
+    <p class="text-xs">Grade صرفاً مشخصهٔ منبع است و سایز فرض نمی‌شود. اعمال الگو فقط فرم را تغییر می‌دهد؛ ذخیره کنید، پیش‌نمایش کامل را بگیرید و سپس تأیید کنید.</p>
+    <details><summary class="text-xs">سازگاری با گزارش قدیمی بدون سایز و رنگ</summary><button type="button" id="tiam-factinventory-preset" onclick="tiamFactInventoryPreset('legacy')" class="bg-slate-700 text-white px-4 py-2 rounded-lg text-xs">الگوی قدیمی — هر کد یک کالا</button></details>
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-    <?php foreach (['sku'=>'کد / بارکد کالا *', 'name'=>'نام کالا *', 'stock'=>'موجودی *', 'size'=>'سایز', 'color'=>'رنگ', 'warehouse'=>'انبار / شعبه', 'price'=>'قیمت (واحد فعلی سیستم)', 'model'=>'شناسهٔ پایدار محصول / مدل مادر', 'category'=>'دسته‌بندی منبع', 'subcategory'=>'زیردسته‌بندی منبع', 'product_type'=>'نوع محصول منبع', 'grade'=>'Grade (بدون فرض سایز)', 'warehouse_name'=>'نام شعبه', 'source_updated_at'=>'زمان به‌روزرسانی منبع', 'color_code'=>'کد رنگ', 'category_path'=>'مسیر دسته‌بندی سازگار با ERP'] as $field=>$label): ?>
-        <label class="text-xs"><?php echo $label; ?><input data-tiam-map="<?php echo $field; ?>" value="<?php echo htmlspecialchars($inventoryCfg['mapping'][$field] ?? ''); ?>" class="input text-xs mt-1" dir="ltr"></label>
+    <?php foreach (['sku'=>'کد / بارکد کالا *', 'name'=>'نام کالا *', 'stock'=>'موجودی *', 'size'=>'سایز', 'color'=>'رنگ', 'warehouse'=>'انبار / شعبه', 'price'=>'قیمت اختیاری — در گزارش فعلی خالی', 'model'=>'شرح مدل — همان ستون نام کالا', 'category'=>'دسته‌بندی منبع', 'subcategory'=>'زیردسته‌بندی منبع', 'product_type'=>'نوع محصول منبع', 'grade'=>'Grade (بدون فرض سایز)', 'warehouse_name'=>'نام شعبه', 'source_updated_at'=>'زمان به‌روزرسانی منبع', 'category_path'=>'مسیر دسته‌بندی سازگار با ERP'] as $field=>$label): ?>
+        <label class="text-xs"><?php echo $label; ?><input data-tiam-map="<?php echo $field; ?>" value="<?php echo htmlspecialchars($inventoryCfg['mapping'][$field] ?? (TiamInventory::factInventoryMapping()[$field]??'')); ?>" class="input text-xs mt-1" dir="ltr"></label>
     <?php endforeach; ?>
     </div>
     <p class="text-xs">کلید ایجنت را فقط روی سیستم اجرای ایجنت وارد کنید. رمزها در خروجی این فرم نمایش داده نمی‌شوند. تغییر اتصال یا نگاشت نیازمند تأیید دوبارهٔ پیش‌نمایش است. ردیف تکراری یا دادهٔ ناقص اعمال نمی‌شود.</p>
@@ -93,12 +93,10 @@ async function tiamPairAgent(button) {
     } catch(e){log.textContent='ساخت اتصال انجام نشد: '+e.message;}
     finally{button.disabled=false;}
 }
-function tiamFactInventoryPreset(complete=false) {
-    const baseMapping=<?php echo json_encode(TiamInventory::factInventoryMapping(), JSON_UNESCAPED_UNICODE); ?>;
-    const mapping=complete?<?php echo json_encode(TiamInventory::factInventoryMapping(true), JSON_UNESCAPED_UNICODE); ?>:baseMapping;
+function tiamFactInventoryPreset(mode='sizes') {
+    const mapping=mode==='legacy'?<?php echo json_encode(TiamInventory::factInventoryMapping(false), JSON_UNESCAPED_UNICODE); ?>:<?php echo json_encode(TiamInventory::factInventoryMapping(), JSON_UNESCAPED_UNICODE); ?>;
     document.querySelectorAll('[data-tiam-map]').forEach(el=>el.value=mapping[el.dataset.tiamMap]||'');
-    if(!complete)document.querySelector('[data-tiam-field="view"]').value='FactInventory';
-    document.getElementById('tiam-inventory-log').textContent=complete?'الگوی کامل ERP وارد شد؛ نام گزارش را مطابق خروجی تیم فنی تنظیم کنید. فقط پس از اضافه‌شدن ستون‌ها ذخیره و تست کنید.':'نگاشت FactInventory فعلی وارد شد؛ سایز، رنگ و قیمت تعیین نشده‌اند. تنظیمات را ذخیره کنید، سپس پیش‌نمایش را بررسی کنید.';
+    document.getElementById('tiam-inventory-log').textContent=mode==='legacy'?'الگوی قدیمی بدون سایز و رنگ انتخاب شد؛ برای گزارش فعلی از نگاشت شرح محصول + شرح رنگ استفاده کنید.':'هویت محصول: شرح ProDes + رنگ Color. کد هر سایز: ProCode. موجودی: StockTedad به تفکیک ShopCode. تنظیمات را ذخیره و پیش‌نمایش بگیرید.';
 }
 function tiamUpdateNetworkMode() {
     const managed=document.getElementById('tiam-network-mode').value==='1';

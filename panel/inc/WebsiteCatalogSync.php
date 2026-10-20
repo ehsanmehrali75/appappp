@@ -214,14 +214,15 @@ class WebsiteCatalogSync {
         return is_string($value)?mb_strtolower(trim(preg_replace('/[\s\x{00a0}]+/u',' ',$value))):'';
     }
     private static function colorName($value) {
-        return str_replace(['ي','ك'],['ی','ک'],self::modelName($value));
+        return preg_replace('/\s*[-–—]\s*/u','-',str_replace(['ي','ك'],['ی','ک'],self::modelName($value)));
     }
     /** Strip only this product's explicit color suffix, never arbitrary model words. */
     private static function productModel($product) {
         $name=self::modelName($product['name']??'');$color=self::colorName($product['color']??'');
         if($color!=='') {
-            $normalized=self::colorName($name);
-            if(preg_match('/^(.*?)\s+[-–—]\s*'.preg_quote($color,'/').'$/u',$normalized,$parts)&&trim($parts[1])!=='')return trim($parts[1]);
+            $normalized=str_replace(['ي','ك'],['ی','ک'],$name);
+            $suffix=implode('\s*[-–—]\s*',array_map(static fn($part)=>preg_quote($part,'/'),explode('-',$color)));
+            if(preg_match('/^(.*?)\s+[-–—]\s*'.$suffix.'$/u',$normalized,$parts)&&trim($parts[1])!=='')return trim($parts[1]);
         }
         return $name;
     }
