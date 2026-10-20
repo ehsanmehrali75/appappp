@@ -5730,8 +5730,8 @@ if ($project) {
             $memberProjectsToSave=array_values(array_filter($db['projects'],static fn($p)=>isMainAdmin()||$p['id']===$project['id']));
             ProjectMembers::save($memberProjectsToSave, [$u_username]);
         } catch (Throwable $e) {
-            error_log('Project membership write failed: '.get_class($e));
-            redirect('admin.php?tab=users&msg='.rawurlencode('ثبت کاربر انجام نشد؛ تغییری اعمال نشده است. لطفاً دوباره تلاش کنید یا گزارش سرور را بررسی کنید.'));
+            $membershipTracking=ProjectMembers::report($e);
+            redirect('admin.php?tab=users&msg='.rawurlencode('ثبت کاربر انجام نشد؛ کد پیگیری '.$membershipTracking.' را از گزارش سرور بررسی کنید. اطلاعات ورود در لاگ ثبت نمی‌شود.'));
         }
         
         // Reload project to reflect in $project
@@ -5828,8 +5828,8 @@ if ($project) {
                 $memberProjectsToSave=array_values(array_filter($db['projects'],static fn($p)=>isMainAdmin()||$p['id']===$project['id']));
                 ProjectMembers::save($memberProjectsToSave, [$orig_username,$u_username]);
             } catch (Throwable $e) {
-                error_log('Project membership write failed: '.get_class($e));
-                redirect('admin.php?tab=users&msg='.rawurlencode('ویرایش کاربر انجام نشد؛ تغییری اعمال نشده است. لطفاً دوباره تلاش کنید یا گزارش سرور را بررسی کنید.'));
+                $membershipTracking=ProjectMembers::report($e);
+                redirect('admin.php?tab=users&msg='.rawurlencode('ویرایش کاربر انجام نشد؛ کد پیگیری '.$membershipTracking.' را از گزارش سرور بررسی کنید. اطلاعات ورود در لاگ ثبت نمی‌شود.'));
             }
             
             // Reload project to reflect in $project
