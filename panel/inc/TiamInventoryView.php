@@ -145,7 +145,7 @@ async function tiamInventoryAction(action) {
     }
     try {
         const response=await fetch(<?php echo json_encode('/panel/tiam_inventory.php'); ?>,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-        const data=await response.json();
+        let data;try{data=await response.json();}catch{const error=new Error('پاسخ معتبر از پنل دریافت نشد؛ وضعیت اتصال و سرور بررسی می‌شود.');error.status=response.status;throw error;}
         if(requestVersion!==tiamInventoryRequest) return;
         if(data.code==='TIAM_JOB_BUSY') { await tiamInventoryAction('latest'); if(tiamInventoryRequest===requestVersion+1) log.textContent='درخواست جدید ساخته نشد؛ وضعیت درخواست قبلی:\n'+log.textContent; return; }
         if(!response.ok || data.error) {const error=new Error(data.error || 'خطای سرور');error.status=response.status;throw error;}

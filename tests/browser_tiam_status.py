@@ -29,12 +29,12 @@ try:
             body=route.request.post_data_json
             if body.get('action') in ['latest','status']:
                 retries.append(body['action'])
-                if len(retries)==1:return route.fulfill(status=503,content_type='application/json',body=json.dumps({'code':'TIAM_STATE_BUSY','error':'Fixture busy'}))
+                if len(retries)==1:return route.fulfill(status=503,content_type='text/html',body='<html>Fixture busy</html>')
             return route.continue_()
         page.route('**/panel/tiam_inventory.php',temporary_busy)
         page.goto(base+'/panel/admin.php?tab=settings')
         page.wait_for_function("document.getElementById('tiam-inventory-log')?.textContent.includes('۵ ثانیه')")
-        page.wait_for_function("!document.getElementById('tiam-inventory-log')?.textContent.includes('Fixture busy')",timeout=15000)
+        page.wait_for_function("!document.getElementById('tiam-inventory-log')?.textContent.includes('۵ ثانیه')",timeout=15000)
         assert len(retries)>=2,retries
         assert not errors,errors
         # Separate session avoids inheriting global-owner identity.
