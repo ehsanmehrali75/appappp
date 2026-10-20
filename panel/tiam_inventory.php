@@ -14,7 +14,8 @@ try {
     if (!is_array($body)) tiamReply(['error' => 'Invalid JSON'], 400);
     $id = $body['project'] ?? null; $action = $body['action'] ?? '';
     if (!is_string($id) || $id === '') tiamReply(['error' => 'Project required'], 400);
-    $project = getCurrentProject($id, true);
+    $agent = in_array($action, ['agent_poll', 'agent_result','agent_result_chunk'], true);
+    $project = $agent ? TiamInventory::connectionProject($id) : getCurrentProject($id,true);
     if (!$project) tiamReply(['error' => 'Project not found'], 404);
     $cfg = $project['settings']['tiam_inventory'] ?? [];
     $agent = in_array($action, ['agent_poll', 'agent_result','agent_result_chunk'], true);
@@ -37,7 +38,7 @@ try {
         if (in_array($action, ['preview', 'apply', 'export_manual','run_full','rollback','history','changes'], true) && (!hasPermission('products') || !isModuleActive('products') || !AccessControl::allowed('products', 'use'))) AccessControl::deny();
     }
     $response = TiamInventory::locked($id, function() use ($id, $action, $body, $agent) {
-        $project = getCurrentProject($id, true); $cfg = $project['settings']['tiam_inventory'] ?? [];
+        $project = $agent ? TiamInventory::connectionProject($id) : getCurrentProject($id,true); $cfg = $project['settings']['tiam_inventory'] ?? [];
         $job = TiamInventory::read($id);
         if(in_array($action,['history','changes','rollback'],true)){
             InventoryVersions::init();
@@ -80,17 +81,18 @@ try {
             $pending = in_array($job['state'] ?? '', ['queued', 'running'], true) && ($job['expires'] ?? 0) > time();
             $waitingForConfirmation = ($job['state'] ?? '') === 'preview' && ($job['expires'] ?? 0) > time();
             if (!$pending && !$waitingForConfirmation && TiamInventory::due($cfg)) {
+                $project=getCurrentProject($id,true);
                 $project['settings']['tiam_inventory']['last_attempt'] = (new DateTimeImmutable('now', new DateTimeZone('Asia/Tehran')))->format('Y-m-d');
                 if (!saveProject($project)) throw new RuntimeException('ذخیرهٔ زمان تلاش ناموفق بود.');
                 $job = TiamInventory::createJob($project, 'scheduled'); $pending = true;
             }
-            if (!$pending) return ['status' => 'idle'];
+            if (!$pending) return ['protocol_version'=>2,'status' => 'idle'];
             // A job is leased for 15 minutes. Polling never starts it twice.
-            if (($job['state'] ?? '') === 'running') return ['status' => 'idle'];
+            if (($job['state'] ?? '') === 'running') return ['protocol_version'=>2,'status' => 'idle'];
             $job['state'] = 'running'; $job['started_at'] = time(); TiamInventory::write($id, $job);
             unset($cfg['agent_token_hash'], $cfg['approved']);
             if (empty($cfg['vpn_enabled'])) foreach (['vpn_server','vpn_username','vpn_password','vpn_secret','vpn_service'] as $field) unset($cfg[$field]);
-            return ['status' => 'job', 'job' => $job['id'], 'kind' => $job['kind'], 'config' => $cfg];
+            return ['protocol_version'=>2,'status' => 'job', 'job' => $job['id'], 'kind' => $job['kind'], 'config' => $cfg];
         } elseif ($action === 'agent_result_chunk') {
             if(!is_string($body['job']??null)||!hash_equals($job['id']??'',$body['job']))throw new RuntimeException('درخواست ارسال معتبر نیست.');
             if(in_array($job['state']??'',['done','error','preview','applied'],true))return ['status'=>'received','state'=>$job['state']];
@@ -124,6 +126,7 @@ try {
                 $job['state'] = 'done'; $job['columns'] = $body['columns'] ?? []; $job['sample'] = array_slice($body['rows'] ?? [], 0, 5);
             } else {
                 try {
+                    $project=getCurrentProject($id,true);
                     $job = TiamInventory::preview($project, $job, $body['rows'] ?? []);
                     if ($job['kind'] === 'scheduled') {
                         if (empty($cfg['enabled']) || ($cfg['approved'] ?? '') !== TiamInventory::fingerprint($cfg)) throw new RuntimeException('زمان‌بندی غیرفعال شده یا نگاشت تأیید نشده است.');
@@ -144,6 +147,7 @@ try {
         $job['agent_connected'] = !empty($job['agent_last_seen']) && $job['agent_last_seen'] >= time()-90;
         $job['can_apply'] = ($job['state'] ?? '') === 'preview' && hash_equals($job['owner'] ?? '', TiamInventory::owner());
         if(($job['state']??'')==='running'&&!empty($job['result_upload']))$job['upload_progress']=['parts'=>count($job['result_upload']['received']),'total_parts'=>$job['result_upload']['chunks'],'rows'=>$job['result_upload']['rows'],'total_rows'=>$job['result_upload']['total_rows']];
+        $job['protocol_version']=2;
         unset($job['result_upload'],$job['products'], $job['erp_items'], $job['owner'], $job['config_hash'], $job['base']);
         return $job;
     });

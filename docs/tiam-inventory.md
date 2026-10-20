@@ -92,3 +92,5 @@ The supplied five-row sample yields three products: Grace Fit W/yellow stock 1; 
 
 
 The source system permanently uses descriptions as identities: ProDes is the model identity and Color is the color identity. No physical ModelCode or ColorCode is required or requested. The default TIAM mapping now uses this contract. Legacy named fields in exported manual ERP JSON remain compatibility aliases, not a requirement on SQL. Any legacy SKU-based mapping must be explicitly switched using the standard preset and a new preview; saved project settings are never silently migrated.
+
+ایجنت 1.0.6 صف را هر ۵ ثانیه بررسی می‌کند و پس از خواندن SQL، تعداد ردیف‌ها و پیشرفت ارسال بخش‌ها را در لاگ نمایش می‌دهد. بررسی صف و دریافت بخش‌ها فقط تنظیمات اتصال پروژه را می‌خواند؛ گراف کامل محصولات تنها برای ساخت پیش‌نمایش نهایی بارگذاری می‌شود. رد شدن نتیجه با HTTP 400 به پنل گزارش می‌شود تا درخواست در حالت running رها نشود. کد TIAM_PANEL_UPDATE_REQUIRED یعنی نسخهٔ PHP پنل هنوز عملیات ارسال تکه‌ای را نمی‌شناسد. در صفحهٔ وضعیت، خطای موقت 503 باعث توقف بررسی خودکار نمی‌شود.

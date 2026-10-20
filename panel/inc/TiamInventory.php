@@ -6,6 +6,12 @@ require_once __DIR__.'/TiamResultUpload.php';
 class TiamJobBusy extends RuntimeException {}
 class TiamStateBusy extends RuntimeException {}
 class TiamInventory {
+    public static function connectionProject($id) {
+        if(!isSqlActive())return getCurrentProject($id,true);
+        $q=getConn()->prepare('SELECT id, settings FROM projects WHERE id = ?');$q->bind_param('s',$id);$q->execute();$row=$q->get_result()->fetch_assoc();$q->close();
+        if(!$row)return null;
+        return ['id'=>$row['id'],'settings'=>json_decode($row['settings']??'{}',true)?:[]];
+    }
     public static function directory() {
         $dir = getenv('TIAM_STATE_DIR') ?: sys_get_temp_dir() . '/maarksho-tiam-' . substr(hash('sha256', __DIR__), 0, 16);
         if (!is_dir($dir) && !mkdir($dir, 0700, true)) throw new RuntimeException('فضای خصوصی صف همگام‌سازی قابل نوشتن نیست.');

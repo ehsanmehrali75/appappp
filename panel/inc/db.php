@@ -343,7 +343,7 @@ function getConn() {
 
     if ($conn !== null && !$migrationsRun) {
         $migrationsRun = true;
-        db_get_all();
+        db_get_all(false);
     }
     
     return $conn;
@@ -407,7 +407,7 @@ function db_auto_migrate_from_json($conn) {
     }
 }
 
-function db_get_all() {
+function db_get_all($withData = true) {
     static $migrationDone = false;
     if (!$migrationDone && isSqlActive()) {
         $conn = getConn();
@@ -535,7 +535,7 @@ function db_get_all() {
 
         $migrationDone = true;
     }
-    return fetchDB();
+    return $withData ? fetchDB() : null;
 }
 
 function db_save_project($project, $onlyProducts = null, $onlySchedules = null, $manageTransaction = true) {

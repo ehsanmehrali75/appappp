@@ -184,7 +184,7 @@ def execute_job(job, project):
         stage(logs, 'network', probe, 'SQL Server TCP port reachable')
         if job['kind'] == 'vpn_test':
             return {'success': True, 'logs': logs, 'rows': [], 'columns': []}
-        logs.append({'stage': 'sql_settings', 'status': 'info', 'message': 'Agent 1.0.5; driver: ODBC Driver 18 for SQL Server; security mode: ' + ('compatibility' if cfg.get('sql_security', 'verified') == 'compatibility' else 'verified')})
+        logs.append({'stage': 'sql_settings', 'status': 'info', 'message': 'Agent 1.0.6; driver: ODBC Driver 18 for SQL Server; security mode: ' + ('compatibility' if cfg.get('sql_security', 'verified') == 'compatibility' else 'verified')})
         columns, rows = stage(logs, 'sql_view', lambda: read_view(cfg, job['kind'] == 'view_test'),
                               'SQL authentication and view SELECT completed (security mode: ' + cfg.get('sql_security', 'verified') + ')')
         logs.append({'stage': 'schema', 'status': 'success', 'message': str(len(columns)) + ' columns; ' + str(len(rows)) + ' rows received', 'elapsed_ms': 0})
@@ -209,7 +209,22 @@ def request(url, project, token, action, **data):
     if token.isascii() and not any(c in token for c in '\r\n'):
         headers['X-Tiam-Token'] = token.strip()
     req = urllib.request.Request(url, data=payload, headers=headers)
-    with urllib.request.build_opener(NoRedirect()).open(req, timeout=45) as response:
+    try:
+        response = urllib.request.build_opener(NoRedirect()).open(req, timeout=45)
+    except urllib.error.HTTPError as exc:
+        exc.tiam_action = action
+        exc.tiam_code = 'TIAM_HTTP_' + str(exc.code)
+        try:
+            detail = json.loads(exc.read(8192))
+            code = detail.get('code', '')
+            if isinstance(code, str) and re.fullmatch(r'TIAM_[A-Z_]{1,60}', code):
+                exc.tiam_code = code
+            if 'عملیات ناشناخته' in str(detail.get('error', '')):
+                exc.tiam_code = 'TIAM_PANEL_UPDATE_REQUIRED'
+        except (ValueError, OSError, TypeError, AttributeError):
+            pass
+        raise
+    with response:
         try:
             result = json.load(response)
         except (ValueError, UnicodeDecodeError) as exc:
@@ -221,7 +236,7 @@ def request(url, project, token, action, **data):
     return result
 
 
-def upload_result(url, project, token, job_id, result):
+def upload_result(url, project, token, job_id, result, progress=None):
     rows = result.get('rows', [])
     if not isinstance(rows, list) or not rows or len(rows) > MAX_ROWS:
         raise PayloadError('Invalid result row count')
@@ -242,6 +257,8 @@ def upload_result(url, project, token, job_id, result):
     if total + 2 * len(chunks) > MAX_RESULT_BYTES or len(chunks) > 1024:
         raise PayloadError('Complete result exceeds supported limit')
     for index, data in enumerate(chunks):
+        if progress and (index == 0 or index % 10 == 0 or index == len(chunks)-1):
+            progress('Uploading result part', index+1, 'of', len(chunks), flush=True)
         reply = request(url, project, token, 'agent_result_chunk', job=job_id, index=index,
                         chunks=len(chunks), total_rows=len(rows), data=data,
                         sha256=hashlib.sha256(data.encode('utf-8')).hexdigest())
@@ -253,7 +270,7 @@ def upload_result(url, project, token, job_id, result):
     return request(url, project, token, 'agent_result', job=job_id, uploaded=True, **metadata)
 
 
-def submit_result(url, project, token, job_id, result):
+def submit_result(url, project, token, job_id, result, progress=None):
     """Retry the same result, never another SQL SELECT, after transport failures."""
     payload = result
     for attempt in range(3):
@@ -264,10 +281,10 @@ def submit_result(url, project, token, job_id, result):
                 except urllib.error.HTTPError as exc:
                     if exc.code != 413:
                         raise
-                    reply = upload_result(url, project, token, job_id, payload)
+                    reply = upload_result(url, project, token, job_id, payload, progress)
             except PayloadError:
                 try:
-                    reply = upload_result(url, project, token, job_id, payload)
+                    reply = upload_result(url, project, token, job_id, payload, progress)
                 except PayloadError:
                     payload = {'success': False, 'logs': [{'stage': 'upload', 'status': 'error',
                         'message': 'Complete result exceeds supported limits; no changes applied'}]}
@@ -296,7 +313,7 @@ def main(argv=None, configuration=None, stop_event=None, log=print):
     parsed = urllib.parse.urlsplit(url)
     if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password or len(token) < 32 or not project:
         raise SystemExit('Configure an HTTPS TIAM_PANEL_URL, TIAM_PROJECT_ID and TIAM_AGENT_TOKEN in the service environment')
-    log('Agent started; checking panel connection...', flush=True)
+    log('Agent 1.0.6 started; checking panel connection...', flush=True)
     last_idle_log = None
     pending = None
     while True:
@@ -306,7 +323,10 @@ def main(argv=None, configuration=None, stop_event=None, log=print):
                 if job.get('status') == 'job':
                     log(time.strftime('%Y-%m-%d %H:%M:%S'), 'job received; executing', flush=True)
                     last_idle_log = None
-                    pending = (job['job'], execute_job(job, project), time.monotonic() + 900)
+                    sql_started=time.monotonic()
+                    result=execute_job(job, project)
+                    log('SQL completed; sending result:',len(result.get('rows',[])),'rows; elapsed:',round(time.monotonic()-sql_started,1),'s',flush=True)
+                    pending = (job['job'], result, time.monotonic() + 900)
                 elif job.get('status') == 'idle':
                     now = time.monotonic()
                     if last_idle_log is None or now-last_idle_log >= 300:
@@ -320,12 +340,22 @@ def main(argv=None, configuration=None, stop_event=None, log=print):
                     log('Result delivery expired; create a new job in the panel', flush=True)
                     pending = None
                 else:
-                    reply = submit_result(url, project, token, job_id, result)
+                    reply = submit_result(url, project, token, job_id, result, progress=log)
                     log(time.strftime('%Y-%m-%d %H:%M:%S'), 'job finished:', 'ok' if result['success'] and reply.get('state') != 'error' else 'failed', flush=True)
                     pending = None
         except urllib.error.HTTPError as exc:
             if exc.code < 500 and exc.code not in (408, 429):
-                pending = None  # Cancelled/expired jobs and invalid credentials are not retried.
+                if pending is not None and exc.code == 400:
+                    # Tell the panel to end this job instead of abandoning a running lease.
+                    try:
+                        request(url, project, token, 'agent_result', job=pending[0], success=False,
+                                logs=[{'stage':'upload','status':'error','message':
+                                       'Panel rejected result: ' + getattr(exc,'tiam_code','TIAM_HTTP_400') +
+                                       '; update panel files and retry the preview'}])
+                    except Exception:
+                        pass
+                pending = None
+            log('Request:', getattr(exc,'tiam_action','unknown'), 'code:', getattr(exc,'tiam_code','TIAM_HTTP_'+str(exc.code)), flush=True)
             hints = {401: 'check saved agent token', 404: 'check endpoint and project ID', 405: 'check endpoint URL', 403: 'check host firewall or access rules'}
             log(time.strftime('%Y-%m-%d %H:%M:%S'), 'panel HTTP', exc.code, hints.get(exc.code, 'check panel/server status'), flush=True)
         except Exception as exc:
@@ -342,9 +372,9 @@ def main(argv=None, configuration=None, stop_event=None, log=print):
             if stop_event.is_set():
                 time.sleep(2)
             else:
-                stop_event.wait(30)
+                stop_event.wait(5)
         else:
-            time.sleep(30)
+            time.sleep(5)
 
 
 if __name__ == '__main__':

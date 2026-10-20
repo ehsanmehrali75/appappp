@@ -70,6 +70,31 @@ class AgentTests(unittest.TestCase):
             reply=agent.submit_result('https://example.test','p1','a'*64,'job1',self.result)
         self.assertEqual(reply['state'],'preview');self.assertEqual(request.call_args_list[1].args[3],'agent_result_chunk')
 
+    def test_rejected_result_reports_failure_so_job_does_not_stay_running(self):
+        error=urllib.error.HTTPError('https://example.test',400,'private server detail',None,None)
+        error.tiam_code='TIAM_PANEL_UPDATE_REQUIRED';error.tiam_action='agent_result_chunk'
+        responses=[{'status':'job','job':'j1','kind':'preview','config':{}},{'status':'received','state':'error'}]
+        output=io.StringIO()
+        with patch.object(sys,'argv',['agent','--once']),patch.object(agent,'request',side_effect=responses) as request,patch.object(agent,'execute_job',return_value=self.result),patch.object(agent,'submit_result',side_effect=error),contextlib.redirect_stdout(output):
+            agent.main(configuration={'TIAM_PANEL_URL':'https://example.test','TIAM_PROJECT_ID':'p','TIAM_AGENT_TOKEN':'a'*64})
+        self.assertEqual(request.call_args_list[-1].args[3],'agent_result')
+        self.assertFalse(request.call_args_list[-1].kwargs['success'])
+        self.assertIn('TIAM_PANEL_UPDATE_REQUIRED',output.getvalue());self.assertNotIn('private server detail',output.getvalue())
+
+    def test_idle_poll_uses_five_second_interval(self):
+        with patch.object(sys,'argv',['agent']),patch.object(agent,'request',return_value={'status':'idle'}),patch.object(agent.time,'sleep',side_effect=KeyboardInterrupt) as sleep,self.assertRaises(KeyboardInterrupt):
+            agent.main(configuration={'TIAM_PANEL_URL':'https://example.test','TIAM_PROJECT_ID':'p','TIAM_AGENT_TOKEN':'a'*64},log=lambda *a,**k:None)
+        sleep.assert_called_once_with(5)
+
+    def test_old_panel_rejection_has_safe_actionable_code(self):
+        body=json.dumps({'error':'عملیات ناشناخته است.','code':'TIAM_ERROR'}).encode()
+        error=urllib.error.HTTPError('https://example.test',400,'private detail',{},io.BytesIO(body))
+        with patch.object(agent.urllib.request,'build_opener') as build:
+            build.return_value.open.side_effect=error
+            with self.assertRaises(urllib.error.HTTPError) as caught:agent.request('https://example.test','p','a'*64,'agent_result_chunk')
+        self.assertEqual(caught.exception.tiam_code,'TIAM_PANEL_UPDATE_REQUIRED')
+        self.assertEqual(caught.exception.tiam_action,'agent_result_chunk')
+
     def test_idle_connection_is_visible_without_secrets(self):
         output = io.StringIO()
         with patch.dict(agent.os.environ, {'TIAM_PANEL_URL':'https://example.test/tiam_inventory.php','TIAM_PROJECT_ID':'p1','TIAM_AGENT_TOKEN':'a'*64}), patch.object(sys,'argv',['agent','--once']), patch.object(agent,'request',return_value={'status':'idle'}), contextlib.redirect_stdout(output):

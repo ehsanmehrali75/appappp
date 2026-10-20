@@ -148,7 +148,7 @@ async function tiamInventoryAction(action) {
         const data=await response.json();
         if(requestVersion!==tiamInventoryRequest) return;
         if(data.code==='TIAM_JOB_BUSY') { await tiamInventoryAction('latest'); if(tiamInventoryRequest===requestVersion+1) log.textContent='درخواست جدید ساخته نشد؛ وضعیت درخواست قبلی:\n'+log.textContent; return; }
-        if(!response.ok || data.error) throw new Error(data.error || 'خطای سرور');
+        if(!response.ok || data.error) {const error=new Error(data.error || 'خطای سرور');error.status=response.status;throw error;}
         if(data.format==='maarksho.erp.inventory.v1') {
             const url=URL.createObjectURL(new Blob([JSON.stringify(data.rows,null,2)],{type:'application/json'}));
             const link=document.createElement('a');link.href=url;link.download='tiam-erp-manual-'+tiamInventoryProject+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return;
@@ -173,7 +173,7 @@ async function tiamInventoryAction(action) {
         }
         if(data.rolled_back_at)log.textContent='این اجرا بازگردانی شده است.\n'+log.textContent;
         if(['queued','running'].includes(data.state)) tiamInventoryTimer=setTimeout(()=>tiamInventoryAction(action==='latest'?'latest':'status'),3000);
-    } catch(e) {if(requestVersion===tiamInventoryRequest) log.textContent=e.message;}
+    } catch(e) {if(requestVersion===tiamInventoryRequest) {log.textContent=e.message;if(['latest','status'].includes(action)&&(e.status>=500||e.status===429||e instanceof TypeError)){log.textContent+='\nبررسی وضعیت تا ۵ ثانیهٔ دیگر تکرار می‌شود…';tiamInventoryTimer=setTimeout(()=>tiamInventoryAction('latest'),5000);}}}
 }
 document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('[data-tiam-field],[data-tiam-map]').forEach(el=>{el.addEventListener('input',()=>tiamSettingsDirty=true);el.addEventListener('change',()=>tiamSettingsDirty=true);});tiamUpdateNetworkMode();tiamInventoryAction('latest');},{once:true});
 </script>

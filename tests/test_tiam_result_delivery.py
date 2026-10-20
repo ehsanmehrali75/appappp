@@ -80,6 +80,18 @@ class TiamResultDelivery(unittest.TestCase):
         body=dict(action='agent_result',project='p',job=job,uploaded=True,success=True,logs=[])
         code,raw=self.fixture.request(self.opener,'/panel/tiam_inventory.php',raw=json.dumps(body).encode(),headers={'Content-Type':'application/json','X-Tiam-Token':self.token})
         return code,json.loads(raw)
+    def test_poll_and_parts_do_not_load_the_product_graph(self):
+        job=self.seed(kind='preview')
+        path=self.fixture.app/'panel/inc/functions.php';original=path.read_text()
+        injected=original.replace('function getCurrentProject($id = null, $forceReload = false) {',"function getCurrentProject($id = null, $forceReload = false) { if(in_array($GLOBALS['action']??'', ['agent_poll','agent_result_chunk'],true))throw new RuntimeException('Unexpected product graph load');")
+        self.assertNotEqual(injected,original);path.write_text(injected)
+        try:
+            body=dict(action='agent_poll',project='p',agent_token=self.token)
+            code,raw=self.fixture.request(self.opener,'/panel/tiam_inventory.php',raw=json.dumps(body).encode(),headers={'Content-Type':'application/json'})
+            self.assertEqual(code,200,raw)
+            self.assertEqual(self.part(job,0,1,1,[dict(Code='A',Name='Fixture',Qty=1)])[0],200)
+        finally:path.write_text(original)
+
     def test_partial_parts_never_preview_and_retries_are_idempotent(self):
         job=self.seed(kind='preview');rows=[dict(Code='A',Name='Fixture',Qty=3)]
         self.assertEqual(self.part(job,0,2,2,rows)[0],200)
