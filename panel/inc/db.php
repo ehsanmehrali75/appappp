@@ -430,6 +430,8 @@ function db_get_all() {
         $conn->query("ALTER TABLE products MODIFY project_id VARCHAR(128)");
         $conn->query("ALTER TABLE project_users MODIFY project_id VARCHAR(128)");
         @$conn->query("ALTER TABLE project_users ADD COLUMN mobile VARCHAR(50)");
+        $check=$conn->query("SHOW COLUMNS FROM project_users LIKE 'panel_access'");
+        if($check && $check->num_rows===0)$conn->query("ALTER TABLE project_users ADD COLUMN panel_access TEXT DEFAULT NULL");
         @$conn->query("ALTER TABLE project_users ADD COLUMN telegram_chat_id VARCHAR(100) DEFAULT NULL");
         @$conn->query("ALTER TABLE project_users ADD COLUMN bale_chat_id VARCHAR(100) DEFAULT NULL");
         $conn->query("ALTER TABLE logs MODIFY project_id VARCHAR(128)");
@@ -605,13 +607,14 @@ function db_save_project($project, $onlyProducts = null, $onlySchedules = null, 
                     }
 
                     foreach ($project['users'] as $u) {
-                        $stmt = $conn->prepare("REPLACE INTO project_users (project_id, username, password, role, permissions, mobile, telegram_chat_id, bale_chat_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                        $stmt = $conn->prepare("REPLACE INTO project_users (project_id, username, password, role, permissions, mobile, telegram_chat_id, bale_chat_id, panel_access) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
                         if ($stmt) {
                             $perms = json_encode($u['permissions'] ?? [], JSON_UNESCAPED_UNICODE);
                             $mobile = $u['mobile'] ?? '';
                             $tg_chat_id = $u['telegram_chat_id'] ?? '';
                             $bale_chat_id = $u['bale_chat_id'] ?? '';
-                            $stmt->bind_param("ssssssss", $project['id'], $u['username'], $u['password'], $u['role'], $perms, $mobile, $tg_chat_id, $bale_chat_id);
+                            $panel_access=isset($u['panel_access'])?json_encode($u['panel_access'],JSON_UNESCAPED_UNICODE):null;
+                            $stmt->bind_param("sssssssss", $project['id'], $u['username'], $u['password'], $u['role'], $perms, $mobile, $tg_chat_id, $bale_chat_id, $panel_access);
                             $stmt->execute();
                             $stmt->close();
                         }

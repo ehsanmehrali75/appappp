@@ -610,6 +610,7 @@ function getCurrentProject($id = null, $forceReload = false) {
                         'password' => $uRow['password'],
                         'role' => $uRow['role'],
                         'permissions' => json_decode($uRow['permissions'], true) ?: [],
+                        'panel_access' => isset($uRow['panel_access']) ? json_decode($uRow['panel_access'],true) : null,
                         'mobile' => $uRow['mobile'] ?? '',
                         'telegram_chat_id' => $uRow['telegram_chat_id'] ?? '',
                         'bale_chat_id' => $uRow['bale_chat_id'] ?? ''
@@ -1270,10 +1271,9 @@ function upgradeLegacyLoginPassword($username,$password,$projectId=null) {
     saveJsonDB($db);
 }
 
-function canAccessManagement() {
-    if (isMainAdmin() || isProjectAdmin()) return true;
-    return in_array($_SESSION['user']['role']??'',['manager','editor'],true);
-}
+require_once __DIR__.'/PanelAccess.php';
+function canAccessManagement() { return PanelAccess::allowed('admin'); }
+function canAccessPortal() { return PanelAccess::allowed('portal'); }
 
 function checkModuleSettingAccess($module, $settings) {
     if (FeatureFlags::isUnrestrictedAdmin()) return true;

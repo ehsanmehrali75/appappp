@@ -13,9 +13,6 @@ if (!isUser()) {
 }
 
 // User specified: If portal access but not admin, shouldn't enter admin section
-if (!canAccessManagement()) {
-    redirect('portal.php');
-}
 
 $db = getDB();
 $user = $_SESSION['user'];
@@ -199,6 +196,7 @@ if (isSuperAdmin()) {
 
 // Load current project data if available
 $project = getCurrentProject();
+if (!canAccessManagement()) { if(canAccessPortal())redirect('portal.php'); AccessControl::deny(); }
 
 // Lazy Cron Emulator for Direct Tiam Connection
 if ($project && isset($project['settings']['tiam']['enabled']) && $project['settings']['tiam']['enabled'] == 1) {
@@ -5640,6 +5638,9 @@ if ($project) {
             foreach (['username', 'role', 'password', 'mobile', 'telegram_chat_id', 'bale_chat_id'] as $field) {
                 if (isset($_POST[$field]) && !is_string($_POST[$field])) AccessControl::deny();
             }
+            try {
+                $memberPanelAccess=PanelAccess::fromPost($_POST, isset($_POST['edit_user']) ? $freshMembers[(int)$_POST['user_idx']] : ['role'=>$_POST['role']??'viewer']);
+            } catch (InvalidArgumentException $e) { redirect('admin.php?tab=users&msg='.rawurlencode($e->getMessage())); }
             $candidateUsername = trim($_POST['username'] ?? '');
             if ($candidateUsername === '' || mb_strlen($candidateUsername) > 50 || preg_match('/[\x00-\x1f\x7f]/', $candidateUsername)) AccessControl::deny();
             if (isset($_POST['add_user']) && ($_POST['password'] ?? '') === '') AccessControl::deny();
@@ -5704,7 +5705,8 @@ if ($project) {
                     'mobile' => $u_mobile,
                     'telegram_chat_id' => $u_telegram,
                     'bale_chat_id' => $u_bale,
-                    'permissions' => $u_perms
+                    'permissions' => $u_perms,
+                    'panel_access' => $memberPanelAccess
                 ];
                 
                 if ($exists_idx !== -1 && !ProjectPermissions::canManageMember($p['users'][$exists_idx])) AccessControl::deny();
@@ -5802,7 +5804,8 @@ if ($project) {
                         'mobile' => $u_mobile,
                         'telegram_chat_id' => $u_telegram,
                         'bale_chat_id' => $u_bale,
-                        'permissions' => $u_perms
+                        'permissions' => $u_perms,
+                    'panel_access' => $memberPanelAccess
                     ];
                     
                     if ($exists_idx !== -1) {
@@ -6369,10 +6372,10 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     </a>
                     <?php endif; ?>
                 <?php endif; ?>
-                <a href="portal.php" target="_blank" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-707 text-xs font-black rounded-xl transition-all flex items-center gap-1.5 shadow-sm">
+                <?php if(canAccessPortal()): ?><a href="portal.php" target="_blank" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-707 text-xs font-black rounded-xl transition-all flex items-center gap-1.5 shadow-sm">
                     <span>👀</span>
                     <span class="hidden sm:inline">مشاهده پورتال</span>
-                </a>
+                </a><?php endif; ?>
                 <a href="user_chat.php" class="px-4 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-100 text-amber-700 text-xs font-black rounded-xl transition-all flex items-center gap-1.5 shadow-sm">
                     <span>💬</span>
                     <span class="hidden sm:inline">گفتگوی داخلی</span>
@@ -8635,7 +8638,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                     <?php endif; ?>
 
                                     <?php if($cardWf === 'pending_approval' || ($p['status'] ?? '') === 'pending'): ?>
-                                        <a href="portal.php?tab=pending#product-<?php echo $p['id']; ?>" target="_blank" onclick="event.stopPropagation();" class="w-10 h-10 bg-amber-500 hover:bg-amber-600 hover:scale-105 text-white rounded-xl flex items-center justify-center transition-all shadow-lg shadow-amber-500/30" title="مشاهده و بررسی در پورتال مشتریان">👁️‍🗨️</a>
+                                        <?php if(canAccessPortal()): ?><a href="portal.php?tab=pending#product-<?php echo $p['id']; ?>" target="_blank" onclick="event.stopPropagation();" class="w-10 h-10 bg-amber-500 hover:bg-amber-600 hover:scale-105 text-white rounded-xl flex items-center justify-center transition-all shadow-lg shadow-amber-500/30" title="مشاهده و بررسی در پورتال مشتریان">👁️‍🗨️</a><?php endif; ?>
                                     <?php endif; ?>
 
                                     <?php if(hasPermission('reference_photo') || hasPermission('products') || isSuperAdmin()): ?>
@@ -13996,6 +13999,15 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         <button onclick="document.getElementById('add-user-box').classList.add('hidden')" class="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center hover:bg-white/20 transition-all text-xl">✕</button>
                     </div>
                     <form method="POST" class="p-10 bg-white space-y-12">
+<input type="hidden" name="panel_access_present" value="1">
+                        <fieldset class="p-5 rounded-2xl bg-slate-50 border border-slate-200">
+                            <legend class="font-bold text-sm">دسترسی به محیط کار</legend>
+                            <div class="flex flex-wrap gap-6 py-3">
+                                <label class="flex items-center gap-2"><input type="checkbox" name="panel_access[]" value="portal"  checked> پورتال</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="panel_access[]" value="admin"  checked> پنل ادمین</label>
+                            </div>
+                            <p class="text-xs text-slate-500">برای دسترسی به هر دو، هر دو گزینه را انتخاب کنید. فقط پروژه‌ها و امکانات انتخاب‌شده در دسترس خواهند بود؛ این گزینه نقش ادمین اصلی نمی‌دهد.</p>
+                        </fieldset>
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-10">
                             <div class="space-y-3">
                                 <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">شناسه کاربری (Username)</label>
@@ -14123,7 +14135,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                 </div>
                                 
                                 <div class="mb-6">
-                                    <h3 class="font-black text-xl text-slate-800 mb-2"><?php echo htmlspecialchars($u['username']); ?></h3>
+                                    <h3 class="font-black text-xl text-slate-800 mb-2"><?php echo htmlspecialchars($u['username']); ?></h3><div class="flex flex-wrap gap-2 mb-3 text-xs text-slate-600"><?php foreach(PanelAccess::forMember($u) as $entry): ?><span class="px-3 py-1 rounded-full bg-slate-100"><?= $entry==='portal'?'پورتال':'پنل ادمین' ?></span><?php endforeach; ?></div>
                                     <?php if(!empty($u['mobile'])): ?>
                                         <div class="text-[12px] font-bold text-indigo-600 mb-2 bg-indigo-50/50 py-1.5 px-3 rounded-xl inline-flex items-center gap-1.5" dir="ltr">
                                             <span>📞</span> 
@@ -21204,6 +21216,15 @@ async function handleRequest(request) {
                     </div>
                 </div>
                 
+<input type="hidden" name="panel_access_present" value="1">
+                        <fieldset class="p-5 rounded-2xl bg-slate-50 border border-slate-200">
+                            <legend class="font-bold text-sm">دسترسی به محیط کار</legend>
+                            <div class="flex flex-wrap gap-6 py-3">
+                                <label class="flex items-center gap-2"><input type="checkbox" name="panel_access[]" value="portal" class="edit-user-panel" checked> پورتال</label>
+                                <label class="flex items-center gap-2"><input type="checkbox" name="panel_access[]" value="admin" class="edit-user-panel" checked> پنل ادمین</label>
+                            </div>
+                            <p class="text-xs text-slate-500">برای دسترسی به هر دو، هر دو گزینه را انتخاب کنید. فقط پروژه‌ها و امکانات انتخاب‌شده در دسترس خواهند بود؛ این گزینه نقش ادمین اصلی نمی‌دهد.</p>
+                        </fieldset>
                 <h3 class="text-xs font-black text-slate-500 mt-6 mb-3 border-b border-slate-100 pb-2">📂 سطوح دسترسی تفکیکی</h3>
                 <div class="grid grid-cols-2 gap-3 mb-6">
                     <?php 
@@ -21256,6 +21277,7 @@ async function handleRequest(request) {
         document.getElementById('edit-user-role').value = u.role || 'editor';
         
         // Setup checkboxes
+        document.querySelectorAll('.edit-user-panel').forEach(el=>el.checked=(u.panel_access||['portal','admin']).includes(el.value));
         var perms = u.permissions || [];
         var checkboxes = document.querySelectorAll('.edit-user-perm');
         checkboxes.forEach(function(cb) {

@@ -30,9 +30,16 @@ try:
         form.locator('[name=username]').fill('created-browser')
         form.locator('[name=password]').fill('Fixture-password-123!')
         form.locator('[name="perms[]"][value=products]').check()
+        assert form.locator('[name="panel_access[]"][value=portal]').is_checked()
+        form.locator('[name="panel_access[]"][value=admin]').uncheck()
         with page.expect_navigation():form.locator('[name=add_user]').click()
         with sqlite3.connect(case.database) as db:assert db.execute('SELECT username FROM project_users WHERE username="created-browser"').fetchone()
         assert page.get_by_text('created-browser',exact=True).count()>0
+        page.evaluate("openEditUser(Object.keys(projectUsers).find(k=>projectUsers[k].username==='created-browser'))")
+        assert page.locator('.edit-user-panel[value=portal]').is_checked()
+        assert not page.locator('.edit-user-panel[value=admin]').is_checked()
+        page.evaluate("document.getElementById('editUserModal').style.display='none'")
+        with sqlite3.connect(case.database) as db:assert json.loads(db.execute('SELECT panel_access FROM project_users WHERE username="created-browser"').fetchone()[0])==['portal']
         assert not errors,errors
         # Separate session avoids inheriting global-owner identity.
         context.close();context=browser.new_context();context.route('**/*',route);page=context.new_page();page.on('pageerror',lambda e:errors.append(str(e)))

@@ -20,9 +20,10 @@ class ProjectMembers {
                     if($old){$old['permissions']=json_decode($old['permissions']??'[]',true)?:[];if(!ProjectPermissions::canManageMember($old))throw new RuntimeException('دسترسی تغییر این عضو را ندارید.');}
                     $member=null;foreach($project['users'] as $u)if($u['username']===$name){$member=$u;break;}
                     if($member){
-                        $q=$conn->prepare('REPLACE INTO project_users (project_id, username, password, role, permissions, mobile, telegram_chat_id, bale_chat_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+                        $q=$conn->prepare('REPLACE INTO project_users (project_id, username, password, role, permissions, mobile, telegram_chat_id, bale_chat_id, panel_access) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
                         $permissions=json_encode($member['permissions']??[],JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);$mobile=$member['mobile']??'';$telegram=$member['telegram_chat_id']??'';$bale=$member['bale_chat_id']??'';
-                        $q->bind_param('ssssssss',$pid,$name,$member['password'],$member['role'],$permissions,$mobile,$telegram,$bale);
+                        $panelAccess=isset($member['panel_access'])?json_encode($member['panel_access'],JSON_THROW_ON_ERROR):null;
+                        $q->bind_param('sssssssss',$pid,$name,$member['password'],$member['role'],$permissions,$mobile,$telegram,$bale,$panelAccess);
                     }else{$q=$conn->prepare('DELETE FROM project_users WHERE project_id = ? AND username = ?');$q->bind_param('ss',$pid,$name);}
                     if(!$q->execute())throw new RuntimeException('ثبت عضویت ناموفق بود.');$q->close();
                 }

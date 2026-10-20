@@ -53,7 +53,8 @@ class ProjectPermissions {
 
     public static function publicMember($member) {
         // The editor never needs a stored password or its hash.
-        $public = array_intersect_key($member, array_flip(['username', 'role', 'mobile', 'telegram_chat_id', 'bale_chat_id', 'permissions', 'assigned_projects']));
+        $public = array_intersect_key($member, array_flip(['username', 'role', 'mobile', 'telegram_chat_id', 'bale_chat_id', 'permissions', 'assigned_projects', 'panel_access']));
+        $public['panel_access'] = PanelAccess::forMember($member);
         $public['permissions'] = array_values(array_unique(array_map([AccessControl::class, 'featureKey'], $member['permissions'] ?? [])));
         return $public;
     }

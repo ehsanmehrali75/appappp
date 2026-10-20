@@ -87,6 +87,10 @@ if (!$allowed) {
     http_response_code(403);die('شما عضو این پروژه نیستید. برای پیگیری دسترسی از بخش پشتیبانی حساب کاربری اقدام کنید.');
 }
 
+// The management UI shares this product action; its feature checks still apply below.
+$managementProductAction=($_SERVER['REQUEST_METHOD']??'GET')==='POST' && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']??'')==='xmlhttprequest' && ($_POST['action']??null)==='create_couple_set' && canAccessManagement();
+if (!canAccessPortal() && !$managementProductAction) { if(canAccessManagement())redirect('admin.php'); AccessControl::deny(); }
+
 // Pre-load all allowed projects for quick switching dropdown
 $user_allowed_projects = [];
 $db_p = getDB();
