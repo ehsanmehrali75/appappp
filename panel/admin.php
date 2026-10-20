@@ -10605,9 +10605,10 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                 🚀 همگام‌سازی پورتال و ثبت کالاهای بدون عکس
                             </button>
                         </div>
+                        <?php $inventoryVersionSource='erp';require __DIR__.'/inc/InventoryVersionView.php'; ?>
                     </div>
 
-                    <script src="assets/product-import.js?v=1"></script>
+                    <script src="assets/product-import.js?v=2"></script>
                     <script>
                     function handleERPFileSelect(input) {
                         if (!input.files || !input.files[0]) return;

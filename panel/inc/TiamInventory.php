@@ -1,6 +1,7 @@
 <?php
 /** Outbound SQL Server bridge for shared hosting. No VPN commands run in PHP. */
 require_once __DIR__.'/ERPInventoryContract.php';
+require_once __DIR__.'/InventoryVersions.php';
 class TiamJobBusy extends RuntimeException {}
 class TiamStateBusy extends RuntimeException {}
 class TiamInventory {
@@ -232,7 +233,7 @@ class TiamInventory {
             throw new TiamJobBusy(($old['state']==='queued')?'درخواست قبلی در صف و منتظر دریافت توسط ایجنت است.':'ایجنت درخواست قبلی را دریافت کرده؛ منتظر نتیجه است.');
         }
         $cfg = $project['settings']['tiam_inventory'] ?? [];
-        $job = ['id' => bin2hex(random_bytes(24)), 'kind' => $kind, 'state' => 'queued', 'owner' => $owner, 'created' => time(), 'expires' => time()+900, 'agent_last_seen' => $old['agent_last_seen']??0,
+        $job = ['id' => bin2hex(random_bytes(24)), 'kind' => $kind, 'state' => 'queued', 'actor'=>($_SESSION['user']['username']??'scheduler'), 'owner' => $owner, 'created' => time(), 'expires' => time()+900, 'agent_last_seen' => $old['agent_last_seen']??0,
             'config_hash' => self::fingerprint($cfg), 'base' => self::base($project)];
         self::write($project['id'], $job); return $job;
     }
@@ -241,6 +242,7 @@ class TiamInventory {
         if (!is_string($jobId) || $jobId === '' || !hash_equals($job['id']??'', $jobId)) throw new RuntimeException('درخواست تغییر کرده است؛ آخرین وضعیت را دوباره دریافت کنید.');
         if (!$admin && !hash_equals($job['owner']??'', $owner)) throw new RuntimeException('لغو این درخواست به ایجادکننده یا مدیر پروژه نیاز دارد.');
         if (!in_array($job['state']??'', ['queued','running','preview'], true)) throw new RuntimeException('این درخواست دیگر فعال نیست.');
+        if(!empty($job['run_id'])&&function_exists('isSqlActive')&&isSqlActive())InventoryVersions::cancel($projectId,$job['run_id']);
         $job['state']='cancelled'; $job['cancelled_at']=time();
         $job['logs'][]=['stage'=>'queue','status'=>'cancelled','message'=>'درخواست لغو شد؛ نتیجهٔ دیررس ایجنت پذیرفته نمی‌شود.','elapsed_ms'=>0];
         unset($job['products'], $job['erp_items']);
@@ -255,17 +257,28 @@ class TiamInventory {
         $job['erp_items']=$normalized;
         $job['base'] = self::base($project); $job['state'] = 'preview';
         $job['products'] = $result['products']; $job['counts'] = $result['counts']; $job['changes'] = array_slice($result['changes'], 0, 100);
-        $job['change_count'] = count($result['changes']); $job['sample'] = array_slice($rows, 0, 5);
+        $job['change_count'] = count($result['changes']);
+        if(function_exists('isSqlActive')&&isSqlActive()){InventoryVersions::init();InventoryVersions::prepare($project,'tiam',$job['id'],$job['products'],$job['actor']??'scheduler');$job['run_id']=$job['id'];$job['version_summary']=InventoryVersions::changes($project['id'],$job['id']);}
+        $job['sample'] = array_slice($rows, 0, 5);
         return $job;
     }
     public static function apply(&$project, $job) {
+        if(($job['state']??'')==='applied')return $job;
         $cfg = $project['settings']['tiam_inventory'] ?? [];
         if (($job['state'] ?? '') !== 'preview' || ($job['expires'] ?? 0) <= time() || !hash_equals($job['base'], self::base($project)) || !hash_equals($job['config_hash'], self::fingerprint($cfg))) throw new RuntimeException('پیش‌نمایش منقضی یا داده‌ها تغییر کرده‌اند؛ دوباره دریافت کنید.');
-        $project['products'] = $job['products'];
-        $project['settings']['tiam_inventory']['approved'] = self::fingerprint($cfg);
-        $project['settings']['tiam_inventory']['last_success'] = (new DateTimeImmutable('now', new DateTimeZone('Asia/Tehran')))->format('Y-m-d');
-        $project['settings']['tiam_inventory']['last_error'] = '';
-        if (!saveProject($project)) throw new RuntimeException('ذخیرهٔ محصولات ناموفق بود.');
+        $versioned=function_exists('isSqlActive')&&isSqlActive();
+        if($versioned){InventoryVersions::init();$conn=getConn();if(!$conn->begin_transaction())throw new RuntimeException('شروع ثبت موجودی ناموفق بود.');}
+        try {
+            if($versioned){InventoryVersions::lockProject($project['id']);$fresh=getCurrentProject($project['id'],true);if(!hash_equals($job['base'],self::base($fresh))||!hash_equals($job['config_hash'],self::fingerprint($fresh['settings']['tiam_inventory']??[])))throw new RuntimeException('داده‌ها یا تنظیمات تغییر کرده‌اند؛ پیش‌نمایش جدید بگیرید.');$project=$fresh;}
+            $project['products']=$job['products'];
+            $project['settings']['tiam_inventory']['approved']=self::fingerprint($cfg);
+            $project['settings']['tiam_inventory']['last_success']=(new DateTimeImmutable('now',new DateTimeZone('Asia/Tehran')))->format('Y-m-d');
+            $project['settings']['tiam_inventory']['last_error']='';
+            if($versioned){
+                if(!db_save_project($project,null,null,false))throw new RuntimeException('ذخیرهٔ محصولات ناموفق بود.');
+                $persisted=getCurrentProject($project['id'],true);InventoryVersions::record($project['id'],$job['run_id'],$persisted['products']??[]);if(!$conn->commit())throw new RuntimeException('ثبت نسخهٔ موجودی ناموفق بود.');
+            }elseif(!saveProject($project))throw new RuntimeException('ذخیرهٔ محصولات ناموفق بود.');
+        }catch(Throwable $e){if($versioned)$conn->rollback();throw $e;}
         unset($job['products'], $job['erp_items']); $job['state'] = 'applied'; self::write($project['id'], $job);
         return $job;
     }

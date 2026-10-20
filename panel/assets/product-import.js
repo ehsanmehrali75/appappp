@@ -38,11 +38,18 @@
                 showFullLoader('تجمیع کامل انبارها و آماده‌سازی تغییرات…');
                 job=await request(project,{action:'prepare',job:job.job});
             }
+            if(job.state==='cancelled'){sessionStorage.removeItem(key);throw new Error('واردسازی لغو شده؛ دوباره فایل را انتخاب کنید.');}
+            if(job.state==='prepared') {
+                hideFullLoader();
+                if(!window.InventoryVersionsUI)throw new Error('رابط پیش‌نمایش بارگذاری نشده؛ صفحه را تازه کنید.');
+                const approved=await InventoryVersionsUI.review(project,job.run_id);
+                if(!approved){await request(project,{action:'cancel',job:job.job});sessionStorage.removeItem(key);return;}
+            }
             while(job.state!=='done') {
                 showFullLoader(`ثبت محصولات: ${Math.min(job.cursor*50,job.total)} از ${job.total} — لطفاً صفحه را باز نگه دارید`);
                 job=await request(project,{action:'apply',job:job.job});
             }
-            sessionStorage.removeItem(key);hideFullLoader();
+            sessionStorage.removeItem(key);hideFullLoader();window.dispatchEvent(new CustomEvent('inventory-run-updated',{detail:{project,run_id:job.run_id}}));
             alert('همگام‌سازی کامل شد. جدید: '+(job.summary?.new||0)+'، به‌روز شده: '+(job.summary?.updated||0));
             location.reload();
         } catch(error) {

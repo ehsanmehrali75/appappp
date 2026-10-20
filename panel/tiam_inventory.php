@@ -33,11 +33,18 @@ try {
         $_SESSION['project_id'] = $id;
         if (!hasPermission('settings') || !isModuleActive('settings') || !AccessControl::allowed('settings', 'use')) AccessControl::deny();
         if (empty($body['csrf']) || !hash_equals($_SESSION['tiam_csrf'] ?? '', $body['csrf'])) tiamReply(['error' => 'Invalid CSRF token'], 403);
-        if (in_array($action, ['preview', 'apply', 'export_manual'], true) && (!hasPermission('products') || !isModuleActive('products') || !AccessControl::allowed('products', 'use'))) AccessControl::deny();
+        if (in_array($action, ['preview', 'apply', 'export_manual','run_full','rollback','history','changes'], true) && (!hasPermission('products') || !isModuleActive('products') || !AccessControl::allowed('products', 'use'))) AccessControl::deny();
     }
     $response = TiamInventory::locked($id, function() use ($id, $action, $body, $agent) {
         $project = getCurrentProject($id, true); $cfg = $project['settings']['tiam_inventory'] ?? [];
         $job = TiamInventory::read($id);
+        if(in_array($action,['history','changes','rollback'],true)){
+            InventoryVersions::init();
+            if($action==='history')return ['runs'=>InventoryVersions::history($id)];
+            if($action==='changes')return InventoryVersions::changes($id,$body['run_id']??'',$body['page']??1);
+            if(in_array($job['state']??'',['queued','running'],true)&&($job['expires']??0)>time())throw new TiamJobBusy('ابتدا درخواست جاری را لغو کنید و سپس بازگردانی کنید.');
+            $result=InventoryVersions::rollback($id,$body['run_id']??'');if(($job['run_id']??'')===($body['run_id']??'')){$job['rolled_back_at']=time();TiamInventory::write($id,$job);}return $result;
+        }
         if ($action === 'pair') {
             $token=bin2hex(random_bytes(32));$project['settings']['tiam_inventory']['agent_token_hash']=hash('sha256',$token);
             if(!saveProject($project))throw new RuntimeException('ثبت کلید اتصال ناموفق بود.');
@@ -49,9 +56,10 @@ try {
             if (!saveProject($project)) throw new RuntimeException('ذخیرهٔ تنظیمات ناموفق بود.');
             return ['status' => 'saved'];
         }
-        if (in_array($action, ['vpn_test', 'view_test', 'preview'], true)) {
+        if (in_array($action, ['vpn_test', 'view_test', 'preview','run_full'], true)) {
             if (empty($cfg['agent_token_hash'])) throw new RuntimeException('ابتدا تنظیمات و کلید ایجنت را ذخیره کنید.');
-            $job = TiamInventory::createJob($project, $action, TiamInventory::owner());
+            if($action==='run_full'&&(!isSqlActive()||empty($cfg['mapping']['color'])||empty($cfg['mapping']['size'])||($cfg['mapping']['model']??'')!==($cfg['mapping']['name']??'')))throw new RuntimeException('ابتدا نگاشت شرح محصول + شرح رنگ را ذخیره کنید؛ اجرای قابل بازگشت به SQL نیاز دارد.');
+            $job = TiamInventory::createJob($project, $action==='run_full'?'full_sync':$action, TiamInventory::owner());
         } elseif ($action === 'export_manual') {
             if (empty($job['erp_items']) || !is_string($body['job']??null) || !hash_equals($job['id']??'',$body['job']) || ($job['state']??'')!=='preview' || ($job['expires']??0)<=time() || !hash_equals($job['owner']??'',TiamInventory::owner()) || !hash_equals($job['base']??'',TiamInventory::base($project)) || !hash_equals($job['config_hash']??'',TiamInventory::fingerprint($cfg))) throw new RuntimeException('برای خروجی دستی، پیش‌نمایش معتبر متعلق به همین نشست لازم است.');
             return ['format'=>ERPInventoryContract::VERSION,'rows'=>array_map([ERPInventoryContract::class,'row'],$job['erp_items']??[])];
@@ -84,6 +92,10 @@ try {
             return ['status' => 'job', 'job' => $job['id'], 'kind' => $job['kind'], 'config' => $cfg];
         } elseif ($action === 'agent_result') {
             if (!hash_equals($job['id'] ?? '', $body['job'] ?? '')) throw new RuntimeException('نتیجهٔ تکراری یا منقضی دریافت شد.');
+            if(isSqlActive()){
+                InventoryVersions::init();$q=getConn()->prepare('SELECT state FROM inventory_import_versions WHERE id = ? AND project_id = ?');$jid=$job['id'];$q->bind_param('ss',$jid,$id);$q->execute();$version=$q->get_result()->fetch_assoc();$q->close();
+                if($version&&in_array($version['state'],['applied','rolled_back'],true)){$job['state']='applied';$job['run_id']=$jid;unset($job['products'],$job['erp_items']);TiamInventory::write($id,$job);return ['status'=>'received','state'=>'applied'];}
+            }
             // A response can be lost after the result is committed. Acknowledge
             // retries of that same job without revalidating rows or applying again.
             if (in_array($job['state'] ?? '', ['done', 'error', 'preview', 'applied'], true)) return ['status' => 'received', 'state' => $job['state']];
@@ -93,6 +105,7 @@ try {
                 $message = substr((string)($log['message'] ?? ''), 0, 1500);
                 foreach (['password', 'vpn_password', 'vpn_secret'] as $secret) if (!empty($cfg[$secret])) $message = str_replace($cfg[$secret], '[REDACTED]', $message);
                 $logs[] = ['stage' => substr((string)($log['stage'] ?? ''), 0, 40), 'status' => substr((string)($log['status'] ?? ''), 0, 20), 'message' => $message, 'elapsed_ms' => (int)($log['elapsed_ms'] ?? 0)];
+                if(isset($log['diagnostic']['category'])&&preg_match('/^[a-z_]{3,50}$/D',(string)$log['diagnostic']['category']))$logs[count($logs)-1]['diagnostic_category']=$log['diagnostic']['category'];
             }
             $job['logs'] = $logs;
             $configurationMatches = hash_equals($job['config_hash'], TiamInventory::fingerprint($cfg));

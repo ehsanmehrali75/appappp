@@ -26,11 +26,23 @@ try:
         login('fixture_owner');page.goto(base+'/panel/admin.php?switch_project=p')
         page.goto(base+'/panel/admin.php?tab=extract&ex_view=central')
         rows=[dict(sku='ERP-'+str(i),name='محصول '+str(i),color='سبز',stock_tedad=7) for i in range(1000)]
+        page.evaluate("rows => {window.testImport=importERPInBatches('p', rows, 'standard');}",rows)
+        page.locator('.iv-dialog').wait_for(timeout=60000)
+        with sqlite3.connect(case.database) as db:assert db.execute('SELECT count(*) FROM products WHERE project_id="p"').fetchone()[0]==5
+        assert page.locator('.iv-dialog .iv-summary').is_visible()
         with page.expect_event("dialog",timeout=60000):
-            page.evaluate("rows => {window.testImport=importERPInBatches('p', rows, 'standard');}",rows)
+            page.locator('.iv-dialog button',has_text='تأیید و اعمال').click()
         page.wait_for_timeout(500)
         assert any('همگام‌سازی کامل شد' in d for d in dialogs),dialogs
         with sqlite3.connect(case.database) as db:assert db.execute('SELECT count(*) FROM products WHERE project_id="p"').fetchone()[0]==1005
+        page.wait_for_load_state()
+        page.goto(base+'/panel/admin.php?tab=extract&ex_view=central')
+        page.locator('.iv-undo').wait_for(timeout=10000)
+        page.locator('.iv-undo').click()
+        page.get_by_text('بازگردانی انجام شد.',exact=False).wait_for(timeout=30000)
+        with sqlite3.connect(case.database) as db:assert db.execute('SELECT count(*) FROM products WHERE project_id="p"').fetchone()[0]==5
+        page.set_viewport_size({'width':390,'height':844})
+        assert page.locator('[data-inventory-versions]').is_visible()
         assert not errors,errors
         # Separate session avoids inheriting global-owner identity.
         context.close();context=browser.new_context();context.route('**/*',route);page=context.new_page();page.on('pageerror',lambda e:errors.append(str(e)))
@@ -39,5 +51,5 @@ try:
         assert page.locator('[data-portal-action="approve"]:visible').count()==0
         assert not errors,errors
         browser.close()
-    print(json.dumps({'large_import_rows':1000,'readonly_portal':True,'page_errors':errors}))
+    print(json.dumps({'large_import_rows':1000,'rollback_rows':1000,'readonly_portal':True,'page_errors':errors}))
 finally:HttpSecurity.tearDownClass()

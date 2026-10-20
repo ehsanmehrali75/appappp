@@ -34,7 +34,7 @@ $job=TiamInventory::preview($project,$job,$rows);
 check($project['products'][0]['stock_total']===5.0 && !isset($GLOBALS['saved']),'preview does not persist');
 $changed=$project;$changed['products'][0]['description']='Changed';rejects(fn()=>TiamInventory::apply($changed,$job),'stale preview rejected');
 $applied=TiamInventory::apply($project,$job);check($applied['state']==='applied','confirmation applies once');
-rejects(fn()=>TiamInventory::apply($project,$applied),'replay rejected');
+$savedBeforeReplay=$GLOBALS['saved'];check(TiamInventory::apply($project,$applied)['state']==='applied' && $GLOBALS['saved']===$savedBeforeReplay,'replay acknowledged without another write');
 $now=new DateTimeImmutable('2026-10-15 12:00:00',new DateTimeZone('Asia/Tehran'));
 $daily=$cfg;$daily['approved']=TiamInventory::fingerprint($cfg);
 check(TiamInventory::due($daily,$now),'daily noon due');

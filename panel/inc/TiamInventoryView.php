@@ -68,14 +68,18 @@ $inventoryCfg = $project['settings']['tiam_inventory'] ?? [];
     <button type="button" onclick="tiamCopyLog()" id="tiam-copy-log" class="bg-slate-700 text-white px-4 py-2 rounded-lg text-xs">کپی لاگ</button>
     <span id="tiam-copy-result" class="text-xs" role="status" aria-live="polite"></span>
     <textarea id="tiam-copy-fallback" readonly hidden class="input text-xs" dir="rtl" aria-label="لاگ برای کپی دستی"></textarea>
+    <button type="button" onclick="tiamInventoryAction('run_full')" class="bg-emerald-700 text-white px-5 py-3 rounded-lg font-bold">دریافت کامل تیام و بررسی قبل از ثبت</button>
+    <p class="text-xs">اجرای کامل با تنظیمات ذخیره‌شده انجام می‌شود؛ ابتدا خلاصه و فهرست تغییرات را ببینید و سپس تأیید یا لغو کنید. بعد از ثبت، نسخهٔ قبل از همین واردسازی قابل بازگشت است.</p>
     <pre id="tiam-inventory-log" class="text-xs bg-slate-900 text-slate-100 p-4 rounded-lg whitespace-pre-wrap max-h-96 overflow-auto" dir="rtl" aria-live="polite"></pre>
     <p class="text-xs">لغو درخواست، نتیجهٔ آن را بی‌اعتبار می‌کند؛ اتصال VPN یا پردازش محلی در حال اجرا را فوراً متوقف نمی‌کند.</p>
-    <button type="button" id="tiam-inventory-cancel" hidden onclick="tiamInventoryAction('cancel')" class="bg-rose-700 text-white px-4 py-2 rounded-lg text-xs">لغو درخواست معطل / جاری</button>
+    <button type="button" id="tiam-inventory-cancel" hidden onclick="tiamInventoryAction('cancel')" class="bg-rose-700 text-white px-4 py-2 rounded-lg text-xs">لغو درخواست یا پیش‌نمایش</button>
     <button type="button" id="tiam-inventory-export" hidden onclick="tiamInventoryAction('export_manual')" class="bg-slate-700 text-white px-4 py-2 rounded-lg text-xs">دانلود JSON سازگار با بخش همگام‌سازی دستی</button>
-    <button type="button" id="tiam-inventory-confirm" hidden onclick="tiamInventoryAction('apply')" class="bg-emerald-600 text-white px-5 py-3 rounded-lg font-bold">تأیید پیش‌نمایش و اعمال تغییرات</button>
+    <button type="button" id="tiam-inventory-confirm" hidden onclick="tiamInventoryAction('apply')" class="bg-emerald-600 text-white px-5 py-3 rounded-lg font-bold">تأیید پیش‌نمایش و اعمال — با نقطهٔ بازگشت</button>
 </section>
+<?php $inventoryVersionSource='tiam';require __DIR__.'/InventoryVersionView.php'; ?>
 <script>
 window.tiamInventoryConfigured = <?php echo !empty($inventoryCfg['host'])?'true':'false'; ?>;
+let tiamSettingsDirty=false;
 let tiamInventoryJob = null, tiamInventoryTimer = null, tiamInventoryRequest = 0;
 const tiamInventoryProject = <?php echo json_encode($project['id']); ?>;
 const tiamInventoryCsrf = <?php echo json_encode($_SESSION['tiam_csrf']); ?>;
@@ -94,6 +98,7 @@ async function tiamPairAgent(button) {
     finally{button.disabled=false;}
 }
 function tiamFactInventoryPreset(mode='sizes') {
+    tiamSettingsDirty=true;
     const mapping=mode==='legacy'?<?php echo json_encode(TiamInventory::factInventoryMapping(false), JSON_UNESCAPED_UNICODE); ?>:<?php echo json_encode(TiamInventory::factInventoryMapping(), JSON_UNESCAPED_UNICODE); ?>;
     document.querySelectorAll('[data-tiam-map]').forEach(el=>el.value=mapping[el.dataset.tiamMap]||'');
     document.getElementById('tiam-inventory-log').textContent=mode==='legacy'?'الگوی قدیمی بدون سایز و رنگ انتخاب شد؛ برای گزارش فعلی از نگاشت شرح محصول + شرح رنگ استفاده کنید.':'هویت محصول: شرح ProDes + رنگ Color. کد هر سایز: ProCode. موجودی: StockTedad به تفکیک ShopCode. تنظیمات را ذخیره و پیش‌نمایش بگیرید.';
@@ -126,6 +131,7 @@ async function tiamGenerateKey() {
     catch(e) { alert('کپی خودکار ممکن نشد؛ کلید در فیلد کلید ایجنت قرار گرفت.'); }
 }
 async function tiamInventoryAction(action) {
+    if(action==='run_full'&&tiamSettingsDirty){document.getElementById('tiam-inventory-log').textContent='ابتدا تنظیمات تغییرکرده را ذخیره کنید، سپس دریافت کامل را بزنید.';return;}
     const requestVersion = ++tiamInventoryRequest;
     clearTimeout(tiamInventoryTimer);
     const log = document.getElementById('tiam-inventory-log');
@@ -147,9 +153,10 @@ async function tiamInventoryAction(action) {
             const url=URL.createObjectURL(new Blob([JSON.stringify(data.rows,null,2)],{type:'application/json'}));
             const link=document.createElement('a');link.href=url;link.download='tiam-erp-manual-'+tiamInventoryProject+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);return;
         }
+        if(data.status==='rolled_back'){log.textContent='بازگردانی انجام شد؛ همگام‌سازی روزانه تا تأیید مجدد متوقف است.';return;}
         if(data.id) tiamInventoryJob=data.id;
         if(data.status==='saved') {
-            window.tiamInventoryConfigured=true;
+            window.tiamInventoryConfigured=true;tiamSettingsDirty=false;
             log.textContent='تنظیمات این پروژه ذخیره شد. ایجنت را با آدرس '+window.location.origin+<?php echo json_encode('/panel/tiam_inventory.php'); ?>+' و شناسهٔ پروژه '+tiamInventoryProject+' اجرا کنید.';
             document.querySelectorAll('[data-tiam-field][type="password"]').forEach(el=>el.value=''); return;
         }
@@ -159,12 +166,14 @@ async function tiamInventoryAction(action) {
         const seen=data.agent_last_seen?new Date(data.agent_last_seen*1000).toLocaleString('fa-IR',{timeZone:'Asia/Tehran'}):'هنوز ارتباط معتبری ثبت نشده';
         log.textContent=(labels[data.state]||'وضعیت ایجنت')+'\nآخرین ارتباط ایجنت: '+seen+' (تهران)\n'+(data.agent_connected?'ایجنت در ۹۰ ثانیهٔ اخیر با پنل ارتباط داشته است.':'ارتباط اخیر ایجنت ثبت نشده؛ آدرس، شناسهٔ پروژه و توکن را بررسی کنید.')+'\n'+JSON.stringify(data,null,2);
         if(data.state==='queued') log.textContent='در انتظار اتصال ایجنت این پروژه…\n'+log.textContent;
+        if(data.run_id&&['preview','applied'].includes(data.state))window.dispatchEvent(new CustomEvent('inventory-run-updated',{detail:{project:tiamInventoryProject,run_id:data.run_id}}));
         if(data.state==='preview') {
             log.textContent='پیش‌نمایش (حداکثر ۱۰۰ تغییر نمایش داده می‌شود؛ تعداد کل در change_count):\n'+log.textContent;
             document.getElementById('tiam-inventory-confirm').hidden=!data.can_apply;
         }
+        if(data.rolled_back_at)log.textContent='این اجرا بازگردانی شده است.\n'+log.textContent;
         if(['queued','running'].includes(data.state)) tiamInventoryTimer=setTimeout(()=>tiamInventoryAction(action==='latest'?'latest':'status'),3000);
     } catch(e) {if(requestVersion===tiamInventoryRequest) log.textContent=e.message;}
 }
-document.addEventListener('DOMContentLoaded',()=>{tiamUpdateNetworkMode();tiamInventoryAction('latest');},{once:true});
+document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('[data-tiam-field],[data-tiam-map]').forEach(el=>{el.addEventListener('input',()=>tiamSettingsDirty=true);el.addEventListener('change',()=>tiamSettingsDirty=true);});tiamUpdateNetworkMode();tiamInventoryAction('latest');},{once:true});
 </script>
