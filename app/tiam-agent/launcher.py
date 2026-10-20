@@ -11,6 +11,7 @@ from tkinter import ttk, messagebox
 if not getattr(sys, 'frozen', False):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'panel'))
 import tiam_inventory_agent as agent
+from clipboard_input import connection_input, paste_shortcut
 
 
 class Launcher:
@@ -26,15 +27,16 @@ class Launcher:
             if not isinstance(settings, dict): settings = {}
         except (OSError, ValueError):
             settings = {}
-        root.title('Maarksho — Tiam Agent 1.0.3')
+        root.title('Maarksho — Tiam Agent 1.0.4')
         root.geometry('760x560')
         root.minsize(580, 450)
         frame = ttk.Frame(root, padding=18)
         frame.pack(fill='both', expand=True)
         frame.columnconfigure(0, weight=1)
         frame.rowconfigure(8, weight=1)
-        ttk.Label(frame, text='اتصال تیام به مارک‌شو', font=('Segoe UI', 17, 'bold')).grid(row=0, sticky='e', pady=(0,12))
+        ttk.Label(frame, text='اتصال تیام به مارک‌شو', font=('Segoe UI', 17, 'bold')).grid(row=0, columnspan=2, sticky='e', pady=(0,12))
         self.values = {}
+        self.entries = {}
         for row, (key, label, default) in enumerate([
             ('TIAM_PANEL_URL', 'آدرس اتصال پنل', 'https://maarksho.com/panel/tiam_inventory.php'),
             ('TIAM_PROJECT_ID', 'شناسهٔ پروژه', ''),
@@ -45,38 +47,75 @@ class Launcher:
             self.values[key] = value
             entry = ttk.Entry(frame, textvariable=value, show='*' if key == 'TIAM_AGENT_TOKEN' else '')
             entry.grid(row=row*2, sticky='ew', pady=(3,9))
+            self.entries[key] = entry
+            entry.bind('<Control-KeyPress>', lambda event, widget=entry:self.entry_shortcut(event, widget))
+            entry.bind('<Shift-Insert>', lambda event, widget=entry:self.paste_entry(widget))
+            menu = tk.Menu(root, tearoff=False)
+            menu.add_command(label='چسباندن / Paste', command=lambda widget=entry:self.paste_entry(widget))
+            menu.add_command(label='انتخاب همه', command=lambda widget=entry:self.select_entry(widget))
+            entry.bind('<Button-3>', lambda event, popup=menu:popup.tk_popup(event.x_root,event.y_root))
+            if key == 'TIAM_AGENT_TOKEN':
+                ttk.Button(frame, text='چسباندن توکن', command=self.paste_token).grid(row=row*2, column=1, padx=(8,0), pady=(3,9))
         self.status = tk.StringVar(value='از شبکه یا VPN فعلی سیستم استفاده می‌شود؛ تنظیم VPN در پنل باید خاموش باشد.')
-        ttk.Label(frame, textvariable=self.status, wraplength=680).grid(row=7, sticky='e', pady=8)
+        status_label=ttk.Label(frame, textvariable=self.status, wraplength=680)
+        status_label.grid(row=7,columnspan=2,sticky='e',pady=8)
         self.logs = tk.Text(frame, height=10, wrap='word', state='disabled')
-        self.logs.grid(row=8, sticky='nsew')
+        self.logs.grid(row=8,columnspan=2,sticky='nsew')
         buttons = ttk.Frame(frame)
-        buttons.grid(row=9, sticky='ew', pady=(12,0))
-        ttk.Button(buttons, text='چسباندن اتصال از پنل', command=self.paste_connection).pack(side='right', padx=8)
+        buttons.grid(row=9,columnspan=2,sticky='ew',pady=(12,0))
+        ttk.Button(buttons, text='چسباندن اتصال یا توکن', command=self.paste_connection).pack(side='right', padx=8)
         self.start_button = ttk.Button(buttons, text='اتصال و شروع', command=self.start)
         self.start_button.pack(side='right')
         self.stop_button = ttk.Button(buttons, text='توقف', command=self.stop, state='disabled')
         self.stop_button.pack(side='right', padx=8)
         ttk.Button(buttons, text='کپی لاگ', command=self.copy_log).pack(side='left')
-        ttk.Label(frame, text='پس از اتصال، تست SQL یا دریافت پیش‌نمایش را از پنل پروژه اجرا کنید. SQL به ODBC Driver 18 نیاز دارد.', wraplength=680).grid(row=10, sticky='e', pady=(12,0))
+        footer=ttk.Label(frame,text='پس از اتصال، تست SQL یا دریافت پیش‌نمایش را از پنل پروژه اجرا کنید. SQL به ODBC Driver 18 نیاز دارد.',wraplength=680)
+        footer.grid(row=10,columnspan=2,sticky='e',pady=(12,0))
+        frame.bind('<Configure>',lambda event:[label.configure(wraplength=max(300,event.width-12)) for label in (status_label,footer)])
         root.protocol('WM_DELETE_WINDOW', self.close)
         root.after(100, self.drain)
 
-    def paste_connection(self):
+    def select_entry(self, entry):
+        entry.focus_set()
+        entry.selection_range(0, 'end')
+        entry.icursor('end')
+        return 'break'
+
+    def entry_shortcut(self, event, entry):
+        if paste_shortcut(event):
+            return self.paste_entry(entry)
+        if getattr(event, 'keycode', None) == 65 or str(getattr(event, 'keysym', '')).lower() == 'a':
+            return self.select_entry(entry)
+
+    def paste_entry(self, entry):
+        if entry is self.entries.get('TIAM_AGENT_TOKEN'):
+            self.paste_token()
+            return 'break'
+        try:
+            text = self.root.clipboard_get().strip()
+            if entry.selection_present():
+                entry.delete('sel.first','sel.last')
+            entry.insert('insert',text)
+        except tk.TclError:
+            messagebox.showerror('چسباندن', 'کلیپ‌بورد متن قابل چسباندن ندارد.')
+        return 'break'
+
+    def paste_token(self):
+        self.paste_connection(token_only=True)
+
+    def paste_connection(self, token_only=False):
         if self.thread and self.thread.is_alive():
             messagebox.showinfo('اتصال فعال', 'ابتدا اتصال فعلی را متوقف کنید.')
             return
         try:
-            profile = json.loads(self.root.clipboard_get())
-            if not isinstance(profile, dict) or profile.get('version') != 1:
-                raise ValueError()
-            for key, field in [('TIAM_PANEL_URL','panel_url'), ('TIAM_PROJECT_ID','project_id'), ('TIAM_AGENT_TOKEN','agent_token')]:
-                if not isinstance(profile.get(field), str) or not profile[field] or len(profile[field]) > 2048:
-                    raise ValueError()
-            for key, field in [('TIAM_PANEL_URL','panel_url'), ('TIAM_PROJECT_ID','project_id'), ('TIAM_AGENT_TOKEN','agent_token')]:
-                self.values[key].set(profile[field].strip())
-            self.status.set('اطلاعات اتصال از پنل دریافت شد؛ اتصال و شروع را بزنید.')
+            profile = connection_input(self.root.clipboard_get())
+            if not token_only and 'panel_url' in profile:
+                self.values['TIAM_PANEL_URL'].set(profile['panel_url'])
+                self.values['TIAM_PROJECT_ID'].set(profile['project_id'])
+            self.values['TIAM_AGENT_TOKEN'].set(profile['agent_token'])
+            self.status.set('توکن چسبانده شد؛ شناسهٔ پروژه را بررسی و اتصال و شروع را بزنید.' if token_only or 'panel_url' not in profile else 'اطلاعات اتصال دریافت شد؛ اتصال و شروع را بزنید.')
         except (ValueError, tk.TclError):
-            messagebox.showerror('کپی اتصال', 'در تنظیمات تیام پنل، دکمهٔ ساخت کلید و کپی اتصال ایجنت را بزنید و سپس اینجا بچسبانید.')
+            messagebox.showerror('چسباندن', 'توکن حداقل ۳۲ کاراکتری یا اطلاعات کامل اتصال کپی‌شده از پنل را کپی کنید.')
 
     def emit(self, *items, **kwargs):
         self.messages.put(' '.join(str(item) for item in items))

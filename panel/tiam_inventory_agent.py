@@ -182,7 +182,7 @@ def execute_job(job, project):
         stage(logs, 'network', probe, 'SQL Server TCP port reachable')
         if job['kind'] == 'vpn_test':
             return {'success': True, 'logs': logs, 'rows': [], 'columns': []}
-        logs.append({'stage': 'sql_settings', 'status': 'info', 'message': 'Agent 1.0.3; driver: ODBC Driver 18 for SQL Server; security mode: ' + ('compatibility' if cfg.get('sql_security', 'verified') == 'compatibility' else 'verified')})
+        logs.append({'stage': 'sql_settings', 'status': 'info', 'message': 'Agent 1.0.4; driver: ODBC Driver 18 for SQL Server; security mode: ' + ('compatibility' if cfg.get('sql_security', 'verified') == 'compatibility' else 'verified')})
         columns, rows = stage(logs, 'sql_view', lambda: read_view(cfg, job['kind'] == 'view_test'),
                               'SQL authentication and view SELECT completed (security mode: ' + cfg.get('sql_security', 'verified') + ')')
         logs.append({'stage': 'schema', 'status': 'success', 'message': str(len(columns)) + ' columns; ' + str(len(rows)) + ' rows received', 'elapsed_ms': 0})
