@@ -159,7 +159,7 @@ if (isSqlActive()) {
         while ($row = $res->fetch_assoc()) {
             $proj = getCurrentProject($row['id']);
             if ($proj) {
-                autoApprovePendingProducts($proj);
+                autoApprovePendingProducts($proj,true);
                 checkAndSendDailyAggregatedNotifications($proj);
                 saveProject($proj);
             }
@@ -170,7 +170,7 @@ if (isSqlActive()) {
     $db = getJsonDB();
     if (!empty($db['projects'])) {
         foreach ($db['projects'] as &$proj) {
-            autoApprovePendingProducts($proj);
+            autoApprovePendingProducts($proj,true);
             checkAndSendDailyAggregatedNotifications($proj);
         }
         saveJsonDB($db);

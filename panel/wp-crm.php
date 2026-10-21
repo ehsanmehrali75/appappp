@@ -28,7 +28,7 @@ if (!file_exists($functionsPath)) {
 require_once $functionsPath;
 
 if (!isUser()) {
-    redirect('index.php');
+    redirect('/?action=login');
 }
 
 $projectId = $_SESSION['project_id'] ?? null;

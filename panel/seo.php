@@ -114,7 +114,7 @@ if (isset($_GET['token']) && !empty($_GET['token'])) {
 
 if (!$publicReadOnly) {
     if (!isUser()) {
-        redirect('index.php');
+        redirect('/?action=login');
     }
 
     $allUserProjects = [];

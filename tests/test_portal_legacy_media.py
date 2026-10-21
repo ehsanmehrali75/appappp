@@ -52,7 +52,7 @@ class PortalLegacyMedia(unittest.TestCase):
         for name in ['original.png', 'gallery-original.png', 'gallery-second.png', 'reference-original.png', 'reference-second.png']:
             self.assertEqual((self.fixture.app/'panel/uploads'/name).read_bytes(), http_fixtures.PNG)
 
-    def test_pending_object_gallery_preserves_approval_filter(self):
+    def test_pending_gallery_shows_both_approved_and_unapproved_images(self):
         gallery = [{'url': 'uploads/approved.png'}, {'src': 'uploads/unapproved.png'}]
         approvals = [{'url': 'uploads/approved.png', 'approved': True}, {'url': 'uploads/unapproved.png', 'approved': False}]
         self.update_product(gallery=json.dumps(gallery), images_list=json.dumps(approvals), status='pending')
@@ -60,7 +60,7 @@ class PortalLegacyMedia(unittest.TestCase):
         code, page = self.fixture.request(self.opener, '/panel/portal.php?tab=library')
         self.assertEqual(code, 200)
         sources = [urllib.parse.urljoin(self.fixture.base, src) for src in re.findall(r'<img\b[^>]*\bsrc="([^"]*)"', page)]
-        self.assertNotIn(self.fixture.base+'/panel/uploads/approved.png', sources)
+        self.assertIn(self.fixture.base+'/panel/uploads/approved.png', sources)
 
     def test_invalid_gallery_entries_are_ignored(self):
         invalid = [True, 42, {'unexpected': 'uploads/hidden.png'}, {'url': ['uploads/hidden.png']}, 'javascript:alert(1)', '../private.png']

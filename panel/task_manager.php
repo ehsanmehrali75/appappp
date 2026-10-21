@@ -9,7 +9,7 @@ require_once 'inc/cors.php';
 
 // بررسی دسترسی کاربر ملحق شده
 if (!isUser()) {
-    redirect('index.php');
+    redirect('/?action=login');
 }
 
 $currentUser = $_SESSION['user'];

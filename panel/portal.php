@@ -37,10 +37,11 @@ require_once $functionsPath;
 require_once __DIR__.'/inc/ModuleProjectAccess.php';
 require_once __DIR__.'/inc/PortalAccess.php';
 require_once __DIR__.'/inc/ProjectPermissions.php';
+require_once __DIR__.'/inc/ProductMediaGallery.php';
 
 // Authentication check
 if (!isUser()) {
-    redirect('index.php');
+    redirect('/?action=login');
 }
 
 // دریافت پارامتر تب فعال
@@ -140,6 +141,7 @@ if (!isModuleActive('products')) {
             <link rel="stylesheet" href="/panel/assets/neo-tokens.css?v=1">
 <link rel="stylesheet" href="/panel/assets/portal-workspace.css?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.css'); ?>">
 <script src="/panel/assets/portal-workspace.js?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.js'); ?>" defer></script>
+<link rel="stylesheet" href="/panel/assets/product-media.css?v=1"><script defer src="/panel/assets/product-media.js?v=1"></script>
 </head>
             <body class="bg-slate-50 min-h-screen flex items-center justify-center font-sans p-6 select-none">
                 <div class="max-w-md w-full bg-white border border-slate-100 rounded-[3rem] p-10 text-center shadow-2xl shadow-indigo-500/5">
@@ -161,74 +163,8 @@ if (!isModuleActive('products')) {
     }
 }
 
-function isProductImageUrlApproved($p, $imgUrl) {
-    return WebsiteCatalogSync::imageApproved($p,$imgUrl);
-}
-
 function renderCardImageCarousel($p) {
-    $allImages = [];
-    $addImage = static function($entry) use (&$allImages) {
-        $url = ProductSizeChartCatalog::entryUrl($entry);
-        if ($url !== '' && isValidProductImage($url)) $allImages[$url] = true;
-    };
-    $addImage($p['social_image'] ?? $p['socialImage'] ?? '');
-    foreach (['gallery', 'image', 'reference_gallery'] as $field) {
-        if ($field === 'image') {
-            $addImage($p[$field] ?? '');
-            continue;
-        }
-        $items = $p[$field] ?? [];
-        if (is_string($items)) $items = json_decode($items, true);
-        if (is_array($items)) foreach ($items as $item) $addImage($item);
-    }
-    $images = array_keys($allImages);
-    if (($p['status'] ?? '') === 'pending') {
-        $pendingImages = array_values(array_filter($images, static fn($url) => !isProductImageUrlApproved($p, $url)));
-        if ($pendingImages) $images = $pendingImages;
-    }
-    if (!$images) $images = ['https://placehold.co/400x500?text=Maarksho'];
-
-    $productId = $p['id'];
-    $count = count($images);
-    
-    if ($count <= 1) {
-        $imgUrl = htmlspecialchars($images[0], ENT_QUOTES, 'UTF-8');
-        echo '<img src="' . $imgUrl . '" loading="lazy" referrerpolicy="no-referrer" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105" onerror="this.src=\'https://placehold.co/400x500?text=Maarksho\'">';
-        return;
-    }
-    ?>
-    <div class="relative w-full h-full select-none flex overflow-hidden group/carousel z-10" dir="ltr" onclick="event.stopPropagation()">
-        <!-- Scroll Track -->
-        <div id="card-scroll-<?php echo $productId; ?>" 
-             onscroll="updateCardDots('<?php echo $productId; ?>')"
-             class="flex w-full h-full overflow-x-auto scroll-smooth snap-x snap-mandatory scrollbar-none">
-            <?php foreach ($images as $img): 
-                $imgUrl = htmlspecialchars($img, ENT_QUOTES, 'UTF-8');
-            ?>
-                <div class="w-full h-full flex-shrink-0 snap-start relative h-full cursor-pointer" onclick="openDetailById('<?php echo $productId; ?>')">
-                    <img src="<?php echo $imgUrl; ?>" loading="lazy" referrerpolicy="no-referrer" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105" onerror="this.src='https://placehold.co/400x500?text=Maarksho'">
-                </div>
-            <?php endforeach; ?>
-        </div>
-
-        <!-- Navigation Arrows (visible on card hover) -->
-        <button onclick="scrollCardCarousel('<?php echo $productId; ?>', -1); event.stopPropagation();" 
-                class="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/70 text-white flex items-center justify-center font-bold text-sm cursor-pointer z-20 backdrop-blur-sm opacity-0 group-hover/carousel:opacity-100 transition-all duration-300">
-             &lt;
-        </button>
-        <button onclick="scrollCardCarousel('<?php echo $productId; ?>', 1); event.stopPropagation();" 
-                class="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 hover:bg-black/70 text-white flex items-center justify-center font-bold text-sm cursor-pointer z-20 backdrop-blur-sm opacity-0 group-hover/carousel:opacity-100 transition-all duration-300">
-             &gt;
-        </button>
-
-        <!-- Indicators Dots overlay -->
-        <div id="card-dots-<?php echo $productId; ?>" class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1 z-20 bg-black/25 backdrop-blur-md px-2 py-1 rounded-full pointer-events-none">
-            <?php for ($i = 0; $i < $count; $i++): ?>
-                <span class="w-1.5 h-1.5 rounded-full transition-all duration-300 <?php echo $i === 0 ? 'bg-white' : 'bg-white/40'; ?>"></span>
-            <?php endfor; ?>
-        </div>
-    </div>
-    <?php
+    ProductMediaGallery::render($p);
 }
 
 // شناسایی خودکار تنوع رنگی سبک و بهینه بر اساس اسامی مشابه
@@ -1067,6 +1003,14 @@ if ($isAjax && isset($_POST['action'])) {
         exit;
     }
     
+    if($productToUpdate&&ProductApprovalFlow::enabled($project['settings'])&&in_array($_POST['action'],['quick_action','approve','reject'],true)){
+        $flowAction=$_POST['action']==='quick_action'?($_POST['sub']??''):$_POST['action'];
+        if(preg_match('/^(approve|reject)(?:_stage([12]))?$/D',$flowAction,$match)){
+            try{ProductApprovalFlow::decide($productToUpdate,$project,isset($match[2])?(int)$match[2]:0,$match[1]==='reject',trim($_POST['comment']??''),$_SESSION['user']['username']??'');saveProject($project,[$productToUpdate]);$response=['status'=>'success','msg'=>'تصمیم این مرحله ثبت شد.','newStatus'=>$productToUpdate['status']];}
+            catch(RuntimeException $e){http_response_code(403);$response=['status'=>'error','msg'=>$e->getMessage()];}
+            echo json_encode($response,JSON_UNESCAPED_UNICODE);exit;
+        }
+    }
     if ($_POST['action'] === 'vote') {
         $type = $_POST['type']; // 'like' or 'dislike'
         $voterId = getVoterId();
@@ -1687,6 +1631,7 @@ if (!PortalAccess::canProducts()) {
 <link rel="stylesheet" href="/panel/assets/neo-tokens.css?v=1">
 <link rel="stylesheet" href="/panel/assets/portal-workspace.css?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.css'); ?>">
 <script src="/panel/assets/portal-workspace.js?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.js'); ?>" defer></script>
+<link rel="stylesheet" href="/panel/assets/product-media.css?v=1"><script defer src="/panel/assets/product-media.js?v=1"></script>
 </head>
 <body class="portal-workspace" data-portal-tab="<?php echo htmlspecialchars($active_tab,ENT_QUOTES,'UTF-8'); ?>">
 <style id="portal-action-permissions">
@@ -1843,6 +1788,7 @@ foreach (($project['products'] ?? []) as $p) {
     }
 
     if (($p['status'] ?? '') === 'pending') {
+        if(ProductApprovalFlow::enabled($project['settings'])){if(ProductApprovalFlow::visiblePending($p,$project))$my_prod_pending_count++;continue;}
         if ($is_prod_s1 && !in_array($user_lo, $app1_lo) && ($p['stage1_decision'] ?? '') !== 'rejected') {
             $my_prod_pending_count++;
         } elseif ($is_prod_s2 && ($p['stage1_decision'] ?? '') === 'approved' && !in_array($user_lo, $app2_lo) && ($p['stage2_decision'] ?? '') !== 'rejected') {
@@ -2663,10 +2609,10 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
 
         <!-- Quick Pending Items Showcase -->
         <?php 
-        $top_pending = array_filter((array)($project['products'] ?? []), function($p) {
+        $top_pending = array_filter((array)($project['products'] ?? []), function($p) use ($project) {
             $isNoImg = is_product_without_image($p);
             $isOut = isProductOutOfStock($p);
-            return getProductWorkflowStatus($p)==='pending_approval';
+            return getProductWorkflowStatus($p)==='pending_approval'&&ProductApprovalFlow::visiblePending($p,$project);
         });
         $top_pending = array_slice($top_pending, 0, 4);
         if (!empty($top_pending)):
@@ -2693,6 +2639,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                             </div>
                         </div>
                         <div class="p-4 flex-1 flex flex-col justify-between" onclick="event.stopPropagation()">
+                            <?php echo ProductApprovalFlow::html($p,$project); ?>
                             <div>
                                 <h4 class="font-bold text-xs text-slate-800 line-clamp-1 mb-1"><?php echo htmlspecialchars($p['name']); ?></h4>
                                 <div class="text-[11px] font-black text-indigo-600 mb-3"><?php echo $p['price']; ?></div>
@@ -2713,10 +2660,10 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
     <div id="tab-pending" class="tab-content <?php echo (($active_tab ?? 'overview') === 'pending') ? 'active' : ''; ?>">
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             <?php 
-            $pending = array_filter((array)($project['products'] ?? []), function($p) {
+            $pending = array_filter((array)($project['products'] ?? []), function($p) use ($project) {
                 $isNoImg = is_product_without_image($p);
                 $isOut = isProductOutOfStock($p);
-                return getProductWorkflowStatus($p)==='pending_approval';
+                return getProductWorkflowStatus($p)==='pending_approval'&&ProductApprovalFlow::visiblePending($p,$project);
             });
             usort($pending, function($a, $b) { return (int)($b['extractedAt'] ?? 0) - (int)($a['extractedAt'] ?? 0); });
             
@@ -2767,7 +2714,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                     </div>
                     
                     <div class="p-5 flex-1 flex flex-col" onclick="event.stopPropagation()">
-                        <h4 class="font-bold text-sm text-slate-800 line-clamp-2 h-10 mb-2"><?php echo htmlspecialchars($p['name']); ?></h4>
+                        <?php echo ProductApprovalFlow::html($p,$project); ?><h4 class="font-bold text-sm text-slate-800 line-clamp-2 h-10 mb-2"><?php echo htmlspecialchars($p['name']); ?></h4>
                         <div class="flex items-center justify-between gap-2 mb-4">
                             <div class="text-xs font-black text-brand-600"><?php echo $p['price']; ?></div>
                             <?php if (!empty($p['variants']) && count($p['variants']) > 1): ?>
@@ -3583,6 +3530,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                     </div>
                     
                     <div class="p-5 flex-1 flex flex-col bg-white" onclick="event.stopPropagation()">
+                        <?php echo ProductApprovalFlow::html($p,$project); ?>
                         <div class="font-bold text-sm text-slate-800 line-clamp-2 h-10 mb-2"><?php echo htmlspecialchars($p['name']); ?></div>
                         <?php $portalTrail=$p['website_sync']['site_category_labels']??[];if(!is_array($portalTrail)||!$portalTrail)$portalTrail=WebsiteCatalogSync::categories($p);$portalTrail=array_values(array_filter($portalTrail,'is_string'));if($portalTrail): ?><p class="portal-category-trail"><?php echo htmlspecialchars(implode(' ← ',$portalTrail),ENT_QUOTES,'UTF-8'); ?></p><?php endif; ?><?php if(WebsiteCatalogSync::chartExempt($project,$p)): ?><span class="wc-badge portal-chart-exempt">جدول سایز نیاز ندارد</span><?php endif; ?>
                         <div class="flex items-center justify-between gap-2 mb-4">
@@ -4344,7 +4292,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                             $timeout_hours = (int)($project['settings']['approval_timeout_calendar'] ?? 48);
                             $uploaded_at = $plan['pdf_uploaded_at'] ?? 0;
                             if ($uploaded_at > 0) {
-                                $deadline_ts = $uploaded_at + ($timeout_hours * 3600);
+                                $deadline_ts = $uploaded_at + ($timeout_hours * (($project['settings']['approval_timeout_unit']??'')==='minutes'?60:3600));
                                 $now_ts = time();
                                 $diff = $deadline_ts - $now_ts;
                                 if ($diff > 0) {
@@ -5089,21 +5037,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
         }
     }
     
-    function toast(m) {
-        const t = document.createElement('div');
-        t.className = 'toast';
-        t.innerText = m;
-        document.body.appendChild(t);
-        setTimeout(() => t.remove(), 2500);
-    }
 
-    function scrollCardCarousel(productId, direction) {
-        const container = document.getElementById(`card-scroll-${productId}`);
-        if (container) {
-            const width = container.clientWidth;
-            container.scrollBy({ left: direction * width, behavior: 'smooth' });
-        }
-    }
 
     function toggleFilterAccordion() {
         const content = document.getElementById('filter-accordion-content');
@@ -5117,22 +5051,6 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
                 arrow.style.transform = 'rotate(0deg)';
             }
         }
-    }
-
-    function updateCardDots(productId) {
-        const container = document.getElementById(`card-scroll-${productId}`);
-        if (!container) return;
-        const scrollLeft = container.scrollLeft;
-        const width = container.clientWidth;
-        const index = Math.round(scrollLeft / width);
-        const dots = document.querySelectorAll(`#card-dots-${productId} span`);
-        dots.forEach((dot, idx) => {
-            if (idx === index) {
-                dot.className = 'w-1.5 h-1.5 rounded-full bg-white transition-all duration-300';
-            } else {
-                dot.className = 'w-1.5 h-1.5 rounded-full bg-white/40 transition-all duration-300';
-            }
-        });
     }
 
     function switchTab(id) {
@@ -5704,99 +5622,8 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
         document.getElementById('pd-price').innerText = p.price;
         document.getElementById('pd-sku').innerText = 'SKU: ' + (p.sku || '---');
         
-        // Build Carousel Images list based on priority: social_image > gallery > image
-        portalCarouselImages = [];
-        const isPending = (p.status === 'pending');
-        
-        const isImgApproved = (imgUrl) => {
-            if (!p) return false;
-            let list = p.images_list || [];
-            if (typeof list === 'string') {
-                try { list = JSON.parse(list); } catch(e) { list = []; }
-            }
-            if (Array.isArray(list)) {
-                const cleanImg = imgUrl ? imgUrl.split('?')[0] : '';
-                const found = list.find(item => {
-                    const cleanItemUrl = item && item.url ? item.url.split('?')[0] : '';
-                    return cleanItemUrl && cleanItemUrl === cleanImg;
-                });
-                if (found) {
-                    return found.source === 'site' || !!found.site_verified_at || !!found.approved;
-                }
-            }
-            if ((p.status || '') === 'active') {
-                return true;
-            }
-            return false;
-        };
-
-        if (p.social_image && !p.social_image.includes('placehold')) {
-            if (!isPending || !isImgApproved(p.social_image)) {
-                portalCarouselImages.push(p.social_image);
-            }
-        }
-        let gal = p.gallery;
-        if (gal && typeof gal === 'string') {
-            try { gal = JSON.parse(gal); } catch(e) { gal = []; }
-        }
-        if (gal && Array.isArray(gal)) {
-            gal.forEach(img => {
-                if (img && !img.includes('placehold')) {
-                    if (!isPending || !isImgApproved(img)) {
-                        portalCarouselImages.push(img);
-                    }
-                }
-            });
-        }
-        if (p.image && !p.image.includes('placehold')) {
-            if (!isPending || !isImgApproved(p.image)) {
-                portalCarouselImages.push(p.image);
-            }
-        }
-        let refGal = p.reference_gallery;
-        if (refGal && typeof refGal === 'string') {
-            try { refGal = JSON.parse(refGal); } catch(e) { refGal = []; }
-        }
-        if (refGal && Array.isArray(refGal)) {
-            refGal.forEach(img => {
-                if (img && !img.includes('placehold')) {
-                    if (!isPending || !isImgApproved(img)) {
-                        portalCarouselImages.push(img);
-                    }
-                }
-            });
-        }
-        portalCarouselImages = [...new Set(portalCarouselImages)];
-        
-        // Fallback: if zero images are left because all were approved, show all of them
-        if (portalCarouselImages.length === 0) {
-            if (p.social_image && !p.social_image.includes('placehold')) {
-                portalCarouselImages.push(p.social_image);
-            }
-            if (gal && Array.isArray(gal)) {
-                gal.forEach(img => {
-                    if (img && !img.includes('placehold')) {
-                        portalCarouselImages.push(img);
-                    }
-                });
-            }
-            if (p.image && !p.image.includes('placehold')) {
-                portalCarouselImages.push(p.image);
-            }
-            if (refGal && Array.isArray(refGal)) {
-                refGal.forEach(img => {
-                    if (img && !img.includes('placehold')) {
-                        portalCarouselImages.push(img);
-                    }
-                });
-            }
-            portalCarouselImages = [...new Set(portalCarouselImages)];
-        }
-        
-        if (portalCarouselImages.length === 0) {
-            portalCarouselImages.push(p.social_image || p.image || 'https://placehold.co/400x500?text=No+Image');
-        }
-        
+        portalCarouselImages=window.productMediaUrls(p);
+        if(!portalCarouselImages.length)portalCarouselImages=['https://placehold.co/400x500?text=No+Image'];
         const wrapper = document.getElementById('pd-carousel-wrapper');
         wrapper.innerHTML = '';
         portalCarouselImages.forEach((imgUrl, idx) => {
@@ -6301,6 +6128,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
         
         document.getElementById('pd-submit-comment').onclick = () => { portalCommentManual(p.id, 'modal'); };
         document.getElementById('product-detail-modal').style.display = 'flex';
+        window.updateApprovalControls?.(p.id,document.getElementById('product-detail-modal'));
         document.body.style.overflow = 'hidden';
     }
 

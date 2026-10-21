@@ -30,7 +30,7 @@ require_once $functionsPath;
 
 // Enforce authentication
 if (!isUser()) {
-    redirect('index.php');
+    redirect('/?action=login');
 }
 
 // Check and locked project association

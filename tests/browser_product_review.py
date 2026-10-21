@@ -40,15 +40,15 @@ try:
         page.goto(base+'/panel/admin.php?tab=extract&wc_queue=pending_image');row().wait_for(state='visible')
         # Visible one-click actions are reversible and do not require opening comparison.
         page.goto(base+'/panel/admin.php?tab=extract&wc_queue=missing_photo')
-        with page.expect_navigation():row().locator('.wc-quick[data-action="website_catalog_set_preference"]').click()
+        with page.expect_navigation():row().locator('.wc-quick[data-action="website_catalog_set_preference"]:not([data-asset="chart"])').click()
         assert row().count()==0
         page.locator('.wc-review-tabs a[href*="wc_queue=image_not_required"]').click();row().wait_for(state='visible')
         for width in [1440,375]:
             page.set_viewport_size({'width':width,'height':950});page.wait_for_timeout(300);page.evaluate('window.scrollTo(0,0)')
-            assert row().locator('.wc-quick[data-action="website_catalog_set_preference"]').is_visible()
+            assert row().locator('.wc-quick[data-action="website_catalog_set_preference"]:not([data-asset="chart"])').is_visible()
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
             page.screenshot(path=str(out/f'workbench-{width}.png'),full_page=True)
-        with page.expect_navigation():row().locator('.wc-quick[data-action="website_catalog_set_preference"]').click()
+        with page.expect_navigation():row().locator('.wc-quick[data-action="website_catalog_set_preference"]:not([data-asset="chart"])').click()
         assert row().count()==0
         page.goto(base+'/panel/admin.php?tab=extract&wc_queue=missing_photo')
         with page.expect_navigation():row().locator('.wc-quick[data-value="technical"]').click()

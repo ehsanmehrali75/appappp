@@ -36,3 +36,11 @@ Optional browser interaction checks (Chromium + Playwright):
 ```sh
 PHP_BINARY=php CHROMIUM_PATH=/usr/bin/chromium python tests/browser_workspace.py
 ```
+
+## Login, settings and product review
+
+`/panel/` and protected panel pages use the homepage login and the same user records. Project settings have searchable sections; switching sections preserves all unsaved fields.
+
+Under image approval, projects may retain parallel review or enable style-first/conformity-first review. Stage responsibility, minimum votes and permissions are checked on both admin and portal requests. The next stage opens after the first reaches its threshold; its complete deadline starts at that transition and is stored in the product's `website_sync.approval_flow`. Existing website imports remain approved. Existing parallel review is unchanged. Sequential timeout transitions are persisted by the existing panel cron; keep cron configured for automatic approvals. An explicit `approval_timeout_unit=minutes` preserves newly saved short deadlines while legacy hour settings remain readable.
+
+The shared product gallery displays the main photo first, followed by all remaining product, social and reference images without changing their approval status. Browser regression: `PHP_BINARY=php python tests/browser_settings_media.py`.

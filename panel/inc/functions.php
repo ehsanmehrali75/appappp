@@ -3315,7 +3315,8 @@ function isQualityCheckPassed($p) {
     return true;
 }
 
-function autoApprovePendingProducts(&$project) {
+require_once __DIR__.'/ProductApprovalFlow.php';
+function autoApprovePendingProducts(&$project, $advanceSequential = false) {
     $now = time();
     $isSplit = !empty($project['settings']['prod_approval_split_enabled']);
     $st1_min = (int)($project['settings']['prod_approval_stage1_min'] ?? 1);
@@ -3325,14 +3326,14 @@ function autoApprovePendingProducts(&$project) {
     $getTimeoutMinutes = function($key, $default, $project) {
         if (isset($project['settings'][$key])) {
             $val = (int)$project['settings'][$key];
-            if ($val > 0 && $val <= 120) {
+            if (($project['settings']['approval_timeout_unit']??'')!=='minutes' && $val > 0 && $val <= 120) {
                 return $val * 60;
             }
             return $val;
         }
         $oldApprovalTimeout = (int)($project['settings']['approval_timeout'] ?? 0);
         if ($oldApprovalTimeout > 0) {
-            if ($oldApprovalTimeout <= 120) {
+            if (($project['settings']['approval_timeout_unit']??'')!=='minutes' && $oldApprovalTimeout <= 120) {
                 return $oldApprovalTimeout * 60;
             }
             return $oldApprovalTimeout;
@@ -3354,6 +3355,7 @@ function autoApprovePendingProducts(&$project) {
     if (isset($project['products']) && is_array($project['products'])) {
         foreach ($project['products'] as &$p) {
             if (($p['status'] ?? 'active') === 'pending') {
+                if(ProductApprovalFlow::enabled($project['settings'])){if($advanceSequential)ProductApprovalFlow::autoAdvance($p,$project,$now);continue;}
                 $isImageRelated = (!empty($p['is_manual_image']) || !empty($p['uploaded_by']));
                 $extractedAt = $p['extractedAt'] ?? 0;
                 
@@ -4245,14 +4247,14 @@ function checkAndSendSmsNotifications(&$project) {
     $getTimeoutMinutes = function($key, $default, $project) {
         if (isset($project['settings'][$key])) {
             $val = (int)$project['settings'][$key];
-            if ($val > 0 && $val <= 120) {
+            if (($project['settings']['approval_timeout_unit']??'')!=='minutes' && $val > 0 && $val <= 120) {
                 return $val * 60;
             }
             return $val;
         }
         $oldApprovalTimeout = (int)($project['settings']['approval_timeout'] ?? 0);
         if ($oldApprovalTimeout > 0) {
-            if ($oldApprovalTimeout <= 120) {
+            if (($project['settings']['approval_timeout_unit']??'')!=='minutes' && $oldApprovalTimeout <= 120) {
                 return $oldApprovalTimeout * 60;
             }
             return $oldApprovalTimeout;
@@ -5759,6 +5761,8 @@ function refreshProductSplitStatus(&$p, $project) {
         return;
     }
     
+    ProductApprovalFlow::record($p,$project['settings']);
+    if(ProductApprovalFlow::enabled($project['settings'])&&(($p['stage1_decision']??'')==='rejected'||($p['stage2_decision']??'')==='rejected')){$p['status']='rejected';return;}
     $st1_min = (int)($project['settings']['prod_approval_stage1_min'] ?? 1);
     $st2_min = (int)($project['settings']['prod_approval_stage2_min'] ?? 1);
     
@@ -5809,9 +5813,11 @@ function refreshProductSplitStatus(&$p, $project) {
                 ];
             }
             if (!empty($p['gallery']) && is_array($p['gallery'])) {
-                foreach ($p['gallery'] as $galUrl) {
-                    if (!empty($p['image']) && $galUrl === $p['image']) continue;
-                    $isLocal = (strpos($galUrl, 'uploads/') === 0);
+                foreach ($p['gallery'] as $galEntry) {
+                    $galUrl = ProductSizeChartCatalog::entryUrl($galEntry);
+                    if ($galUrl === '') continue;
+                    if (!empty($p['image']) && $galUrl === ProductSizeChartCatalog::entryUrl($p['image'])) continue;
+                    $isLocal = (bool)preg_match('~^(?:/panel/|/)?uploads/~', $galUrl);
                     $imagesList[] = [
                         'url' => $galUrl,
                         'source' => $isLocal ? 'manual' : 'site'
@@ -5819,6 +5825,7 @@ function refreshProductSplitStatus(&$p, $project) {
                 }
             }
             $p['images_list'] = $imagesList;
+            approveProductImages($p);
             $p['has_image'] = !empty($p['image']) && strpos($p['image'], 'placeholder') === false && strpos($p['image'], 'placehold.co') === false;
             $p['media_status'] = $p['has_image'] ? 'ok' : 'missing';
         } else {
@@ -6712,7 +6719,7 @@ function isOccasionApproved($project, $occ_key) {
     $timeout_hours = (int)($project['settings']['approval_timeout_calendar'] ?? 48);
     $uploaded_at = $plan['pdf_uploaded_at'] ?? 0;
     if ($uploaded_at > 0) {
-        $deadline_ts = $uploaded_at + ($timeout_hours * 3600);
+        $deadline_ts = $uploaded_at + ($timeout_hours * (($project['settings']['approval_timeout_unit']??'')==='minutes'?60:3600));
         if (time() >= $deadline_ts) {
             return true; // Auto-approved on timeout!
         }

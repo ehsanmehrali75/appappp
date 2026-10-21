@@ -64,6 +64,7 @@ try:
     page.evaluate("document.getElementById('profile-modal').style.display='none'")
     # Both prerequisites are persisted by the real settings form, independently per project.
     page.goto(base+'/panel/admin.php?tab=settings');page.wait_for_load_state()
+    page.get_by_role('tab',name='تأیید و تولید تصویر',exact=True).click()
     page.locator('[name=prod_require_reference]').uncheck();page.locator('[name=prod_require_image_request]').check()
     form=page.locator('[name=prod_require_reference]').locator('xpath=ancestor::form')
     # submit() avoids unrelated legacy required controls; preserve the form submit marker explicitly.

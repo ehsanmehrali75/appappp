@@ -4,7 +4,7 @@ require_once 'inc/cors.php';
 
 // Check system authentication
 if (!isUser()) {
-    redirect('index.php');
+    redirect('/?action=login');
 }
 
 // Check and resolve current project

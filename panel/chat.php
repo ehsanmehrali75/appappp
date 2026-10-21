@@ -4,7 +4,7 @@ require_once 'inc/cors.php';
 
 // Authentication
 if (!isUser()) {
-    redirect('index.php');
+    redirect('/?action=login');
 }
 
 $db = getDB();

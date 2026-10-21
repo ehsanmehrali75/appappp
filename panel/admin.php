@@ -4,12 +4,13 @@ OutputBuffer::start();
 require_once 'inc/functions.php';
 require_once __DIR__.'/inc/ModuleProjectAccess.php';
 require_once __DIR__.'/inc/ProjectPermissions.php';
+require_once __DIR__.'/inc/ProductMediaGallery.php';
 require_once __DIR__.'/inc/ProjectMembers.php';
 require_once 'inc/cors.php';
 
 // Authentication (Standard UI access)
 if (!isUser()) {
-    redirect('index.php');
+    redirect('/?action=login');
 }
 
 // User specified: If portal access but not admin, shouldn't enter admin section
@@ -2097,6 +2098,10 @@ $sections_json
 
         foreach($project['products'] as &$p) {
             if ($p['id'] == $pid) {
+                if(ProductApprovalFlow::enabled($project['settings'])&&in_array($status,['active','rejected'],true)){
+                    try{ProductApprovalFlow::decide($p,$project,$stage==='stage1'?1:($stage==='stage2'?2:0),$status==='rejected',$reason,$current_user);saveProject($project,[$p]);echo json_encode(['status'=>'success','msg'=>'تصمیم این مرحله ثبت شد.']);}
+                    catch(RuntimeException $e){http_response_code(403);echo json_encode(['status'=>'failed','msg'=>$e->getMessage()]);}exit;
+                }
                 $pName = $p['name'] ?? 'محصول شماره ' . $pid;
                 if ($status === 'rejected') {
                     $reason_trimmed = trim($reason);
@@ -2277,6 +2282,14 @@ $sections_json
         if (!hasPermission('approve_content')) { echo json_encode(['status' => 'failed', 'msg' => 'دسترسی غیرمجاز']); exit(); }
         $pids = $_POST['pids'] ?? [];
         $status = $_POST['status'];
+        if(ProductApprovalFlow::enabled($project['settings'])&&in_array($status,['active','rejected'],true)){
+            try{
+                foreach($project['products'] as &$product){
+                    if(in_array($product['id'],$pids,true))ProductApprovalFlow::decide($product,$project,0,$status==='rejected',trim($_POST['reason']??''),$_SESSION['user']['username']??'');
+                }
+                unset($product);saveProject($project);echo json_encode(['status'=>'success']);
+            }catch(RuntimeException $e){http_response_code(403);echo json_encode(['status'=>'failed','msg'=>$e->getMessage()]);}exit;
+        }
         $affectedCount = 0;
         foreach($project['products'] as &$p) {
             if (in_array($p['id'], $pids)) {
@@ -3844,11 +3857,12 @@ if ($project) {
     }
 
     if (isset($_POST['save_project_settings'])) {
+        $project['settings']['approval_timeout_unit'] = 'minutes';
         $project['settings']['posting_slots'] = $_POST['slots'] ?? []; 
-        $project['settings']['approval_timeout_image'] = (int)($_POST['approve_hours_image'] ?? 48);
-        $project['settings']['approval_timeout_library'] = (int)($_POST['approve_hours_library'] ?? 48);
-        $project['settings']['approval_timeout_calendar'] = (int)($_POST['approve_hours_calendar'] ?? 48);
-        $project['settings']['approval_timeout'] = (int)($_POST['approve_hours_library'] ?? 48);
+        $project['settings']['approval_timeout_image'] = max(0, (int)($_POST['approve_hours_image'] ?? 48)) * 60;
+        $project['settings']['approval_timeout_library'] = max(0, (int)($_POST['approve_hours_library'] ?? 48)) * 60;
+        $project['settings']['approval_timeout_calendar'] = max(0, (int)($_POST['approve_hours_calendar'] ?? 48)) * 60;
+        $project['settings']['approval_timeout'] = $project['settings']['approval_timeout_library'];
         $project['settings']['occasions_sheet_id'] = $_POST['occasions_sheet_id'] ?? '';
         saveProject($project);
         redirect('admin.php?tab=settings&msg=تنظیمات پیشرفته ذخیره شد.');
@@ -4888,6 +4902,10 @@ if ($project) {
             ];
         }
 
+        $approvalOrder=$_POST['prod_approval_order']??($project['settings']['prod_approval_order']??'parallel');
+        if(!is_string($approvalOrder)||!in_array($approvalOrder,['parallel','style_first','conformity_first'],true))AccessControl::deny();
+        if(($project['settings']['prod_approval_order']??'parallel')!==$approvalOrder)$project['settings']['prod_approval_sequence_since']=time();
+        $project['settings']['prod_approval_order']=$approvalOrder;$project['settings']['approval_timeout_unit']='minutes';
         // Save split/multistage approval settings
         $project['settings']['prod_approval_split_enabled'] = isset($_POST['prod_approval_split_enabled']) ? 1 : 0;
         $project['settings']['prod_approval_stage1_users'] = $_POST['prod_approval_stage1_users'] ?? '';
@@ -6339,6 +6357,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
     <?php if ($neoWorkspace): ?><script src="/panel/assets/neo-workspace.js?v=<?php echo filemtime(__DIR__.'/assets/neo-workspace.js'); ?>" defer></script><?php endif; ?>
     <script src="/panel/assets/neo-shell.js?v=<?php echo filemtime(__DIR__.'/assets/neo-shell.js'); ?>" defer></script>
 <?php endif; ?>
+<link rel="stylesheet" href="/panel/assets/product-media.css?v=1"><script defer src="/panel/assets/product-media.js?v=1"></script>
 </head>
 <body class="tab-<?php echo htmlspecialchars($tab ?? 'none'); ?><?php echo $neoShell?' maarksho-shell':''; ?><?php echo $neoWorkspace?' neo-workspace':''; ?><?php echo $neoPilot?' maarksho-pilot':''; ?>">
     <div id="global-loader">
@@ -8527,7 +8546,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         $dataSearch = strtolower(implode(' ', array_filter(array_map('trim', $searchParts))));
                         ?>
                         <div tabindex="0" role="button" aria-label="<?php echo htmlspecialchars('مشاهدهٔ محصول '.($p['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" class="ig-post-card group product-item relative" data-name="<?php echo strtolower($p['name']); ?>" data-sku="<?php echo strtolower($p['sku']??''); ?>" data-search="<?php echo htmlspecialchars($dataSearch); ?>" onclick="showManualInfo(<?php echo htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8'); ?>)">
-                            <img src="<?php echo $image; ?>" loading="lazy" onerror="this.src='https://placehold.co/400x500?text=Maarksho'">
+                            <?php ProductMediaGallery::render($p);echo ProductApprovalFlow::html($p,$project); ?>
                             
                             <!-- Selection Checkbox for couples creator in active admin filter -->
                             <?php if ($can_create_couples && $filter === 'active'): ?>
@@ -12796,7 +12815,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             taskDiv.innerHTML = `
                                 <label class="flex items-center gap-3 cursor-pointer flex-1 py-1">
                                     <input type="checkbox" ${isDone ? 'checked' : ''} onchange="toggleOccasionTask('${t.id}')" class="w-4 h-4 accent-indigo-600 rounded">
-                                    <span class="text-xs font-semibold select-none">${escapeHtml(t.text)}</span>
+                                    <span class="text-xs font-semibold select-none">${escapeCampaignHtml(t.text)}</span>
                                 </label>
                                 <button type="button" onclick="deleteOccasionTask('${t.id}')" class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-all" title="حذف تسک">
                                     ✕
@@ -12832,7 +12851,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     }
                 }
 
-                function escapeHtml(text) {
+                function escapeCampaignHtml(text) {
                     const map = {
                         '&': '&amp;',
                         '<': '&lt;',
@@ -18293,12 +18312,18 @@ export default function CampaignLanding() {
             <?php endif; ?>
 
             <?php if ($tab === 'settings'): ?>
+                <link rel="stylesheet" href="assets/settings-workspace.css?v=1"><script defer src="assets/settings-workspace.js?v=1"></script>
                 <?php 
                 $t_img = $project['settings']['approval_timeout_image'] ?? $project['settings']['approval_timeout'] ?? 2880;
                 $t_lib = $project['settings']['approval_timeout_library'] ?? $project['settings']['approval_timeout'] ?? 2880;
                 $t_cal = $project['settings']['approval_timeout_calendar'] ?? $project['settings']['approval_timeout'] ?? 2880;
+                if (($project['settings']['approval_timeout_unit'] ?? '') !== 'minutes') {
+                    foreach (['t_img','t_lib','t_cal'] as $timeoutVariable) {
+                        if ($$timeoutVariable > 0 && $$timeoutVariable <= 120) $$timeoutVariable *= 60;
+                    }
+                }
                 ?>
-                <form method="POST" class="space-y-8 select-none" dir="rtl">
+                <form method="POST" id="project-settings-form" class="space-y-8 select-none settings-workspace" dir="rtl">
                     <input type="hidden" name="save_settings" value="1">
                     <div class="max-w-5xl mx-auto space-y-8">
                         <!-- Settings Column Container -->
@@ -20358,7 +20383,7 @@ async function handleRequest(request) {
                                          <label class="flex items-center gap-3 cursor-pointer">
                                              <input type="checkbox" name="prod_approval_split_enabled" value="1" <?php echo !empty($project['settings']['prod_approval_split_enabled']) ? 'checked' : ''; ?> class="w-5 h-5 rounded-lg border-slate-200 text-indigo-600 focus:ring-indigo-500/20">
                                              <span class="text-xs font-black text-indigo-950">فعال‌سازی تایید دو بخشی محصولات (استایل + دقت)</span>
-                                         </label>
+                                         </label><div class="p-4 bg-white border border-slate-200 rounded-2xl mt-4"><label for="prod-approval-order" class="font-bold text-sm">ترتیب بررسی تصاویر</label><select id="prod-approval-order" name="prod_approval_order" class="select mt-2"><option value="parallel" <?= ($project['settings']['prod_approval_order']??'parallel')==='parallel'?'selected':'' ?>>بدون اولویت؛ بررسی هم‌زمان</option><option value="style_first" <?= ($project['settings']['prod_approval_order']??'')==='style_first'?'selected':'' ?>>ابتدا استایل، سپس انطباق</option><option value="conformity_first" <?= ($project['settings']['prod_approval_order']??'')==='conformity_first'?'selected':'' ?>>ابتدا انطباق، سپس استایل</option></select><p class="text-xs text-slate-500 mt-2">در حالت ترتیبی، مرحلهٔ بعد پس از رسیدن تأیید مرحلهٔ اول به حدنصاب باز می‌شود و مهلت کامل خودش را از همان زمان خواهد داشت. مهلت‌ها در بخش زمان‌بندی تنظیم می‌شوند.</p></div>
                                      </div>
                                      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
                                          <div>
@@ -21123,9 +21148,10 @@ async function handleRequest(request) {
                                     <span>ذخیره کلیه‌ تنظیمات پروژه</span>
                                 </button>
                             </div>
+                        </div></div>
                         </form>
 
-                        <div class="card p-8 bg-slate-900 text-white rounded-[2.5rem] mt-8 shadow-2xl shadow-slate-950/20"><h2 class="font-black mb-6 text-xl flex items-center gap-3 text-white border-b border-white/10 pb-4">💬 مدیریت بازخوردهای آماده (Quick Phrases)</h2>
+                        <div id="settings-feedback" class="card p-8 bg-slate-900 text-white rounded-[2.5rem] mt-8 shadow-2xl shadow-slate-950/20"><h2 class="font-black mb-6 text-xl flex items-center gap-3 text-white border-b border-white/10 pb-4">💬 مدیریت بازخوردهای آماده (Quick Phrases)</h2>
                                 <div class="space-y-3 mb-8 max-h-64 overflow-y-auto pr-2">
                                     <?php foreach($project['settings']['feedbackOptions'] ?? [] as $opt): ?>
                                         <div class="flex items-center justify-between bg-white/10 px-5 py-3 rounded-2xl border border-white/5 group transition-all hover:bg-white/15">
@@ -21160,8 +21186,6 @@ async function handleRequest(request) {
                                     </form>
                                 </div>
                             </div>
-                        </div>
-                    </div>
             <?php endif; ?>
 
             <?php if ($tab === 'analysis' || $tab === 'sales_analysis'): ?>
@@ -21720,18 +21744,7 @@ async function handleRequest(request) {
         }
 
         // Add Feedback AJAX
-        function addFeedback() {
-            const text = document.getElementById('fb-text').value;
-            const cat = document.getElementById('fb-cat').value;
-            if(!text) return alert('متن خالی است');
-            
-            const fd = new FormData();
-            fd.append('add_feedback', '1');
-            fd.append('text', text);
-            fd.append('category', cat);
-            
-            fetch('admin.php?tab=settings', { method: 'POST', body: fd }).then(() => location.reload());
-        }
+
 
         // ==========================================
         // 🖼️ PRODUCT IMAGE DEBUG & BATCH EXTRACTOR JS ENGINE
@@ -22348,12 +22361,7 @@ async function handleRequest(request) {
         }
 
         // Social Confirmation Helper
-        function confirmSocial(hasSocial) {
-            if (!hasSocial) {
-                return confirm("⚠️ این محصول تصویر اختصاصی سوشیال (Social Image) ندارد.\n\nآیا مایلید از تصویر اصلی سایت برای ارسال استفاده شود؟\n(در صورت لغو، عملیات متوقف می‌شود)");
-            }
-            return true;
-        }
+
 
         async function resetCalendar() {
             if (!confirm('⚠️ هشدار جدی: آیا از بازنشانی و حذف کامل تقویم انتشار اطمینان دارید؟ با این کار تمامی برنامه‌ریزی‌های انجام شده برای ارسال پست‌ها به طور کامل حذف خواهند شد و این عملیات غیرقابل بازگشت است!')) {
@@ -23332,17 +23340,9 @@ async function handleRequest(request) {
             }
         }
 
-        function openEditFromManual() {
-            if(!currentManualProduct) return;
-            openEdit(currentManualProduct);
-            document.getElementById('manualModal').style.display = 'none';
-            document.body.style.overflow = '';
-        }
 
-        function deleteProductFromManual() {
-            if(!currentManualProduct) return;
-            deleteProduct(currentManualProduct.id);
-        }
+
+
 
         function clearProducts() {
             if(!confirm('تمام محصولات یافت شده پاک شوند؟')) return;
@@ -23449,23 +23449,9 @@ async function handleRequest(request) {
             }
         }
 
-        function closeEditSchedule() {
-            const modal = document.getElementById('edit-sched-modal');
-            if (modal) {
-                modal.classList.add('hidden');
-                modal.style.display = 'none';
-            }
-        }
 
-        function filterCalendar() {
-            const status = document.getElementById('filter-status')?.value || 'all';
-            const platform = document.getElementById('filter-platform')?.value || 'all';
-            document.querySelectorAll('.sched-item-row').forEach(el => {
-                const sMatch = (status === 'all' || el.dataset.status === status);
-                const pMatch = (platform === 'all' || el.dataset.platform === platform);
-                el.style.display = (sMatch && pMatch) ? 'flex' : 'none';
-            });
-        }
+
+
 
         function closeEditSchedule() {
             document.getElementById('edit-sched-modal').classList.add('hidden');
@@ -23518,9 +23504,12 @@ async function handleRequest(request) {
             if (!confirm(`آیا مطمئن هستید که می‌خواهید تمام ${pids.length} محصول این صفحه را ${msg} کنید؟`)) {
                 return;
             }
+            const reason=status==='rejected'?(prompt('علت رد تصاویر را وارد کنید:')||'').trim():'';
+            if(status==='rejected'&&!reason)return;
             showLoader(`در حال ${msg} کردن دسته جمعی محصولات...`);
             const fd = new FormData();
             fd.append('ajax_action', 'bulk_status');
+            fd.append('reason', reason);
             fd.append('status', status);
             pids.forEach(id => {
                 fd.append('pids[]', id);
@@ -24312,6 +24301,7 @@ ${desc2}
         }
 
         function filterCalendar(status) {
+            if(status===undefined){status=document.getElementById('filter-status')?.value||'all';const platform=document.getElementById('filter-platform')?.value||'all';document.querySelectorAll('.sched-item-row').forEach(el=>el.style.display=((status==='all'||el.dataset.status===status)&&(platform==='all'||el.dataset.platform===platform))?'flex':'none');}
             const posts = document.querySelectorAll('.cal-v2-post');
             posts.forEach(p => {
                 const isAll = (status === 'all');
@@ -24437,29 +24427,8 @@ ${desc2}
         function showManualInfo(p) {
             currentManualProduct = p;
             
-            // Build Admin Carousel
-            adminCarouselImages = [];
-            if (p.social_image && !p.social_image.includes('placehold')) {
-                adminCarouselImages.push(p.social_image);
-            }
-            let gal = p.gallery;
-            if (gal && typeof gal === 'string') {
-                try { gal = JSON.parse(gal); } catch(e) { gal = []; }
-            }
-            if (gal && Array.isArray(gal)) {
-                gal.forEach(img => {
-                    if (img && !img.includes('placehold')) {
-                        adminCarouselImages.push(img);
-                    }
-                });
-            }
-            if (p.image && !p.image.includes('placehold')) {
-                adminCarouselImages.push(p.image);
-            }
-            adminCarouselImages = [...new Set(adminCarouselImages)];
-            if (adminCarouselImages.length === 0) {
-                adminCarouselImages.push(p.social_image || p.image || 'https://placehold.co/400x500?text=No+Image');
-            }
+            adminCarouselImages=window.productMediaUrls(p);
+            if(!adminCarouselImages.length)adminCarouselImages=['https://placehold.co/400x500?text=No+Image'];
 
             const wrapper = document.getElementById('m-carousel-wrapper');
             wrapper.innerHTML = '';
@@ -24899,6 +24868,7 @@ ${desc2}
             setPreviewPlatform('telegram');
             renderProductImageSelection('manual-product-image-picker-container', p.id, 'manual_selected_images', 'manual_publish_mode');
             document.getElementById('manualModal').style.display = 'flex';
+            window.updateApprovalControls?.(p.id,document.getElementById('manualModal'));
             document.body.style.overflow = 'hidden';
         }
 
@@ -25037,30 +25007,7 @@ ${desc2}
             updateCaptionPreview();
         }
 
-        function updateCaptionPreview() {
-            const p = currentManualProduct;
-            if(!p) return;
 
-            // UTM Logic
-            const baseUrl = p.link || '';
-            const utm = `?utm_source=${currentPreviewPlatform}&utm_medium=social&utm_campaign=manual_share&pid=${p.id}`;
-            const finalLink = baseUrl.includes('?') ? baseUrl + utm.replace('?', '&') : baseUrl + utm;
-            document.getElementById('m-utm-link').innerText = finalLink;
-
-            let caption = '';
-            const buyText = 'خرید آنلاین';
-            const prettyLink = (currentPreviewPlatform === 'telegram' || currentPreviewPlatform === 'bale' || currentPreviewPlatform === 'rubika') 
-                              ? `[${buyText}](${finalLink})` 
-                              : finalLink;
-
-            if (currentPreviewPlatform === 'instagram') {
-                caption = `🛍️ ${p.name}\n\n✨ جزئیات محصول:\n🎨 رنگبندی: ${p.color || '---'}\n📦 وضعیت: ${p.status === 'active' ? 'موجود' : 'ناموجود'}\n\n💰 قیمت: ${p.price || 'استعلام بگیرید'}\n\n🔗 برای خرید روی لینک بایو کلیک کنید یا دایرکت پیام بدید.\n#خرید_آنلاین #فروشگاه #${currentPreviewPlatform}`;
-            } else {
-                caption = `🌟 ${p.name}\n\n💰 قیمت: ${p.price || 'تماس بگیرید'}\n🎨 رنگبندی: ${p.color || '---'}\n📦 موجودی: ${p.stock_online || 'محدود'}\n\n✅ شناسه کالا: ${p.sku}\n\n🔗 مشاهده و خرید آنلاین:\n${prettyLink}`;
-            }
-
-            document.getElementById('m-caption').innerText = caption;
-        }
 
         async function directSendWithConfirm() {
             if(!currentManualProduct) return;
