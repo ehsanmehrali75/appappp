@@ -15,18 +15,20 @@ class ProductApprovalFlow {
         if(($settings['approval_timeout_unit']??'')!=='minutes'&&$value>0&&$value<=120)$value*=60;
         return max(0,$value)*60;
     }
+    public static function hasImage($p){return (bool)WebsiteCatalogSync::photos($p);}
     public static function state($p,$settings,$now=null){
-        $now=$now??time();$order=self::order($settings);$flow=$p['website_sync']['approval_flow']??[];
+        $hasImage=self::hasImage($p);$now=$now??time();$order=self::order($settings);$flow=$p['website_sync']['approval_flow']??[];
         $generation=hash('sha256',json_encode([$p['image']??'',$p['extractedAt']??0]));if(($flow['generation']??'')!==$generation)$flow=['generation'=>$generation];
         $start=max(0,(int)($p['extractedAt']??0));
         $first=$order[0];$second=$order[1];
         if(self::approved($p,$settings,$first)&&empty($flow['approved_'.$first]))$flow['approved_'.$first]=max($start,(int)($settings['prod_approval_sequence_since']??$now));
         $stages=[];foreach([1,2] as $stage){$approved=self::approved($p,$settings,$stage);$rejected=($p['stage'.$stage.'_decision']??'')==='rejected';$blocked=$stage===$second&&!self::approved($p,$settings,$first);
             $at=$stage===$first?$start:(int)($flow['approved_'.$first]??0);$duration=self::duration($p,$settings);
-            $stages[$stage]=['label'=>$stage===1?'استایل':'انطباق','state'=>$rejected?'rejected':($approved?'approved':($blocked?'blocked':'pending')),'started_at'=>$at,'deadline'=>!$blocked&&$duration>0&&$at>0?$at+$duration:0];}
+            $stages[$stage]=['label'=>$stage===1?'استایل':'انطباق','state'=>!$hasImage?'waiting_image':($rejected?'rejected':($approved?'approved':($blocked?'blocked':'pending'))),'started_at'=>$hasImage?$at:0,'deadline'=>$hasImage&&!$blocked&&$duration>0&&$at>0?$at+$duration:0];}
         return ['flow'=>$flow,'stages'=>$stages,'first'=>$first,'second'=>$second];
     }
     public static function allowed($p,$settings,$stage){
+        if(!self::hasImage($p))return false;
         if(!self::enabled($settings))return true;
         foreach([1,2] as $s)if(($p['stage'.$s.'_decision']??'')==='rejected')return false;
         return (self::state($p,$settings)['stages'][$stage]['state']??'blocked')==='pending';
@@ -88,6 +90,7 @@ class ProductApprovalFlow {
     }
     public static function html($p,$project){
         if(!self::enabled($project['settings']??[])||($p['status']??'')!=='pending')return '';
+        if(!self::hasImage($p))return '<div class="approval-waiting-image">منتظر عکس نهایی</div>';
         $state=self::state($p,$project['settings']);$html='<div class="approval-deadlines" data-approval-product="'.htmlspecialchars((string)($p['id']??''),ENT_QUOTES,'UTF-8').'">';
         foreach(self::order($project['settings']) as $s){$phase=$state['stages'][$s];$label=$phase['label'];$text=['approved'=>'تأیید شده','rejected'=>'رد شده','blocked'=>'پس از تأیید '.$state['stages'][$state['first']]['label'].' فعال می‌شود','pending'=>'بدون محدودیت زمانی'][$phase['state']];
             $html.='<div data-approval-stage="'.$s.'" data-phase="'.$phase['state'].'"><strong>'.$label.'</strong> <span'.($phase['state']==='pending'&&$phase['deadline']?' data-approval-deadline="'.$phase['deadline'].'"':'').'>'.$text.'</span></div>';}

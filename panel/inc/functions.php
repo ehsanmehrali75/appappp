@@ -3365,6 +3365,7 @@ function autoApprovePendingProducts(&$project, $advanceSequential = false) {
     if (isset($project['products']) && is_array($project['products'])) {
         foreach ($project['products'] as &$p) {
             if (($p['status'] ?? 'active') === 'pending') {
+                if(!ProductApprovalFlow::hasImage($p))continue;
                 if(ProductApprovalFlow::enabled($project['settings'])){if($advanceSequential)ProductApprovalFlow::autoAdvance($p,$project,$now);continue;}
                 $isImageRelated = (!empty($p['is_manual_image']) || !empty($p['uploaded_by']));
                 $extractedAt = $p['extractedAt'] ?? 0;

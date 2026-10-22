@@ -113,6 +113,12 @@ class ProductApprovalFlow(unittest.TestCase):
         self.decide('style','approve_stage1');self.clear_cache();code,page=self.case.request(viewer,'/panel/portal.php?tab=pending')
         self.assertEqual(code,200);pending=page.split('id="tab-pending"')[1].split('id="tab-calendar"')[0];self.assertIn('data-product-id="one"',pending);self.assertIn('data-approval-deadline=',pending)
 
+    def test_missing_or_reference_only_images_never_start_approval_or_auto_approve(self):
+        source="""require $argv[1];$project=getCurrentProject('p',true);$p=$project['products'][0];foreach($project['products'] as $item)if($item['id']==='one')$p=$item;$p['image']='https://placehold.co/400x500';$p['gallery']=[];$p['images_list']=[];$p['reference_gallery']=['uploads/original.png'];$p['extractedAt']=time()-999999;$state=ProductApprovalFlow::state($p,$project['settings']);$html=ProductApprovalFlow::html($p,$project);$allowed=ProductApprovalFlow::allowed($p,$project['settings'],1);ProductApprovalFlow::autoAdvance($p,$project,time());$sequential=$p['status'];$project['products']=[$p];$project['settings']['prod_approval_order']='parallel';autoApprovePendingProducts($project,true);echo json_encode([$state['stages'][1]['deadline'],$state['stages'][1]['state'],$html,$allowed,$sequential,$project['products'][0]['status']]);"""
+        result=subprocess.run([fixtures.PHP,'-r',source,str(self.case.app/'panel/inc/functions.php')],check=True,capture_output=True,text=True)
+        deadline,state,html,allowed,sequential,parallel=json.loads(result.stdout)
+        self.assertEqual(deadline,0);self.assertEqual(state,'waiting_image');self.assertIn('منتظر عکس نهایی',html);self.assertNotIn('data-approval-deadline',html);self.assertFalse(allowed);self.assertEqual(sequential,'pending');self.assertEqual(parallel,'pending')
+
     def test_automatic_second_stage_gets_full_duration_after_first_transition(self):
         source="""require $argv[1];$p=getCurrentProject('p',true);$p['settings']['approval_timeout_image']=1;$x=$p['products'][0];foreach($p['products'] as $item)if($item['id']==='one')$x=$item;$now=time();$x['extractedAt']=$now-120;ProductApprovalFlow::autoAdvance($x,$p,$now);$first=$x;ProductApprovalFlow::autoAdvance($x,$p,$now+59);$middle=$x['status'];ProductApprovalFlow::autoAdvance($x,$p,$now+60);echo json_encode([$first,$middle,$x['status'],$now]);"""
         r=subprocess.run([fixtures.PHP,'-r',source,str(self.case.app/'panel/inc/functions.php')],check=True,capture_output=True,text=True)
