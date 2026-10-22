@@ -4,3 +4,9 @@
 
 .portal-product-card>div:has(>.product-media-carousel)~div{align-self:stretch;width:100%}
 .ig-post-card>.ig-overlay{pointer-events:none}.ig-post-card>.ig-overlay :is(button,a,input){pointer-events:auto}.ig-post-card .product-media-controls{z-index:25}
+
+/* Keep management reachable without hover, including touch and keyboard users. */
+.library-product-management{position:relative;z-index:35;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:10px 12px;background:#edf3ee;border-top:1px solid #d5e2d8;color:#52665b}
+.library-product-management button{min-height:44px;padding:9px 12px;border:1px solid #bfd0c3;border-radius:12px;background:#fff;color:#294b38;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.library-product-management span{font-size:10px}.library-product-management button:focus-visible{outline:3px solid #54816a;outline-offset:2px}
+.library-product-management .library-product-delete{color:#9a3940;border-color:transparent;background:transparent;font-weight:400}

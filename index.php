@@ -23,139 +23,29 @@ $temp_mobile = '';
 // Check order placement and payment state
 $order_success = null;
 $order_error = null;
+if(empty($_SESSION['checkout_nonce']))$_SESSION['checkout_nonce']=bin2hex(random_bytes(16));
 
-// ----------------------------------------------------
-// Handle ZarinPal Gateway Return Callback
-// ----------------------------------------------------
-if (isset($_GET['payment_callback']) && $_GET['payment_callback'] === 'zarinpal') {
-    $cb_order_id = trim($_GET['order_id'] ?? '');
-    $cb_authority = trim($_GET['Authority'] ?? '');
-    $cb_status = trim($_GET['Status'] ?? '');
-
-    $order = null;
-    if (!empty($cb_order_id)) {
-        $order = getOrderById($cb_order_id);
-    }
-    if (!$order && !empty($cb_authority)) {
-        $order = getOrderByAuthority($cb_authority);
-    }
-
-    if ($order) {
-        if (strtoupper($cb_status) === 'OK') {
-            $verifyRes = zarinpalVerifyPayment($cb_authority ?: ($order['authority'] ?? ''), $order['amount']);
-            if ($verifyRes['success']) {
-                $order['status'] = 'completed';
-                $order['ref_code'] = (string)($verifyRes['ref_id'] ?? ($order['ref_code'] ?? rand(100000, 999999)));
-                $order['card_pan'] = $verifyRes['card_pan'] ?? '';
-                $order['card_hash'] = $verifyRes['card_hash'] ?? '';
-                $order['paid_at'] = date('Y-m-d H:i:s');
-                saveOrder($order);
-
-                // Automatically provision / activate user portal account
-                savePortalUser($order['customer_mobile'], $order['customer_name'], '', '', 0);
-
-                $order_success = $order;
-            } else {
-                $order['status'] = 'failed';
-                $order['error_message'] = $verifyRes['error'] ?? 'خطا در تایید تراکنش بانکی';
-                saveOrder($order);
-                $order_error = '❌ تراکنش تایید نشد: ' . ($verifyRes['error'] ?? 'پرداخت ناموفق');
-            }
-        } else {
-            $order['status'] = 'canceled';
-            saveOrder($order);
-            $order_error = '⚠️ فرآیند پرداخت در درگاه زرین‌پال توسط شما لغو شد یا تراکنش ناموفق بود.';
-        }
-    } else {
-        $order_error = 'سفارش مورد نظر در سیستم یافت نشد یا منقضی شده است.';
-    }
+// Purchases are verified against a private, server-priced order before provisioning.
+require_once __DIR__.'/panel/inc/ProjectPurchases.php';
+if (isset($_GET['payment_callback']) && $_GET['payment_callback']==='zarinpal') {
+    try {
+        $order_success=(new ProjectPurchases())->confirm((string)($_GET['order_id']??''),(string)($_GET['Authority']??''),(string)($_GET['Status']??''));
+        $_SESSION['purchase_project_id']=$order_success['project_id'];
+        $_SESSION['checkout_nonce']=bin2hex(random_bytes(16));
+        if(isUser()&&SessionIdentity::includePurchasedProject(getCurrentProject($order_success['project_id'],true)))unset($_SESSION['purchase_project_id']);
+        if(isMainAdmin())unset($_SESSION['purchase_project_id']);
+    } catch(Throwable $e) { $order_error=$e instanceof RuntimeException?$e->getMessage():'تأیید پرداخت تکمیل نشد؛ رسید پرداخت را برای پشتیبانی نگه دارید.'; }
 }
-
-// ----------------------------------------------------
-// Handle Checkout Form Submission
-// ----------------------------------------------------
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_checkout_order'])) {
-    $c_name = trim($_POST['customer_name'] ?? '');
-    $c_mobile = trim($_POST['customer_mobile'] ?? '');
-    $c_business = trim($_POST['customer_business'] ?? '');
-    $c_plan_id = trim($_POST['plan_id'] ?? 'plan_pro');
-    $c_cycle = trim($_POST['billing_cycle'] ?? 'yearly');
-    $c_gateway = trim($_POST['payment_gateway'] ?? 'zarinpal');
-    
-    if (empty($c_name) || empty($c_mobile)) {
-        $order_error = 'لطفاً نام و شماره همراه معتبر خود را وارد کنید.';
-    } else {
-        $selected_plan = null;
-        foreach ($subscription_plans as $p) {
-            if ($p['id'] === $c_plan_id) {
-                $selected_plan = $p;
-                break;
-            }
-        }
-        if (!$selected_plan) {
-            $selected_plan = $subscription_plans[1] ?? reset($subscription_plans);
-        }
-        
-        $price = ($c_cycle === 'yearly') ? ($selected_plan['price_yearly'] ?? 0) : ($selected_plan['price_monthly'] ?? 0);
-        $order_id = 'ORD-' . date('Ymd') . '-' . rand(1000, 9999);
-        
-        $order_data = [
-            'order_id' => $order_id,
-            'customer_name' => $c_name,
-            'customer_mobile' => $c_mobile,
-            'customer_business' => $c_business,
-            'plan_id' => $selected_plan['id'],
-            'plan_name' => $selected_plan['name'],
-            'billing_cycle' => $c_cycle,
-            'amount' => $price,
-            'payment_gateway' => $c_gateway,
-            'status' => 'pending',
-            'created_at' => date('Y-m-d H:i:s')
-        ];
-        
-        if ($c_gateway === 'test') {
-            // Simulated Test Gateway
-            $order_data['status'] = 'completed';
-            $order_data['ref_code'] = 'TEST-' . rand(100000, 999999);
-            $order_data['paid_at'] = date('Y-m-d H:i:s');
-            saveOrder($order_data);
-            savePortalUser($c_mobile, $c_name, '', '', 0);
-            $order_success = $order_data;
-        } else {
-            // ZarinPal Payment Gateway
-            $merchantId = trim($site_settings['zarinpal_merchant_id'] ?? '');
-            $isSandbox = !empty($site_settings['zarinpal_sandbox']);
-            
-            if (empty($merchantId) && !$isSandbox) {
-                // If Merchant ID is not yet configured, complete as demo & advise
-                $order_data['status'] = 'completed';
-                $order_data['ref_code'] = 'ZP-DEMO-' . rand(100000, 999999);
-                $order_data['paid_at'] = date('Y-m-d H:i:s');
-                saveOrder($order_data);
-                savePortalUser($c_mobile, $c_name, '', '', 0);
-                $order_success = $order_data;
-            } else {
-                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-                $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-                $reqUri = strtok($_SERVER['REQUEST_URI'] ?? '', '?');
-                $callbackUrl = $protocol . $host . $reqUri . '?payment_callback=zarinpal&order_id=' . urlencode($order_id);
-                
-                $descPrefix = trim($site_settings['zarinpal_description_prefix'] ?? 'خرید اشتراک مارکشو فلو - سفارش ');
-                $description = $descPrefix . $order_id . ' (' . $selected_plan['name'] . ')';
-                
-                $zarinRes = zarinpalRequestPayment($price, $description, $callbackUrl, $c_mobile, '', $order_id);
-                
-                if ($zarinRes['success'] && !empty($zarinRes['payment_url'])) {
-                    $order_data['authority'] = $zarinRes['authority'];
-                    saveOrder($order_data);
-                    header('Location: ' . $zarinRes['payment_url']);
-                    exit;
-                } else {
-                    $order_error = '❌ خطا در اتصال به درگاه زرین‌پال: ' . ($zarinRes['error'] ?? 'خطای نامشخص');
-                }
-            }
-        }
-    }
+if (($_SERVER['REQUEST_METHOD']??'GET')==='POST' && isset($_POST['submit_checkout_order'])) {
+    RequestSecurity::enforce();
+    try {
+        $secure=($_SERVER['HTTPS']??'')==='on'||($_SERVER['HTTP_X_FORWARDED_PROTO']??'')==='https';
+        $host=$_SERVER['HTTP_HOST']??'';
+        if(!preg_match('/^[a-zA-Z0-9.:-]+$/D',$host))throw new RuntimeException('آدرس بازگشت معتبر نیست.');
+        if(!is_string($_POST['checkout_nonce']??null)||!hash_equals($_SESSION['checkout_nonce'],$_POST['checkout_nonce']))throw new RuntimeException('فرم خرید قدیمی است؛ صفحه را تازه کنید و دوباره تلاش کنید.');
+        $purchase=(new ProjectPurchases())->start($_POST,$site_settings,($secure?'https':'http').'://'.$host.'/index.php');
+        redirect($purchase['payment_url']);
+    }catch(Throwable $e){$order_error=$e instanceof RuntimeException?$e->getMessage():'ثبت سفارش تکمیل نشد؛ دوباره تلاش کنید.';}
 }
 
 // Handle OTP Send requests
@@ -282,7 +172,7 @@ if (isset($_POST['verify_code'])) {
                 redirect('panel/support.php');
             }
             
-            redirect(canAccessManagement() ? 'panel/admin.php' : 'panel/portal.php');
+            redirect(ProjectOnboarding::landing(canAccessManagement() ? 'panel/admin.php' : 'panel/portal.php'));
         } else {
             $login_error = 'کد وارد شده صحیح نیست یا منقضی شده است.';
             $temp_mobile = $mobile;
@@ -346,7 +236,7 @@ if(isset($_POST['login'])&&!LoginThrottle::check(trim((string)($_POST['user']??'
                     LoginThrottle::check($u,true);
                     session_regenerate_id(true);
                     if (!SessionIdentity::beginPassword($u, $p, $project['id'])) continue;
-                    redirect(canAccessManagement() ? 'panel/admin.php' : 'panel/portal.php');
+                    redirect(ProjectOnboarding::landing(canAccessManagement() ? 'panel/admin.php' : 'panel/portal.php'));
                 }
             }
         }
@@ -838,13 +728,15 @@ $show_login_modal = ($login_error !== '' || $sms_notification !== '' || isset($_
 
     <!-- Checkout Modal -->
     <div id="checkout-modal" class="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 max-w-lg w-full relative shadow-2xl">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 max-w-lg w-full relative shadow-2xl max-h-[90vh] overflow-y-auto">
             <button onclick="closeCheckoutModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white font-black text-xl">✕</button>
 
             <h3 class="text-lg font-black text-white mb-2">تکمیل سفارش و فعال‌سازی آنلاین</h3>
             <p id="checkout-plan-title" class="text-xs text-indigo-400 font-bold mb-6"></p>
 
             <form method="POST" class="space-y-4">
+                <input type="hidden" name="app_csrf" value="<?php echo htmlspecialchars(RequestSecurity::token(),ENT_QUOTES,'UTF-8'); ?>">
+                <input type="hidden" name="checkout_nonce" value="<?php echo htmlspecialchars($_SESSION['checkout_nonce']); ?>">
                 <input type="hidden" name="plan_id" id="checkout-plan-id" value="plan_pro">
                 <input type="hidden" name="billing_cycle" id="checkout-cycle-input" value="yearly">
 
@@ -860,22 +752,14 @@ $show_login_modal = ($login_error !== '' || $sms_notification !== '' || isset($_
 
                 <div>
                     <label class="block text-xs font-bold text-slate-400 mb-1">نام فروشگاه / کسب‌وکار</label>
-                    <input type="text" name="customer_business" placeholder="مثال: پوشاک آراکس" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-indigo-500">
+                    <input type="text" name="customer_business" required placeholder="مثال: پوشاک آراکس" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-indigo-500">
                 </div>
 
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 mb-1">انتخاب درگاه پرداخت:</label>
-                    <div class="grid grid-cols-2 gap-2">
-                        <label class="p-3 bg-slate-800 border border-indigo-500/50 rounded-xl flex items-center gap-2 cursor-pointer text-xs text-white font-bold">
-                            <input type="radio" name="payment_gateway" value="zarinpal" checked>
-                            <span>درگاه زرین‌پال ⚡</span>
-                        </label>
-                        <label class="p-3 bg-slate-800 border border-slate-700 rounded-xl flex items-center gap-2 cursor-pointer text-xs text-slate-300 font-bold">
-                            <input type="radio" name="payment_gateway" value="test">
-                            <span>درگاه تست و فعال‌سازی</span>
-                        </label>
-                    </div>
-                </div>
+                <?php if(!isUser()||!SessionIdentity::member(getCurrentProject())): ?>
+                <div><label class="block text-xs font-bold text-slate-400 mb-1">نام کاربری حساب جدید</label><input name="account_username" required minlength="3" maxlength="60" autocomplete="username" dir="ltr" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white"><p class="text-xs text-slate-400">اگر حساب دارید، ابتدا وارد شوید؛ پروژهٔ جدید به همان حساب اضافه می‌شود.</p></div>
+                <div><label class="block text-xs font-bold text-slate-400 mb-1">رمز حساب جدید؛ حداقل ۱۰ کاراکتر</label><input name="account_password" type="password" minlength="10" maxlength="72" required autocomplete="new-password" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white"></div>
+                <?php else: ?><p class="text-xs text-emerald-300">پروژهٔ جدید پس از تأیید پرداخت به حساب فعلی شما اضافه می‌شود.</p><?php endif; ?>
+                <input type="hidden" name="payment_gateway" value="zarinpal"><p class="text-xs text-slate-400">پرداخت از طریق زرین‌پال انجام می‌شود. پس از تأیید بانک، راهنمای راه‌اندازی پروژه در دسترس است.</p>
 
                 <button type="submit" name="submit_checkout_order" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl shadow-lg mt-4">
                     پرداخت آنلاین و تحویل آنی 💳
@@ -911,7 +795,7 @@ $show_login_modal = ($login_error !== '' || $sms_notification !== '' || isset($_
             </div>
 
             <div class="flex gap-3">
-                <a href="index.php?action=login" class="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl text-center shadow-lg transition-all">ورود به پورتال 👤</a>
+                <a href="<?php $paidProject=getCurrentProject($order_success['project_id'],true);echo htmlspecialchars((isMainAdmin()||SessionIdentity::member($paidProject))?ProjectOnboarding::url($paidProject['id']):'/index.php?action=login',ENT_QUOTES,'UTF-8'); ?>" class="flex-1 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl text-center shadow-lg transition-all">ورود و راه‌اندازی پروژه ←</a>
                 <button onclick="document.getElementById('receipt-modal').remove()" class="px-5 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition-all">بستن</button>
             </div>
         </div>

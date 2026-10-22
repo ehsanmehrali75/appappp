@@ -116,6 +116,27 @@ class SessionIdentity {
         return true;
     }
 
+    /** A paid project may join a live session only through an already verified matching account. */
+    public static function includePurchasedProject($project) {
+        if(!is_array($project)||empty($project['id']))return false;
+        $identity=$_SESSION['auth_identity']??[];
+        if(!in_array($identity['kind']??'', ['password','otp'],true))return false;
+        self::$accounts=null;
+        $targets=self::accounts()['projects'][$project['id']]??[];
+        foreach(array_keys($identity['grants']??[]) as $origin){
+            $source=self::member(['id'=>(string)$origin]);if(!$source)continue;
+            foreach($targets as $target){
+                if(($target['username']??'')!==$source['username'])continue;
+                if($identity['kind']==='otp')$same=($identity['mobile']??'')!==''&&($target['mobile']??'')===$identity['mobile'];
+                else $same=hash_equals($source['password'],$target['password'])||(!password_get_info($source['password'])['algo']&&password_verify($source['password'],$target['password']));
+                if(!$same)continue;
+                $_SESSION['auth_identity']['grants'][$project['id']]=['username'=>$target['username'],'proof'=>self::proof($target,$identity['kind'])];
+                return self::select($project);
+            }
+        }
+        return false;
+    }
+
     /** Generic support tickets must not merge unrelated equal usernames. */
     public static function supportActor($projectId) {
         $username = $_SESSION['user']['username'] ?? '';

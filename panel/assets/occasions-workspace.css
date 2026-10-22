@@ -1,0 +1,23 @@
+/* Scoped to the admin planning workspace; existing forms and actions are retained. */
+#occasions-workspace{min-width:0;color:#2e4338;line-height:1.8}
+#occasions-workspace>div:first-of-type{align-items:flex-start;gap:20px}
+#occasions-workspace h2{font-size:clamp(21px,2vw,28px);line-height:1.6;margin:8px 0}
+#occasions-workspace p{line-height:1.9}
+#occasions-workspace .occasions-columns{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:22px;align-items:start}
+#occasions-workspace .occasions-columns>div{min-width:0}
+#occasions-workspace .card{border-radius:24px!important;padding:24px!important}
+#occasions-workspace .timeline-occasion-card{padding:18px;border-radius:18px;overflow-wrap:anywhere}
+#occasions-workspace :is(input,select,textarea){max-width:100%;min-width:0;font-size:13px}
+#occasions-workspace .btn{min-height:44px;white-space:normal;line-height:1.7}
+#occasions-workspace .bg-slate-900.card{background:#29483c!important;color:#fff!important;border-color:#29483c!important}
+#occasions-workspace .bg-slate-900.card :is(h3,h4){color:#fff!important}
+#occasions-workspace .bg-slate-900.card :is(.text-slate-400,.text-slate-300){color:#dae6de!important}
+#occasions-workspace [id$="-modal"].fixed{z-index:1500;overflow-y:auto;overscroll-behavior:contain}
+#occasions-workspace [id$="-modal"].fixed>div{max-height:calc(100dvh - 32px);overflow-y:auto;width:100%;border-radius:24px}
+#occasions-workspace [id$="-modal"].hidden{display:none!important}
+#occasions-workspace #formula-brief-details{overflow-wrap:anywhere}
+@media(max-width:1100px){#occasions-workspace .occasions-columns{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:640px){#occasions-workspace .card{padding:16px!important}#occasions-workspace>div:first-of-type>div{width:100%;min-width:0}#occasions-workspace .flex{flex-wrap:wrap}#occasions-workspace .timeline-occasion-card{padding:14px}#occasions-workspace [id$="-modal"].fixed{padding:12px}#occasions-workspace [id$="-modal"].fixed>div{max-height:calc(100dvh - 24px)}#occasions-workspace .grid-3{grid-template-columns:minmax(0,1fr)}}
+#occasions-workspace [id$="-modal"].fixed>div{display:block;flex-wrap:nowrap}
+#occasions-workspace [id$="-modal"].fixed>div>div{min-width:0}
+#occasions-workspace [id$="-modal"] .font-mono{overflow-wrap:anywhere;white-space:normal}

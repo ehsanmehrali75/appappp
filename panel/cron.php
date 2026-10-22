@@ -4,6 +4,7 @@
  * This file should be triggered every 1-5 minutes
  */
 require_once 'inc/functions.php';
+require_once __DIR__.'/inc/OnboardingCrawl.php';
 
 // The global worker changes multiple projects; only CLI or an authenticated main administrator may run it.
 if (PHP_SAPI !== 'cli') {
@@ -44,12 +45,13 @@ if (!isSqlActive()) {
 $conn = getConn();
 
 // 1. Sync Job Statuses (Optional sanity check)
-$stuck = $conn ? $conn->query("SELECT COUNT(*) as count FROM scraping_jobs WHERE status = 'processing' AND started_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)") : false;
+$staleTime=$conn instanceof SQLite3ToMysqliWrapper?"datetime('now', '-1 hour')":'DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 HOUR)';
+$stuck = $conn ? $conn->query("SELECT COUNT(*) as count FROM scraping_jobs WHERE status = 'processing' AND started_at < $staleTime") : false;
 if ($stuck && ($stuckRow = $stuck->fetch_assoc())) {
     $stuckCount = $stuckRow['count'] ?? 0;
     if ($stuckCount > 0) {
         logSystem("[Cron] Resetting $stuckCount stuck jobs...");
-        $conn->query("UPDATE scraping_jobs SET status = 'pending' WHERE status = 'processing' AND started_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)");
+        $conn->query("UPDATE scraping_jobs SET status = 'pending' WHERE status = 'processing' AND started_at < $staleTime");
     }
 }
 
@@ -72,13 +74,16 @@ while ($pendingJobs && BackgroundWorker::hasTime() && ($job = $pendingJobs->fetc
     if (isset($_GET['ajax'])) flush();
     
     // Mark as processing
-    $conn->query("UPDATE scraping_jobs SET status = 'processing', started_at = NOW() WHERE id = '$jid'");
+    if(!$conn->query("UPDATE scraping_jobs SET status = 'processing', started_at = CURRENT_TIMESTAMP WHERE id = '$jid'")){logSystem('[Scraper] Could not claim job '.$jid);continue;}
     
     try {
         $project = getCurrentProject($pid);
         if (!$project) throw new Exception("Project not found");
 
-        if ($type === 'discovery') {
+        $setupCrawl=strpos($type,'onboarding_')===0;$GLOBALS['onboarding_crawl']=$setupCrawl;
+        $productJobType=$setupCrawl?'onboarding_product':'product_sync';
+        $categoryJobType=$setupCrawl?'onboarding_category':'category_sync';
+        if ($type === 'discovery' || $type === 'onboarding_discovery') {
             logSystem("[Scraper] Running discovery for $url...");
             
             // Check if this is already a product listing page
@@ -89,21 +94,22 @@ while ($pendingJobs && BackgroundWorker::hasTime() && ($job = $pendingJobs->fetc
                 foreach ($products as $newP) {
                     $pUrl = $conn->real_escape_string($newP['link']);
                     $conn->query("INSERT IGNORE INTO scraping_jobs (project_id, url, type, status, priority) 
-                                  VALUES ('$pid', '$pUrl', 'product_sync', 'pending', 0)");
+                                  VALUES ('$pid', '$pUrl', '$productJobType', 'pending', 0)");
                     $newCount++;
                 }
                 $summary = "Queued $newCount product sync jobs from listing";
             } else {
                 $categories = scrapeCategories($url);
+                if($setupCrawl&&!$categories)throw new RuntimeException('هیچ محصول یا دسته‌بندی قابل خواندن پیدا نشد؛ از اپ دسکتاپ استفاده کنید.');
                 logSystem("[Scraper] Found " . count($categories) . " categories.");
                 foreach ($categories as $cat) {
                     $catUrl = $conn->real_escape_string($cat['url']);
                     $conn->query("INSERT IGNORE INTO scraping_jobs (project_id, url, type, status, priority) 
-                                  VALUES ('$pid', '$catUrl', 'category_sync', 'pending', 1)");
+                                  VALUES ('$pid', '$catUrl', '$categoryJobType', 'pending', 1)");
                 }
                 $summary = "Found " . count($categories) . " categories";
             }
-        } elseif ($type === 'category_sync') {
+        } elseif ($type === 'category_sync' || $type === 'onboarding_category') {
             $products = scrapeProductsFromCategory($url);
             logSystem("[Scraper] Found " . count($products) . " products in category. Queuing deep sync...");
             
@@ -111,10 +117,15 @@ while ($pendingJobs && BackgroundWorker::hasTime() && ($job = $pendingJobs->fetc
             foreach ($products as $newP) {
                 $pUrl = $conn->real_escape_string($newP['link']);
                 $conn->query("INSERT IGNORE INTO scraping_jobs (project_id, url, type, status, priority) 
-                              VALUES ('$pid', '$pUrl', 'product_sync', 'pending', 0)");
+                              VALUES ('$pid', '$pUrl', '$productJobType', 'pending', 0)");
                 $newCount++;
             }
             $summary = "Queued $newCount product sync jobs";
+        } elseif ($type === 'onboarding_product') {
+            $deepData=getProductDeepData(['link'=>$url]);
+            if(empty($deepData['sku'])&&empty($deepData['image'])&&empty($deepData['description']))throw new RuntimeException('صفحهٔ محصول قابل خواندن نبود؛ اپ دسکتاپ را امتحان کنید.');
+            $count=OnboardingCrawl::collect($pid,$url,$deepData);
+            $summary='Website observations saved for import preview; rows: '.$count;
         } elseif ($type === 'product_sync') {
 /* ... */
             // Atomic product sync
@@ -141,7 +152,7 @@ while ($pendingJobs && BackgroundWorker::hasTime() && ($job = $pendingJobs->fetc
             throw new Exception("Unknown job type: $type");
         }
 
-        $conn->query("UPDATE scraping_jobs SET status = 'completed', completed_at = NOW(), result_summary = '$summary' WHERE id = '$jid'");
+        if(!$conn->query("UPDATE scraping_jobs SET status = 'completed', completed_at = CURRENT_TIMESTAMP, result_summary = '$summary' WHERE id = '$jid'"))throw new RuntimeException('ثبت نتیجهٔ صف ناموفق بود.');
         logSystem("[Scraper] ✅ Job $jid completed.");
 
     } catch (Exception $e) {
@@ -149,6 +160,7 @@ while ($pendingJobs && BackgroundWorker::hasTime() && ($job = $pendingJobs->fetc
         $conn->query("UPDATE scraping_jobs SET status = 'failed', error_message = '$msg' WHERE id = '$jid'");
         logSystem("[Scraper] ❌ Job $jid failed: " . $e->getMessage());
     }
+    unset($GLOBALS['onboarding_crawl']);
 }
 
 // 3. Auto-Approve Products & Send Daily Aggregated Notifications

@@ -1392,6 +1392,8 @@ function addDebugLog($section, $msg, $data = null) {
 }
 
 function fetchUrl($url, $retries = 2, $timeout = 30, $throttle = true) {
+    if(!empty($GLOBALS['onboarding_crawl'])){require_once __DIR__.'/OnboardingCrawl.php';return OnboardingCrawl::fetch($url);}
+
     global $last_fetch_error;
     if (empty($url)) {
         addDebugLog('CURL', 'URL is empty');
@@ -1717,6 +1719,8 @@ function getProductDeepData($product) {
     $dom = new DOMDocument();
     @$dom->loadHTML('<?xml encoding="UTF-8">' . $html);
     $xpath = new DOMXPath($dom);
+
+    if(empty($product['name'])){$titleNode=$xpath->query('//h1')->item(0);if($titleNode)$product['name']=trim($titleNode->nodeValue);}
 
     $skuNode = $xpath->query("//span[contains(@class, 'product-sku')] | //*[@id='product-code'] | //span[contains(@class, 'sku')] | //div[contains(text(), 'کد کالا')]")->item(0);
     if ($skuNode) {

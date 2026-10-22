@@ -44,6 +44,8 @@ jobs:
         env:
           PHP_BINARY: php
         run: |
+          python tests/browser_occasions.py
+          python tests/browser_project_onboarding.py
           python tests/browser_settings_media.py
           python tests/browser_workspace.py
           python tests/browser_size_studio.py

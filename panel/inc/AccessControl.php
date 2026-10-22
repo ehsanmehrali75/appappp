@@ -73,6 +73,8 @@ class AccessControl {
     public static function moduleVisibility($module, $settings) {
         $module = self::featureKey($module);
         if (!is_array($settings)) return 'disabled';
+        require_once __DIR__.'/ProjectPlans.php';
+        if (!ProjectPlans::allows($module,$settings)) return 'disabled';
         $parent = self::parentFeature($module);
         $parentVisibility = $parent === null ? 'active' : self::moduleVisibility($parent, $settings);
         $rank = ['active' => 0, 'admin_only' => 1, 'maintenance' => 1, 'disabled' => 2];

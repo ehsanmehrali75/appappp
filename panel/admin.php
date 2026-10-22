@@ -6,6 +6,7 @@ require_once __DIR__.'/inc/ModuleProjectAccess.php';
 require_once __DIR__.'/inc/ProjectPermissions.php';
 require_once __DIR__.'/inc/ProductMediaGallery.php';
 require_once __DIR__.'/inc/ProjectMembers.php';
+require_once __DIR__.'/inc/ProjectOnboarding.php';
 require_once 'inc/cors.php';
 
 // Authentication (Standard UI access)
@@ -14,6 +15,11 @@ if (!isUser()) {
 }
 
 // User specified: If portal access but not admin, shouldn't enter admin section
+
+if(isset($_GET['project'])){
+    $selectedProject=is_string($_GET['project'])?getCurrentProject($_GET['project'],true):null;
+    if(!$selectedProject||!SessionIdentity::select($selectedProject))AccessControl::deny();
+}
 
 $db = getDB();
 $user = $_SESSION['user'];
@@ -120,7 +126,8 @@ if (isSuperAdmin()) {
                 'price_yearly' => (float)($p_data['price_yearly'] ?? 0),
                 'badge' => trim($p_data['badge'] ?? ''),
                 'featured' => !empty($p_data['featured']),
-                'features' => array_values($feats)
+                'features' => array_values($feats),
+                'modules'=>ProjectPlans::modules(['id'=>$p_id,'modules'=>array_values(array_filter((array)($p_data['modules']??[]),'is_string'))])
             ];
         }
         if (!empty($saved)) {
@@ -157,13 +164,14 @@ if (isSuperAdmin()) {
             }
         }
 
-        $db['projects'][] = [
-            'id' => uniqid(),
+        $active_modules=array_values(array_unique(array_merge($active_modules,['dashboard','settings','users','support'])));
+        $createdProject = [
+            'id' => bin2hex(random_bytes(12)),
             'name' => $_POST['name'],
             'activeFrom' => $_POST['activeFrom'],
             'activeTo' => $_POST['activeTo'],
             'users' => [
-                 ['username' => $_POST['admin_user'], 'password' => $_POST['admin_pass'], 'role' => 'project_admin', 'permissions' => ['all']]
+                 ['username' => trim($_POST['admin_user']??''), 'password' => password_hash((string)($_POST['admin_pass']??''),PASSWORD_DEFAULT), 'role' => 'project_admin', 'permissions' => ['all'], 'panel_access'=>['admin','portal']]
             ],
             'products' => [],
             'settings' => [
@@ -174,6 +182,7 @@ if (isSuperAdmin()) {
                 'schedule_slots' => [],
                 'feedbackOptions' => [],
                 'category' => $category,
+                'onboarding'=>['created_at'=>time(),'revision'=>0,'steps'=>[]],
                 'billing_tier' => $billing_tier,
                 'billing_price' => $billing_price,
                 'platform_type' => $platform_type,
@@ -181,8 +190,12 @@ if (isSuperAdmin()) {
             ],
             'logs' => []
         ];
-        saveDB($db);
-        redirect('admin.php?tab=projects&msg=پروژه با موفقیت ایجاد شد.');
+        if(trim($createdProject['name'])===''||trim($_POST['admin_user']??'')===''||strlen($_POST['admin_pass']??'')<10)redirect('admin.php?tab=projects&msg='.urlencode('نام پروژه، نام کاربری و رمز حداقل ۱۰ کاراکتر لازم است.'));
+        if(!in_array($platform_type,['wordpress','tiam','custom'],true))AccessControl::deny();
+        ProjectMembers::prepareStorage();
+        if(!db_save_project($createdProject))throw new RuntimeException('ساخت پروژه تکمیل نشد.');
+        SessionIdentity::select($createdProject);
+        redirect(ProjectOnboarding::url($createdProject['id']));
     }
 
     if (isset($_POST['reset_project']) || isset($_POST['delete_project'])) {
@@ -6391,6 +6404,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     </a>
                     <?php endif; ?>
                 <?php endif; ?>
+                <a data-project-purchase href="<?php echo isMainAdmin()?'/panel/admin.php?tab=projects':'/#pricing'; ?>" class="px-3 py-2 bg-emerald-50 border border-emerald-100 text-emerald-800 text-xs font-bold rounded-xl" aria-label="<?php echo isMainAdmin()?'ساخت پروژهٔ جدید':'خرید پروژهٔ جدید'; ?>"><span aria-hidden="true">＋</span><span class="hidden md:inline"><?php echo isMainAdmin()?'ساخت پروژه':'خرید پروژه'; ?></span></a>
                 <?php if(canAccessPortal()): ?><a href="portal.php" target="_blank" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-707 text-xs font-black rounded-xl transition-all flex items-center gap-1.5 shadow-sm">
                     <span>👀</span>
                     <span class="hidden sm:inline">مشاهده پورتال</span>
@@ -7207,6 +7221,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                 <div>
                                     <label class="block text-xs font-bold text-slate-500 mb-1">لیست امکانات (هر سطر یک مورد)</label>
                                     <textarea name="plans[<?php echo $p['id']; ?>][features_text]" rows="6" class="input text-xs font-medium leading-relaxed"><?php echo htmlspecialchars(implode("\n", $p['features'] ?? [])); ?></textarea>
+                                    <details class="mt-4"><summary class="cursor-pointer font-bold text-xs">امکانات واقعی این پلن</summary><p class="text-xs mt-2">این مجوزها هنگام خرید در پروژه ثبت می‌شوند؛ تغییر متن معرفی، مجوز ایجاد نمی‌کند. تغییرات برای خریدهای بعدی است.</p><div class="max-h-72 overflow-auto space-y-2 mt-3"><?php $planModules=ProjectPlans::modules($p);foreach(FeatureFlags::getCatalog() as $feature=>$meta):if(in_array($meta['category']??'',['core','markshow'],true)||AccessControl::parentFeature($feature)!==null)continue;?><label class="flex gap-2 items-center text-xs"><input type="checkbox" name="plans[<?php echo htmlspecialchars($p['id']); ?>][modules][]" value="<?php echo htmlspecialchars($feature); ?>" <?php echo in_array($feature,$planModules,true)?'checked':''; ?>><?php echo htmlspecialchars($meta['title']); ?></label><?php endforeach;?></div></details>
                                 </div>
                             </div>
                         <?php endforeach; ?>
@@ -8547,6 +8562,12 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         ?>
                         <div tabindex="0" role="button" aria-label="<?php echo htmlspecialchars('مشاهدهٔ محصول '.($p['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" class="ig-post-card group product-item relative" data-name="<?php echo strtolower($p['name']); ?>" data-sku="<?php echo strtolower($p['sku']??''); ?>" data-search="<?php echo htmlspecialchars($dataSearch); ?>" onclick="showManualInfo(<?php echo htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8'); ?>)">
                             <?php ProductMediaGallery::render($p);echo ProductApprovalFlow::html($p,$project); ?>
+                            <?php if (hasPermission('products')): ?>
+                                <div class="library-product-management" onclick="event.stopPropagation()">
+                                    <button type="button" onclick="openEdit(<?php echo htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8'); ?>)" aria-label="ویرایش محصول <?php echo htmlspecialchars($p['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">🛠 ویرایش و مدیریت محصول</button>
+                                    <button type="button" class="library-product-delete" onclick="deleteProduct(<?php echo htmlspecialchars(json_encode($p['id']), ENT_QUOTES, 'UTF-8'); ?>)" aria-label="حذف محصول <?php echo htmlspecialchars($p['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">حذف</button>
+                                </div>
+                            <?php endif; ?>
                             
                             <!-- Selection Checkbox for couples creator in active admin filter -->
                             <?php if ($can_create_couples && $filter === 'active'): ?>
@@ -8652,9 +8673,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                 </div>
 
                                 <div class="flex gap-2 flex-wrap justify-center px-4">
-                                    <?php if(hasPermission('products')): ?>
-                                        <button onclick="event.stopPropagation(); openEdit(<?php echo htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8'); ?>)" class="w-10 h-10 bg-white/20 hover:bg-white/40 rounded-xl backdrop-blur-md flex items-center justify-center transition-all text-white font-bold" title="ویرایش و آپدیت محصول">🛠️</button>
-                                    <?php endif; ?>
+
 
                                     <?php if($cardWf === 'pending_approval' || ($p['status'] ?? '') === 'pending'): ?>
                                         <?php if(canAccessPortal()): ?><a href="portal.php?tab=pending#product-<?php echo $p['id']; ?>" target="_blank" onclick="event.stopPropagation();" class="w-10 h-10 bg-amber-500 hover:bg-amber-600 hover:scale-105 text-white rounded-xl flex items-center justify-center transition-all shadow-lg shadow-amber-500/30" title="مشاهده و بررسی در پورتال مشتریان">👁️‍🗨️</a><?php endif; ?>
@@ -12016,6 +12035,8 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
             <?php endif; ?>
 
 <?php if ($tab === 'occasions'): ?>
+                <link rel="stylesheet" href="/panel/assets/occasions-workspace.css?v=<?php echo filemtime(__DIR__.'/assets/occasions-workspace.css'); ?>">
+                <section id="occasions-workspace" aria-label="مدیریت مناسبت‌ها">
                 <!-- Main Header section -->
                 <div class="flex flex-col lg:flex-row justify-between mb-8 items-start lg:items-end gap-4 border-b border-slate-100 pb-6">
                     <div>
@@ -12023,8 +12044,8 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             <span class="text-xs font-black tracking-widest bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full">PLANNING CENTER</span>
                             <span class="text-xs font-bold text-slate-400">نسخه نهایی و یکپارچه</span>
                         </div>
-                        <h2 class="font-black text-3xl text-slate-800">🏮 تقویم استراتژیک ریسرچ، تولید و مارکتینگ</h2>
-                        <p class="text-sm text-slate-500 font-medium">زمانبندی و همگام‌سازی زنجیره تامین B2B (نمایشگاه‌ها/تولید) و پیام‌های کارزار B2C (دراپ‌ها/مارکتینگ) برند برای سال‌های ۱۴۰۵ و ۱۴۰۶ خورشیدی</p>
+                        <h2 class="font-black text-3xl text-slate-800">تقویم مناسبت‌ها و برنامه‌ریزی</h2>
+                        <p class="text-sm text-slate-500 font-medium">مناسبت‌ها را پیدا کنید، برنامهٔ تولید و انتشار را مشخص کنید و پیشرفت کارها را ببینید.</p>
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <button onclick="document.getElementById('add-occasion-modal').classList.remove('hidden')" class="btn btn-primary text-xs font-black px-4 py-2.5 shadow-md shadow-indigo-600/20">➕ مناسبت سفارشی جدید</button>
@@ -12182,7 +12203,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                 </div>
 
                 <!-- Live Interface Filters & Lists -->
-                <div class="grid grid-2 gap-8">
+                <div class="grid grid-2 gap-8 occasions-columns">
                     
                     <!-- Left Column: Master Calendar and Grouped Chronology -->
                     <div class="col-span-1 lg:col-span-1">
@@ -13012,6 +13033,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         });
                 }
                 </script>
+                </section>
             <?php endif; ?>
 
             <?php if ($tab === 'adv_plan'): ?>
@@ -18313,6 +18335,7 @@ export default function CampaignLanding() {
 
             <?php if ($tab === 'settings'): ?>
                 <link rel="stylesheet" href="assets/settings-workspace.css?v=1"><script defer src="assets/settings-workspace.js?v=1"></script>
+                <div class="card p-5 mb-6 flex flex-wrap gap-4 items-center justify-between"><div><strong>راهنمای راه‌اندازی پروژه</strong><p class="text-xs mt-1">بستر، محصولات، اتصال‌ها و تیم را مرحله‌به‌مرحله تکمیل کنید؛ تنظیمات قبلی حفظ می‌شوند.</p></div><a class="btn btn-primary" href="<?php echo htmlspecialchars(ProjectOnboarding::url($project['id']),ENT_QUOTES,'UTF-8'); ?>">شروع / ادامهٔ راه‌اندازی ←</a><a class="btn btn-outline" href="/#pricing">خرید پروژهٔ جدید</a></div>
                 <?php 
                 $t_img = $project['settings']['approval_timeout_image'] ?? $project['settings']['approval_timeout'] ?? 2880;
                 $t_lib = $project['settings']['approval_timeout_library'] ?? $project['settings']['approval_timeout'] ?? 2880;

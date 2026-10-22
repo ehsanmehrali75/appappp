@@ -20,6 +20,9 @@ class ProjectMembers {
         foreach($changes as $change)if(!$conn->query('ALTER TABLE project_users '.$change))throw new RuntimeException('به‌روزرسانی ساختار عضویت ناموفق بود.');
     }
 
+    /** Run schema changes before opening a project-creation transaction. */
+    public static function prepareStorage() {if(isSqlActive())self::schema(getConn());}
+
     public static function save($projects, $usernames) {
         self::$stage='start';self::$diagnostic=[];
         if (!isSqlActive()) {
