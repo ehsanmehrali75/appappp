@@ -30,7 +30,7 @@ Backups default to `panel/db/project-backups`, denied by the existing web-server
 
 ## Deployment and Cron
 
-- Deploy the code to the existing PHP host without replacing `.env`, `panel/db` or uploads. PHP 8.2+ with mysqli or sqlite3, mbstring and fileinfo is expected; ZIP support produces the installable WordPress ZIP.
+- Deploy the code to the existing PHP host without replacing `.env`, `panel/db` or uploads. PHP 8.2+ with mysqli or sqlite3, mbstring and fileinfo is expected; The installable WordPress ZIP includes its template, stylesheet and script and does not require the PHP ZIP extension.
 - The SQL account needs CREATE TABLE for `inventory_version_chunks`; existing ledger rows do not need rewriting. Product and ledger tables must use a transactional engine on MySQL (InnoDB).
 - Configure the host scheduler to run `php /absolute/path/to/cron.php` every five minutes. Each project's weekly task is due seven days after its last successful snapshot, with a per-project nonblocking lock. The backup page displays the last weekly success and latest error. A lazy browser visit is not a substitute for real Cron.
 - The PHP worker needs write access to the backup directory and uploads; size memory/disk for embedded media. To upload downloaded backups up to 32 MiB, set `upload_max_filesize=32M` and `post_max_size` above 32 MiB.
@@ -57,3 +57,15 @@ All destructive regression operations use disposable databases and copied applic
 - Standalone PHP contract/security checks and PHP/JavaScript syntax checks passed.
 
 Live WordPress/ERP connection verification and host Cron installation remain deployment checks; they were not simulated as successful production operations.
+
+## Workspace and connection UI follow-up
+
+The admin/portal context bar links directly to **اتصال وردپرس و کلید API**. In its connection tab, **ساخت کلید API** creates the project key without requiring a site URL, enabling synchronization or changing the platform. Repeated creation preserves the existing key. Only users with the connection use permission can reveal/copy it. The same page documents plugin installation, key entry, HTTPS URL, actual connection testing and paginated receive.
+
+Plugin 6.1.0 ships a responsive Persian RTL settings console. A saved key is labeled as saved, not as a successful connection; actual connection verification remains in the panel. Install the complete ZIP rather than copying only the main PHP file. Workspace selection, the shared context bar and project backup pages share a responsive visual design. Backup restore still requires a fresh preview and captures a safety version before replacement.
+
+### Follow-up validation
+
+- Full Python/HTTP discovery executed 290 tests: 289 passed; one chooser markup compatibility assertion failed. Restoring the existing `project-setup-form` marker fixed it, and the affected purchase/login regression passed on rerun. The additional WordPress suite then passed all 16 tests, including independent stable token creation, view-only token protection and complete ZIP contents.
+- Chromium passed two-tab isolation, 1,000-row ERP import/resume/rollback, WordPress fixture read/preview/send/acknowledgement, portal/admin workspace checks and desktop/390/320-pixel layouts for chooser, connection, backup and plugin settings. No JavaScript errors or horizontal overflow were observed in those checks.
+- PHP syntax, JavaScript syntax, 44 request security checks, 15 ERP contract checks, 82 catalog checks and the code-only release archive validation passed.

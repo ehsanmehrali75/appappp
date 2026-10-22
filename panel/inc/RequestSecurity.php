@@ -106,13 +106,9 @@ class RequestSecurity {
         $parts[]=substr($html,$copied);
         $html=implode('',$parts);
         if(function_exists('isUser')&&isUser()&&in_array(basename($_SERVER['SCRIPT_FILENAME']??''),['admin.php','portal.php'],true)){
-            $central=basename($_SERVER['SCRIPT_FILENAME']??'')==='admin.php'&&isMainAdmin()&&ProjectSelection::centralTab($_GET['tab']??'');
-            $toolbar='<link rel="stylesheet" href="/panel/assets/workspace-shell.css"><nav class="project-toolbar"><a href="/panel/workspace.php">میزکار مرکزی</a><form method="post" action="/panel/workspace.php">'.$hidden.'<label>پروژه <select name="select_project">';
-            if(isMainAdmin())$toolbar.='<option value="__central__" '.($central?'selected':'').'>مدیریت مرکزی</option>';
-            foreach(ProjectSelection::projects() as $p)if(isMainAdmin()||SessionIdentity::member($p))$toolbar.='<option value="'.htmlspecialchars($p['id'],ENT_QUOTES,'UTF-8').'" '.((!$central&&$p['id']===($_SESSION['project_id']??''))?'selected':'').'>'.htmlspecialchars($p['name'],ENT_QUOTES,'UTF-8').'</option>';
-            $toolbar.='</select></label><button>انتخاب</button></form>';
-            if(!$central&&!empty($_SESSION['project_id'])&&canAccessManagement()&&(isMainAdmin()||isProjectAdmin()))$toolbar.='<a href="/panel/backups.php?project='.rawurlencode($_SESSION['project_id']).'">بک‌آپ پروژه</a>';
-            $toolbar.='</nav>';$html=preg_replace_callback('~(<body\b[^>]*>)~i',static fn($m)=>$m[1].$toolbar,$html,1);
+            require_once __DIR__.'/WorkspaceView.php';
+            $toolbar='<link rel="stylesheet" href="/panel/assets/workspace-shell.css?v='.filemtime(__DIR__.'/../assets/workspace-shell.css').'">'.WorkspaceView::toolbar($hidden);
+            $html=preg_replace_callback('~(<body\b[^>]*>)~i',static fn($m)=>$m[1].$toolbar,$html,1);
         }
         return $html;
     }

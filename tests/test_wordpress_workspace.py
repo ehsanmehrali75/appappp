@@ -14,6 +14,29 @@ class WordPressWorkspace(unittest.TestCase):
         prefix="require $argv[1];require dirname($argv[1]).'/WordPressWorkspace.php';SessionIdentity::beginGlobal('fixture_owner');SessionIdentity::select(getCurrentProject('p',true));$p=getCurrentProject('p',true);$p['settings']['platform_type']='wordpress';$p['settings']['wordpress']=['site_url'=>'https://shop.example','token'=>str_repeat('a',64),'enabled'=>true,'auto_publish'=>true];ProjectOnboarding::mutate('p',function(&$x)use($p){$x['settings']=$p['settings'];});"
         proc=subprocess.run([fixtures.PHP,'-r',prefix+source,str(self.case.app/'panel/inc/functions.php')],capture_output=True,text=True)
         self.assertEqual(proc.returncode,0,proc.stderr);return json.loads(proc.stdout)
+    def test_independent_token_is_stable_and_does_not_enable_or_convert_project(self):
+        r=self.php("ProjectOnboarding::mutate('p',function(&$x){$x['settings']['platform_type']='custom';unset($x['settings']['wordpress']);});$svc=new WordPressWorkspace();$first=$svc->ensureToken(getCurrentProject('p',true));$second=$svc->ensureToken(getCurrentProject('p',true));$saved=getCurrentProject('p',true);echo json_encode(['first'=>$first,'second'=>$second,'settings'=>$saved['settings']]);")
+        self.assertEqual(len(r['first']),64);self.assertEqual(r['first'],r['second']);self.assertEqual(r['settings']['platform_type'],'custom');self.assertEqual(r['settings']['wordpress'],{'token':r['first']})
+
+    def test_plugin_download_contains_complete_installable_assets(self):
+        import io,zipfile
+        owner,_=self.case.login()
+        # Read the actual download bytes rather than the fixture's text helper.
+        with owner.open(self.case.base+'/panel/wp-crm.php?project=p&download_plugin=1') as response:
+            self.assertEqual(response.headers.get_content_type(),'application/zip');data=response.read()
+        with zipfile.ZipFile(io.BytesIO(data)) as package:
+            self.assertIsNone(package.testzip())
+            for name in ['maarksho-crm-sync.php','settings-view.php','assets/admin.css','assets/admin.js']:
+                self.assertEqual(package.read('maarksho-crm-sync/'+name),(self.case.app/'integrations/wordpress/maarksho-crm-sync'/name).read_bytes())
+
+    def test_view_only_connection_cannot_reveal_or_generate_token(self):
+        self.php("ProjectOnboarding::mutate('p',function(&$x){$x['settings']['active_modules'][]='wp_crm';});echo json_encode((new WordPressWorkspace())->ensureToken($p));")
+        policy=self.case.app/'panel/db/access_policy.json'
+        policy.write_text(json.dumps({'wp_crm':{'view':{'users':['limited']},'use':{'users':[],'roles':[]}}}))
+        user,csrf=self.case.login('limited')
+        code,page=self.case.request(user,'/panel/wp-crm.php?project=p');self.assertEqual(code,200);self.assertNotIn('a'*64,page);self.assertNotIn('id="wp-api-token"',page)
+        code,_=self.case.request(user,'/panel/wp-crm.php?project=p',{'app_csrf':csrf,'_project_context':'p','action':'generate_token'});self.assertEqual(code,403)
+
     def test_wordpress_removes_crawl_step_and_rejects_new_crawl_jobs(self):
         r=self.php("$blocked=false;try{ProjectOnboarding::queue($p);}catch(RuntimeException $e){$blocked=true;}echo json_encode(['steps'=>array_keys(ProjectOnboarding::steps($p)),'blocked'=>$blocked]);")
         self.assertNotIn('crawl',r['steps']);self.assertTrue(r['blocked'])

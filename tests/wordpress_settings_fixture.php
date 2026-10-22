@@ -7,4 +7,4 @@ function esc_html($v){return htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');}fu
 $_SERVER['REQUEST_METHOD']='GET';
 require __DIR__.'/../integrations/wordpress/maarksho-crm-sync/maarksho-crm-sync.php';
 echo '<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>';
-Maarksho_Data_Bridge::page();echo '</body></html>';
+echo '<link rel="stylesheet" href="/integrations/wordpress/maarksho-crm-sync/assets/admin.css">';Maarksho_Data_Bridge::page();echo '<script src="/integrations/wordpress/maarksho-crm-sync/assets/admin.js"></script>';echo '</body></html>';
