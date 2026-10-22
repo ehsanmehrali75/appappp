@@ -360,6 +360,8 @@ if (!$project && !isSuperAdmin()) {
     redirect('logout.php');
 }
 
+if($project&&($project['settings']['platform_type']??'')==='wordpress'&&in_array($tab,['extract','website_export'],true)&&($_SERVER['REQUEST_METHOD']??'GET')==='GET')redirect('/panel/wp-crm.php?project='.rawurlencode($project['id']));
+
 // Default tab for project view
 if ($project && !isset($_GET['tab'])) {
     $tab = 'dashboard';
@@ -6571,7 +6573,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         <?php endif; ?>
 
                         <?php if(canAccessFeature('extract')): ?>
-                        <a href="?tab=extract" class="nav-link <?php echo $tab=='extract'?'active':''; ?>"><span>✨</span> <span>اتوماسیون استخراج</span><?php echo getModuleVisibilityBadge('extract', $project); ?></a>
+                        <a href="?tab=extract" class="nav-link <?php echo $tab=='extract'?'active':''; ?>"><span>✨</span> <span><?php echo ($project['settings']['platform_type']??'')==='wordpress'?'دریافت از وردپرس':'اتوماسیون استخراج';?></span><?php echo getModuleVisibilityBadge('extract', $project); ?></a>
                         <?php endif; ?>
 
                         <?php if(canAccessFeature('excel')): ?>
@@ -6579,7 +6581,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         <?php endif; ?>
                         
                         <?php if(canAccessFeature('website_export')): ?>
-                        <a href="?tab=website_export" class="nav-link <?php echo $tab=='website_export'?'active':''; ?>"><span>🌐</span> <span>خروجی وب‌سایت</span><?php echo getModuleVisibilityBadge('website_export', $project); ?></a>
+                        <a href="?tab=website_export" class="nav-link <?php echo $tab=='website_export'?'active':''; ?>"><span>🌐</span> <span><?php echo ($project['settings']['platform_type']??'')==='wordpress'?'ارسال به وردپرس':'خروجی وب‌سایت';?></span><?php echo getModuleVisibilityBadge('website_export', $project); ?></a>
                         <?php endif; ?>
 
                         <?php if(canAccessFeature('wp_crm')): ?>

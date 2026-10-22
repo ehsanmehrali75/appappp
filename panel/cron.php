@@ -55,6 +55,12 @@ if ($stuck && ($stuckRow = $stuck->fetch_assoc())) {
     }
 }
 
+// One plugin/API transport for configured WordPress projects; run with the configuring user's current grants.
+try {
+    require_once __DIR__.'/inc/WordPressWorkspace.php';$wordpress=new WordPressWorkspace();
+    foreach($wordpress->principals() as $wpPid=>$principal){if(!BackgroundWorker::hasTime())break;try{AiAccess::run($principal,static function($p)use($wordpress){if(($p['settings']['platform_type']??'')==='wordpress')$wordpress->tick($p);});}catch(Throwable $e){error_log('WordPress scheduled connection could not run: '.get_class($e));}}
+} catch(Throwable $e){error_log('WordPress worker initialization failed: '.get_class($e));}
+
 // 2. Process pending scraping jobs (Replacing Node.js worker)
 $pendingJobs = $conn ? $conn->query("SELECT * FROM scraping_jobs WHERE status = 'pending' ORDER BY priority DESC, id ASC LIMIT " . BackgroundWorker::batchSize()) : false;
 while ($pendingJobs && BackgroundWorker::hasTime() && ($job = $pendingJobs->fetch_assoc())) {
@@ -79,6 +85,10 @@ while ($pendingJobs && BackgroundWorker::hasTime() && ($job = $pendingJobs->fetc
     try {
         $project = getCurrentProject($pid);
         if (!$project) throw new Exception("Project not found");
+
+        if(($project['settings']['platform_type']??'')==='wordpress'){
+            $conn->query("UPDATE scraping_jobs SET status='failed', error_message='WordPress uses plugin API; separate crawl disabled' WHERE id='$jid'");continue;
+        }
 
         $setupCrawl=strpos($type,'onboarding_')===0;$GLOBALS['onboarding_crawl']=$setupCrawl;
         $productJobType=$setupCrawl?'onboarding_product':'product_sync';

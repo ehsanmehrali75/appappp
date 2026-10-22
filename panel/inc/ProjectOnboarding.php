@@ -5,7 +5,7 @@ class ProjectOnboarding {
     public static function steps($p) {
         $s=$p['settings']??[];$products=ProjectPlans::allows('products',$s)&&AccessControl::moduleVisibility('products',$s)==='active';$out=['identity'=>['name'=>'کسب‌وکار و بستر','why'=>'نوع سیستم، مسیر اتصال موجودی و ابزارهای مناسب پروژه را مشخص می‌کند.']];
         if($products)$out['inventory']=['name'=>'محصولات و موجودی','why'=>'این منبع، مرجع موجودی و تنوع‌های رنگ و سایز است؛ عکس و توضیح سایت بعداً به آن اضافه می‌شوند.'];
-        if(ProjectPlans::allows('extract',$s))$out['crawl']=['name'=>'اولین بررسی وب‌سایت','why'=>'تصاویر، توضیحات، دسته‌بندی و جدول سایز وب‌سایت برای مقایسه با کتابخانه دریافت می‌شوند. کراول جایگزین موجودی مرجع نیست.'];
+        if(($s['platform_type']??'')!=='wordpress'&&ProjectPlans::allows('extract',$s))$out['crawl']=['name'=>'اولین بررسی وب‌سایت','why'=>'تصاویر، توضیحات، دسته‌بندی و جدول سایز وب‌سایت برای مقایسه با کتابخانه دریافت می‌شوند. کراول جایگزین موجودی مرجع نیست.'];
         if(ProjectPlans::allows('ai_connect',$s))$out['ai']=['name'=>'ChatGPT و هوش مصنوعی','why'=>'برای پرسش از داده‌های همین پروژه و ثبت محتوا متصل شوید. API جداگانه فقط برای اجرای خودکار و گزارش‌های زمان‌بندی‌شده هزینه دارد.'];
         if(ProjectPlans::allows('calendar',$s))$out['social']=['name'=>'شبکه‌های اجتماعی','why'=>'کانال‌های مورد استفاده و روش انتشار را مشخص کنید تا تقویم محتوا به مقصد درست وصل شود.'];
         if(ProjectPlans::allows('seo_intel',$s)||ProjectPlans::allows('seo_classic',$s))$out['seo']=['name'=>'سئو و آمار سایت','why'=>'Search Console و GA4، جست‌وجو و بازدید را به اطلاعات فروش و محصولات اضافه می‌کنند. دسترسی حساب گوگل و دریافت واقعی هر منبع جداگانه تست می‌شود.'];
@@ -80,6 +80,7 @@ class ProjectOnboarding {
         return $counts;
     }
     public static function queue($project) {
+        if(($project['settings']['platform_type']??'')==='wordpress')throw new RuntimeException('پروژهٔ وردپرس از افزونه دریافت می‌شود و به کراول جدا نیاز ندارد.');
         if(!ProjectPlans::allows('extract',$project['settings'])||!canAccessFeature('extract','use'))throw new RuntimeException('دسترسی کراول در این پروژه فعال نیست.');
         $url=self::website($project['settings']['sourceUrl']??'');if($url==='')throw new RuntimeException('ابتدا آدرس سایت را ذخیره کنید.');
         // Use the existing discovery queue; no crawling runs in this browser request.

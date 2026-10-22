@@ -129,6 +129,7 @@ class WebsiteCatalogSync {
         catch (RuntimeException $e) {return null;}
     }
     public static function inventory($product) {
+        $wp=self::metadata($product)['wordpress']??[];if(!empty($wp['not_in_latest_snapshot']))return 'unknown';if(!empty($wp['origin'])&&($wp['stock_status']??'')==='outofstock')return 'out_of_stock';
         if(($product['status']??'')==='out_of_stock')return 'out_of_stock';
         // A known central total is authoritative; website/legacy stock can be stale.
         $total=$product['stock_total']??null;
@@ -146,7 +147,7 @@ class WebsiteCatalogSync {
             catch (RuntimeException $e) {continue;}
             $known=true;if($quantity>0)$positive=true;
         }
-        return $positive?'in_stock':($known?'out_of_stock':'unknown');
+        return $positive?'in_stock':($known?'out_of_stock':(!empty($wp['origin'])&&($wp['stock_status']??'')==='instock'?'in_stock':'unknown'));
     }
     public static function state($project,$product) {
         $meta=self::metadata($product);$product['website_sync']=$meta;
