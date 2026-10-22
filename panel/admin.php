@@ -6357,7 +6357,7 @@ $suggestions = getCalendarSuggestions($project);
             .ig-grid { grid-template-columns: repeat(2, 1fr); }
         }
     </style>
-<?php $neoPilot = ($tab === 'dashboard' && !empty($project) && ($_GET['design'] ?? '') !== 'legacy'); ?>
+<?php $neoPilot = ($tab === 'dashboard' && !empty($project)); ?>
 <?php
 $neoWorkspaceTabs = [
     'settings', 'extract', 'users', 'calendar', 'products', 'excel', 'website_export',
@@ -6801,259 +6801,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                 </div>
             <?php endif; ?>
 
-            <?php if ($tab === 'dashboard' && $project): ?>
-                <?php if($neoPilot) require __DIR__.'/inc/NeoDashboardIntro.php'; ?>
-                <div <?php echo $neoPilot?'hidden':''; ?> class="mb-10 flex between items-end">
-                    <div>
-                        <h2 class="font-black text-4xl mb-3 text-slate-900 tracking-tight">داشبورد هوشمند: <?php echo htmlspecialchars($project['name'], ENT_QUOTES, 'UTF-8'); ?></h2>
-                        <p class="text-sm text-slate-500 font-medium leading-relaxed">پایش تخصصی و مانیتورینگ عملکرد کتابخانه Maarksho Engine v3</p>
-                    </div>
-                </div>
-
-                <div class="bento-grid mb-12">
-                    <div class="premium-card stat-v3 group">
-                        <div class="flex between items-start w-full">
-                            <div class="stat-icon-v2 bg-indigo-50 text-indigo-600 group-hover:bg-primary group-hover:text-white transition-all duration-500 shadow-sm">📦</div>
-                            <span class="text-[10px] font-black text-indigo-400 bg-indigo-50 px-3 py-1 rounded-full">محصولات</span>
-                        </div>
-                        <div>
-                            <h4 class="text-4xl font-black text-slate-800 tracking-tight"><?php echo count($project['products']); ?></h4>
-                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">کل کتابخانه محتوا</p>
-                        </div>
-                    </div>
-
-                    <div class="premium-card stat-v3 group">
-                        <div class="flex between items-start w-full">
-                            <div class="stat-icon-v2 bg-rose-50 text-rose-600 group-hover:bg-rose-500 group-hover:text-white transition-all duration-500 shadow-sm">❤️</div>
-                            <span class="text-[10px] font-black text-rose-400 bg-rose-50 px-3 py-1 rounded-full">تعاملات</span>
-                        </div>
-                        <div>
-                            <?php 
-                                $totalVotes = 0;
-                                foreach($project['products'] as $pr) { $totalVotes += (($pr['likes']??0) + ($pr['dislikes']??0)); }
-                            ?>
-                            <h4 class="text-4xl font-black text-slate-800 tracking-tight"><?php echo $totalVotes; ?></h4>
-                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">مجموع لایک و دیسلایک</p>
-                        </div>
-                    </div>
-
-                    <?php if(hasPermission('calendar')): ?>
-                    <div class="premium-card stat-v3 group">
-                        <div class="flex between items-start w-full">
-                            <div class="stat-icon-v2 bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all duration-500 shadow-sm">📅</div>
-                            <span class="text-[10px] font-black text-blue-400 bg-blue-50 px-3 py-1 rounded-full">تقویم</span>
-                        </div>
-                        <div>
-                            <h4 class="text-4xl font-black text-slate-800 tracking-tight"><?php echo count($project['schedules'] ?? []); ?></h4>
-                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">برنامه‌های ارسال شده و آتی</p>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-
-                    <?php if(hasPermission('approve_content')): ?>
-                    <div class="premium-card stat-v3 group">
-                        <div class="flex between items-start w-full">
-                            <div class="stat-icon-v2 bg-amber-50 text-amber-600 group-hover:bg-amber-500 group-hover:text-white transition-all duration-500 shadow-sm">⏳</div>
-                            <span class="text-[10px] font-black text-amber-400 bg-amber-50 px-3 py-1 rounded-full">بازبینی</span>
-                        </div>
-                        <div>
-                            <?php 
-                                $pending = 0;
-                                foreach($project['products'] as $pr) { if(($pr['status']??'active') == 'pending') $pending++; }
-                            ?>
-                            <h4 class="text-4xl font-black text-slate-800 tracking-tight"><?php echo $pending; ?></h4>
-                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">موارد در انتظار تایید</p>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-
-                    <?php if(hasPermission('extract')): ?>
-                    <div class="premium-card bento-col-2 p-10 bg-white">
-                        <div class="flex between items-center mb-8">
-                             <h3 class="font-black text-lg text-slate-800 flex items-center gap-2">
-                                <span class="w-2 h-6 bg-primary rounded-full"></span>
-                                روند استخراج محتوا
-                             </h3>
-                             <div class="flex gap-2">
-                                 <span class="text-[10px] font-bold text-slate-400 bg-slate-50 px-3 py-1 rounded-full"><?php echo $neoPilot?'بر اساس زمان ثبت‌شده':'Real-time Data'; ?></span>
-                             </div>
-                        </div>
-                        <canvas id="scrapingChart" style="max-height: 280px;"></canvas>
-                        <?php if($neoPilot): ?><p class="neo-chart-note">فقط محتواهای دارای تاریخ استخراج معتبر شمرده می‌شوند.</p><?php endif; ?>
-                    </div>
-                    <?php endif; ?>
-
-                    <div class="premium-card bento-col-2 p-10 bg-white">
-                        <div class="flex between items-center mb-8">
-                             <h3 class="font-black text-lg text-slate-800 flex items-center gap-2">
-                                <span class="w-2 h-6 bg-rose-500 rounded-full"></span>
-                                محبوب‌ترین محتواها
-                             </h3>
-                             <a href="?tab=products" class="text-xs font-black text-primary hover:bg-indigo-50 px-4 py-2 rounded-xl transition-all">مشاهده همه</a>
-                        </div>
-                        <div class="space-y-5">
-                            <?php 
-                            $top = $project['products'];
-                            usort($top, function($a, $b) { return (($b['likes']??0)+($b['dislikes']??0)) - (($a['likes']??0)+($a['dislikes']??0)); });
-                            $top = array_slice($top, 0, 4);
-                            $visibleTop = 0;
-                            foreach($top as $t): 
-                                $v = ($t['likes']??0) + ($t['dislikes']??0);
-                                if($v == 0) continue;
-                                $visibleTop++;
-                            ?>
-                                <div class="flex items-center gap-5 group/item">
-                                    <div class="w-16 h-16 rounded-2xl overflow-hidden shadow-sm relative">
-                                        <img src="<?php echo $t['image']; ?>" class="w-full h-full object-cover group-hover/item:scale-110 transition-transform duration-500">
-                                    </div>
-                                    <div class="flex-1">
-                                        <p class="text-sm font-bold text-slate-700 line-clamp-1 mb-2"><?php echo $t['name']; ?></p>
-                                        <div class="w-full bg-slate-50 rounded-full h-2">
-                                            <div class="bg-indigo-500 h-2 rounded-full transition-all duration-1000" style="width: <?php echo min(100, $v * 5); ?>%"></div>
-                                        </div>
-                                    </div>
-                                    <div class="text-left">
-                                        <span class="text-sm font-black text-indigo-600 block"><?php echo $v; ?></span>
-                                        <span class="text-[9px] font-black text-slate-300 uppercase">Votes</span>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                            <?php if($neoPilot && !$visibleTop): ?><p class="neo-empty">هنوز رأیی برای محتواهای این پروژه ثبت نشده است.</p><?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-
-                <?php if(hasPermission('calendar')): ?>
-                <div class="premium-card p-10 bg-white">
-                    <div class="flex between items-center mb-10">
-                        <div class="flex items-center gap-4">
-                            <div class="w-1.5 bg-primary h-8 rounded-full"></div>
-                            <h3 class="font-black text-2xl text-slate-800 tracking-tight">📅 زمان‌بندی‌های پیش‌رو</h3>
-                        </div>
-                        <a href="?tab=calendar" class="btn btn-outline py-3 px-8 text-xs font-black">مدیریت هوشمند تقویم</a>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-right">
-                            <thead>
-                                <tr class="text-slate-400 border-b border-slate-50 uppercase text-[10px] tracking-[0.2em]">
-                                    <th class="pb-6 font-black pr-4">زمان اجرا</th>
-                                    <th class="pb-6 font-black">عنوان محتوا / کالا</th>
-                                    <th class="pb-6 font-black">پلتفرم هدف</th>
-                                    <th class="pb-6 font-black text-left pl-4">وضعیت سیستمی</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-50">
-                                <?php 
-                                $scheds = $project['schedules'] ?? [];
-                                usort($scheds, function($a, $b) { 
-                                    $aAt = $a['scheduledAt'] ?? 0;
-                                    $bAt = $b['scheduledAt'] ?? 0;
-                                    $tA = is_numeric($aAt) ? $aAt : (!empty($aAt) ? strtotime($aAt) : 0);
-                                    $tB = is_numeric($bAt) ? $bAt : (!empty($bAt) ? strtotime($bAt) : 0);
-                                    return (int)$tA - (int)$tB; 
-                                });
-                                $next = array_slice(array_filter($scheds, function($s){ 
-                                    $sAt = $s['scheduledAt'] ?? 0;
-                                    $ts = is_numeric($sAt) ? $sAt : (!empty($sAt) ? strtotime($sAt) : 0);
-                                    return $ts > time(); 
-                                }), 0, 8);
-                                foreach($next as $s):
-                                ?>
-                                    <tr class="group hover:bg-slate-50/80 transition-all duration-300">
-                                        <td class="py-6 pr-4">
-                                            <div class="flex items-center gap-4">
-                                                <div class="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500">🕒</div>
-                                                <div>
-                                                    <span class="font-black text-slate-800 text-sm block mb-1">
-                                                        <?php 
-                                                            $at = $s['scheduledAt'] ?? 0;
-                                                            echo is_numeric($at) ? date('H:i', $at) : $at; 
-                                                        ?>
-                                                    </span>
-                                                    <span class="text-[10px] font-bold text-slate-400">
-                                                        <?php echo is_numeric($at) ? date('Y/m/d', $at) : ''; ?>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="py-6">
-                                            <div class="font-black text-slate-700 text-sm group-hover:text-primary transition-colors"><?php echo htmlspecialchars($s['productName'] ?? 'بدون نام'); ?></div>
-                                            <div class="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Post ID: <?php echo substr($s['id'], 0, 8); ?></div>
-                                        </td>
-                                        <td class="py-6">
-                                            <span class="px-4 py-1.5 bg-slate-100 text-slate-500 font-black text-[10px] rounded-full uppercase tracking-tighter">
-                                                <?php echo $s['platform']; ?>
-                                            </span>
-                                        </td>
-                                        <td class="py-6 text-left pl-4">
-                                            <div class="inline-flex items-center gap-2 px-4 py-2 bg-amber-50 text-amber-600 rounded-2xl">
-                                                <span class="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
-                                                <span class="text-[10px] font-black uppercase">Schedule Active</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; if(empty($next)) echo "<tr><td colspan='4' class='py-20 text-center'><div class='text-4xl mb-4'>📭</div><div class='text-slate-400 font-black text-sm'>هیچ برنامه فعالی باز یافت نشد.</div></td></tr>"; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                <?php endif; ?>
-
-                <script src="<?php echo getFullUrl('assets/chart.min.js'); ?>"></script>
-                <?php
-                // Real data connections for scraper trend chart
-                $months = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
-                $currentJalaliMonth = (int)jdate('m', time());
-                $currentJalaliYear = (int)jdate('Y', time());
-                $last6MonthsNames = [];
-                $last6MonthsValues = [];
-
-                for ($i = 5; $i >= 0; $i--) {
-                    $mIndex = ($currentJalaliMonth - 1 - $i + 12) % 12;
-                    $last6MonthsNames[] = $months[$mIndex];
-                    
-                    $count = 0;
-                    foreach ($project['products'] ?? [] as $prod) {
-                        $eat = $prod['extractedAt'] ?? $prod['extracted_at'] ?? ($neoPilot ? 0 : time());
-                        if (!is_numeric($eat)) $eat = strtotime($eat);
-                        if ($eat > 0 && (int)jdate('m', $eat) == ($mIndex + 1) && (!$neoPilot || (int)jdate('Y', $eat) === $currentJalaliYear + (int)floor(($currentJalaliMonth - 1 - $i) / 12))) {
-                            $count++;
-                        }
-                    }
-                    $last6MonthsValues[] = $count;
-                }
-
-                $jsLabels = json_encode($last6MonthsNames, JSON_UNESCAPED_UNICODE);
-                $jsValues = json_encode($last6MonthsValues);
-                ?>
-                <script>
-                    document.addEventListener('DOMContentLoaded', () => {
-                        const canvas = document.getElementById('scrapingChart');
-                        if (!canvas) return;
-                        <?php if($neoPilot): ?>
-                        canvas.setAttribute('role', 'img');
-                        canvas.setAttribute('aria-label', 'تعداد استخراج ثبت‌شده در شش ماه اخیر: ' + <?php echo $jsLabels; ?>.map((month,index) => month + ': ' + <?php echo $jsValues; ?>[index]).join('، '));
-                        <?php endif; ?>
-                        const ctx = canvas.getContext('2d');
-                        new Chart(ctx, {
-                            type: 'line',
-                            data: {
-                                labels: <?php echo $jsLabels; ?>,
-                                datasets: [{
-                                    label: 'استخراج کالا',
-                                    data: <?php echo $jsValues; ?>,
-                                    borderColor: <?php echo json_encode($neoPilot?'#3f6358':'#4f46e5'); ?>,
-                                    tension: 0.4,
-                                    fill: true,
-                                    backgroundColor: <?php echo json_encode($neoPilot?'rgba(63, 99, 88, 0.08)':'rgba(79, 70, 229, 0.05)'); ?>
-                                }]
-                            },
-                            options: { responsive: true, plugins: { legend: { display: false } }, <?php if($neoPilot): ?>scales: { y: { beginAtZero:true, ticks:{precision:0} } },<?php endif; ?> }
-                        });
-                    });
-                </script>
-            <?php endif; ?>
-                <?php if($neoPilot): ?><a class="neo-legacy" href="?tab=dashboard&amp;design=legacy">مشاهدهٔ ظاهر قبلی برای مقایسه</a><?php endif; ?>
+            <?php if ($tab === 'dashboard' && $project) require __DIR__.'/inc/ProjectOverviewView.php'; ?>
 
             <?php if ($tab === 'feature_flags' && isMainAdmin()): ?>
                 <?php include __DIR__ . '/inc/feature_flags_view.php'; ?>
@@ -8118,6 +7866,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                     <select name="f_stock" onchange="this.form.submit()" class="appearance-none bg-slate-50 hover:bg-white focus:bg-white border <?php echo ($adminStock === 'stock_gte_5') ? 'border-amber-400 bg-amber-50/70 text-amber-900 font-black' : 'border-slate-200 text-slate-700 font-bold'; ?> text-xs py-2.5 pr-8 pl-6 rounded-xl cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-inner">
                                         <option value="" <?php echo ($adminStock === '') ? 'selected' : ''; ?>>موجودی: همه</option>
                                         <option value="stock_gte_5" <?php echo ($adminStock === 'stock_gte_5') ? 'selected' : ''; ?>>🔥 موجودی تجمیعی بالای ۵ عدد</option>
+                                        <option value="known_in_stock" <?php echo $adminStock==='known_in_stock'?'selected':''; ?>>موجودی مثبت ثبت‌شده</option>
                                         <option value="in_stock" <?php echo ($adminStock === 'in_stock') ? 'selected' : ''; ?>>✅ دارای موجودی</option>
                                         <option value="out_of_stock" <?php echo ($adminStock === 'out_of_stock') ? 'selected' : ''; ?>>❌ بدون موجودی</option>
                                     </select>
@@ -8483,6 +8232,8 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                             if ($adminStock === 'stock_gte_5') {
                                 $aggStock = getProductAggregatedStock($p, $familyStockMapAdmin);
                                 return ($aggStock >= 5);
+                            } elseif ($adminStock === 'known_in_stock') {
+                                return WebsiteCatalogSync::inventory($p)==='in_stock';
                             } elseif ($adminStock === 'in_stock') {
                                 return !isProductOutOfStock($p);
                             } elseif ($adminStock === 'out_of_stock') {

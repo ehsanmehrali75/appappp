@@ -46,6 +46,7 @@ jobs:
         run: |
           python tests/browser_occasions.py
           python tests/browser_transfer_payment.py
+          python tests/browser_project_overview.py
           python tests/browser_project_onboarding.py
           python tests/browser_settings_media.py
           python tests/browser_workspace.py
