@@ -60,6 +60,33 @@ class ProductApprovalFlow(unittest.TestCase):
         self.assertEqual(p['rejection_reason'],'اصلاح نور تصویر');self.assertTrue(json.loads(p['rejections_history']))
         self.decide('conform','approve_stage2',403)
 
+    def test_parallel_rejection_from_either_team_is_immediately_final(self):
+        for user,stage in [('style',1),('conform',2)]:
+            with self.subTest(stage=stage):
+                self.configure(order='parallel')
+                opener,csrf=self.case.login(user)
+                code,raw=self.case.request(opener,'/panel/portal.php',{'action':'quick_action','sub':'reject_stage'+str(stage),'product_id':'one','comment':'نیازمند عکس جدید'}, {'X-CSRF-Token':csrf,'X-Requested-With':'XMLHttpRequest'})
+                self.assertEqual(code,200,raw);self.assertEqual(self.case.record()['status'],'rejected')
+                self.assertEqual(self.case.record()['stage'+str(3-stage)+'_decision'],'pending')
+                self.decide('conform' if stage==1 else 'style','approve_stage'+str(3-stage),403)
+                self.decide('style','approve_stage1',403,admin=True)
+    def test_metadata_edit_keeps_rejection_but_replacement_restarts_both_stages(self):
+        for order in ['parallel','style_first','conformity_first']:
+            with self.subTest(order=order):
+                self.configure(order=order)
+                with sqlite3.connect(self.case.database) as db:
+                    db.execute("UPDATE products SET status='rejected',stage1_decision='rejected',stage2_decision='approved',approvals_stage2='[]',rejection_reason='replace image' WHERE id='one'")
+                self.clear_cache();opener,csrf=self.case.login()
+                code,raw=self.case.request(opener,'/panel/admin.php?tab=products',{'update_product_data':'1','pid':'one','name':'اصلاح نام','price':'10','status':'active'}, {'X-CSRF-Token':csrf})
+                self.assertEqual(code,200,raw[:300]);self.assertEqual(self.case.record()['status'],'rejected')
+                self.assertEqual(self.case.record()['stage1_decision'],'rejected')
+                code,raw=self.case.upload(opener,csrf,'replacement.png',fixtures.PNG)
+                self.assertEqual(code,200,raw[:300]);product=self.case.record();self.assertEqual(product['status'],'pending')
+                for stage in [1,2]:
+                    self.assertEqual(product['stage'+str(stage)+'_decision'],'pending');self.assertEqual(json.loads(product['approvals_stage'+str(stage)]),[])
+                self.assertNotEqual(product['image'],'uploads/original.png')
+                self.assertFalse(product['rejection_reason'])
+
     def test_next_team_queue_opens_after_first_approval(self):
         viewer,_=self.case.login('conform');code,page=self.case.request(viewer,'/panel/portal.php?tab=pending');self.assertEqual(code,200)
         self.assertNotIn('data-product-id="one"',page.split('id="tab-pending"')[1].split('id="tab-calendar"')[0])

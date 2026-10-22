@@ -2111,6 +2111,7 @@ $sections_json
 
         foreach($project['products'] as &$p) {
             if ($p['id'] == $pid) {
+                if($status==='active'&&($p['status']??'')==='rejected'){http_response_code(403);echo json_encode(['status'=>'failed','msg'=>'تصویر رد شده است؛ ابتدا تصویر اصلاح‌شده را جایگزین کنید.']);exit;}
                 if(ProductApprovalFlow::enabled($project['settings'])&&in_array($status,['active','rejected'],true)){
                     try{ProductApprovalFlow::decide($p,$project,$stage==='stage1'?1:($stage==='stage2'?2:0),$status==='rejected',$reason,$current_user);saveProject($project,[$p]);echo json_encode(['status'=>'success','msg'=>'تصمیم این مرحله ثبت شد.']);}
                     catch(RuntimeException $e){http_response_code(403);echo json_encode(['status'=>'failed','msg'=>$e->getMessage()]);}exit;
@@ -2295,6 +2296,7 @@ $sections_json
         if (!hasPermission('approve_content')) { echo json_encode(['status' => 'failed', 'msg' => 'دسترسی غیرمجاز']); exit(); }
         $pids = $_POST['pids'] ?? [];
         $status = $_POST['status'];
+        if($status==='active')foreach($project['products'] as $item)if(in_array($item['id'],$pids,true)&&($item['status']??'')==='rejected'){http_response_code(403);echo json_encode(['status'=>'failed','msg'=>'تصویر رد شده است؛ ابتدا تصویر اصلاح‌شده را جایگزین کنید.']);exit;}
         if(ProductApprovalFlow::enabled($project['settings'])&&in_array($status,['active','rejected'],true)){
             try{
                 foreach($project['products'] as &$product){
@@ -5215,20 +5217,13 @@ if ($project) {
                 $p['utm_medium'] = $_POST['utm_medium'] ?? '';
                 $p['utm_campaign'] = $_POST['utm_campaign'] ?? '';
                 
+                $approvalImageUrls=static function($item){$urls=[];foreach(array_merge([$item['image']??'', $item['social_image']??''],is_array($item['gallery']??null)?$item['gallery']:[]) as $entry){$url=ProductSizeChartCatalog::entryUrl($entry);if($url!=='')$urls[]=$url;}return array_unique($urls);};
+                $previousApprovalImages=$approvalImageUrls($p);
                 $old_status = $p['status'] ?? 'active';
                 $new_status = $_POST['status'] ?? ($p['status'] ?? 'active');
                 if ($old_status === 'rejected') {
-                    $new_status = 'pending';
-                    $p['approvals_stage1'] = [];
-                    $p['approvals_stage2'] = [];
-                    $p['stage1_decision'] = 'pending';
-                    $p['stage2_decision'] = 'pending';
-                    $p['rejection_reason'] = '';
-                    $p['rejectionReason'] = '';
-                    $p['rejection_by'] = '';
-                    $p['rejection_side'] = '';
-                    $p['extractedAt'] = time();
-                    $p['extracted_at'] = time();
+                    // Only replacing image content below can reopen a rejected submission.
+                    $new_status = 'rejected';
                 } elseif ($new_status === 'rejected' && $old_status !== 'rejected') {
                     if (!isset($project['settings']['sms_rejected_pending_list'])) {
                         $project['settings']['sms_rejected_pending_list'] = [];
@@ -5461,7 +5456,8 @@ if ($project) {
                     $p['has_new_manual_image'] = true;
                 }
 
-                if ($hasNewSiteImageUpload || $hasNewSocialImageUpload || $hasNewUpload || $hasManualImageEdit) {
+                $hasReplacementImage=(bool)array_diff($approvalImageUrls($p),$previousApprovalImages);
+                if (($old_status!=='rejected'||$hasReplacementImage)&&($hasNewSiteImageUpload || $hasNewSocialImageUpload || $hasNewUpload || $hasManualImageEdit)) {
                     $p['status'] = 'pending';
                     $p['extractedAt'] = time();
                     $p['extracted_at'] = time();
@@ -5473,6 +5469,7 @@ if ($project) {
                     $p['rejectionReason'] = '';
                     $p['rejection_by'] = '';
                     $p['rejection_side'] = '';
+                    unset($p['website_sync']['approval_flow']);
                 }
                 
                 // Preserve approvals for unchanged images. Remote manual URLs are not scraper evidence.

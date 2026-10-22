@@ -1003,6 +1003,9 @@ if ($isAjax && isset($_POST['action'])) {
         exit;
     }
     
+    if($productToUpdate&&($_POST['action']??'')==='quick_action'&&strpos($_POST['sub']??'','approve')===0&&($productToUpdate['status']??'')==='rejected'){
+        http_response_code(403);echo json_encode(['status'=>'error','msg'=>'تصویر رد شده است؛ ابتدا تصویر اصلاح‌شده را جایگزین کنید.']);exit;
+    }
     if($productToUpdate&&ProductApprovalFlow::enabled($project['settings'])&&in_array($_POST['action'],['quick_action','approve','reject'],true)){
         $flowAction=$_POST['action']==='quick_action'?($_POST['sub']??''):$_POST['action'];
         if(preg_match('/^(approve|reject)(?:_stage([12]))?$/D',$flowAction,$match)){

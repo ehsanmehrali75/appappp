@@ -31,7 +31,9 @@ class ProductApprovalFlow {
         $p['website_sync']['approval_flow']=$flow;
     }
     public static function autoAdvance(&$p,$project,$now){
-        $settings=$project['settings'];$state=self::state($p,$settings,$now);
+        $settings=$project['settings'];
+        if(($p['stage1_decision']??'')==='rejected'||($p['stage2_decision']??'')==='rejected')return;
+        $state=self::state($p,$settings,$now);
         foreach(self::order($settings) as $s){$phase=$state['stages'][$s];if($phase['state']!=='pending')continue;
             if(!$phase['deadline']||$now<$phase['deadline'])return;
             $p['stage'.$s.'_decision']='approved';$p['approvals_stage'.$s][]='سیستم (پایان مهلت تأیید)';self::record($p,$settings,$now);refreshProductSplitStatus($p,$project);return;}

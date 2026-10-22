@@ -5766,7 +5766,7 @@ function refreshProductSplitStatus(&$p, $project) {
     }
     
     ProductApprovalFlow::record($p,$project['settings']);
-    if(ProductApprovalFlow::enabled($project['settings'])&&(($p['stage1_decision']??'')==='rejected'||($p['stage2_decision']??'')==='rejected')){$p['status']='rejected';return;}
+    if(($p['stage1_decision']??'')==='rejected'||($p['stage2_decision']??'')==='rejected'){$p['status']='rejected';return;}
     $st1_min = (int)($project['settings']['prod_approval_stage1_min'] ?? 1);
     $st2_min = (int)($project['settings']['prod_approval_stage2_min'] ?? 1);
     
