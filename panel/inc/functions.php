@@ -579,6 +579,7 @@ function getCurrentProject($id = null, $forceReload = false) {
         if ($cache_enabled && !$forceReload) {
             $cached_project = MaarkshoCache::get('project_full_' . $id, $cache_ttl);
             if ($cached_project && is_array($cached_project)) {
+                ProductApprovalFlow::normalizeRejections($cached_project);
                 $GLOBALS['LAST_LOADED_PROJECT'] = $cached_project;
                 $memory_cache[$id] = $cached_project;
                 return $cached_project;
@@ -758,6 +759,7 @@ function getCurrentProject($id = null, $forceReload = false) {
             }
         }
         
+        ProductApprovalFlow::normalizeRejections($project);
         autoApprovePendingProducts($project);
         
         if ($cache_enabled) {
@@ -786,6 +788,7 @@ function getCurrentProject($id = null, $forceReload = false) {
                     }
                 }
                 unset($prod);
+                ProductApprovalFlow::normalizeRejections($p);
                 autoApprovePendingProducts($p);
                 $GLOBALS['LAST_LOADED_PROJECT'] = $p;
                 return $p;
@@ -1103,7 +1106,7 @@ function getProductWorkflowStatus($p, $project = null) {
     $rawStatus = $p['status'] ?? 'active';
     $hasUnapprovedImages = (bool)WebsiteCatalogSync::pendingApprovalPhotos($p,true);
     
-    if ($rawStatus === 'rejected') {
+    if ($rawStatus === 'rejected'||($p['stage1_decision']??'')==='rejected'||($p['stage2_decision']??'')==='rejected') {
         return 'rejected';
     }
     

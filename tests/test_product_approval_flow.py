@@ -87,6 +87,21 @@ class ProductApprovalFlow(unittest.TestCase):
                 self.assertNotEqual(product['image'],'uploads/original.png')
                 self.assertFalse(product['rejection_reason'])
 
+    def test_historic_pending_rejection_loads_as_rejected_and_can_be_replaced(self):
+        for order in ['parallel','style_first','conformity_first']:
+            with self.subTest(order=order):
+                self.configure(order=order)
+                with sqlite3.connect(self.case.database) as db:
+                    db.execute("UPDATE products SET status='pending',stage1_decision='rejected',stage2_decision='pending',rejection_reason='old rejection' WHERE id='one'")
+                self.clear_cache()
+                script="require $argv[1];$project=getCurrentProject('p',true);foreach($project['products'] as $p)if($p['id']==='one')echo json_encode([$p['status'],getProductWorkflowStatus($p,$project),ProductApprovalFlow::html($p,$project)]);"
+                result=subprocess.run([fixtures.PHP,'-r',script,str(self.case.app/'panel/inc/functions.php')],capture_output=True,text=True,check=True)
+                self.assertEqual(json.loads(result.stdout),['rejected','rejected',''])
+                opener,csrf=self.case.login();code,page=self.case.request(opener,'/panel/admin.php?tab=products&filter=rejected')
+                self.assertEqual(code,200);self.assertIn('ویرایش و مدیریت محصول',page)
+                code,raw=self.case.upload(opener,csrf,'replacement.png',fixtures.PNG)
+                self.assertEqual(code,200,raw[:200]);product=self.case.record();self.assertEqual(product['status'],'pending');self.assertEqual(product['stage1_decision'],'pending');self.assertEqual(product['stage2_decision'],'pending')
+
     def test_next_team_queue_opens_after_first_approval(self):
         viewer,_=self.case.login('conform');code,page=self.case.request(viewer,'/panel/portal.php?tab=pending');self.assertEqual(code,200)
         self.assertNotIn('data-product-id="one"',page.split('id="tab-pending"')[1].split('id="tab-calendar"')[0])

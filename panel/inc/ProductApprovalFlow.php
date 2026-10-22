@@ -1,6 +1,12 @@
 <?php
 /** Optional sequential image approvals. Stage 1 is style; stage 2 is conformity. */
 class ProductApprovalFlow {
+    /** Interpret historic partial reviews using the current immediate-rejection rule. */
+    public static function normalizeRejections(&$project){
+        foreach($project['products']??[] as $index=>$product){
+            if(($product['stage1_decision']??'')==='rejected'||($product['stage2_decision']??'')==='rejected')$project['products'][$index]['status']='rejected';
+        }
+    }
     public static function enabled($settings){return !empty($settings['prod_approval_split_enabled'])&&in_array($settings['prod_approval_order']??'parallel',['style_first','conformity_first'],true);}
     public static function order($settings){return ($settings['prod_approval_order']??'')==='conformity_first'?[2,1]:[1,2];}
     public static function approved($p,$settings,$stage){return ($p['stage'.$stage.'_decision']??'')!=='rejected'&&(($p['stage'.$stage.'_decision']??'')==='approved'||count(array_unique($p['approvals_stage'.$stage]??[]))>=max(1,(int)($settings['prod_approval_stage'.$stage.'_min']??1)));}
