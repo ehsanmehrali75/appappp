@@ -22,7 +22,19 @@ try:
         page.goto(base+'/',wait_until='domcontentloaded');page.evaluate('openLoginModal();switchLoginTab("admin")')
         page.fill('[name=user]','fixture_owner');page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state('domcontentloaded')
         page.goto(base+'/panel/admin.php?switch_project=p',wait_until='domcontentloaded')
-        page.goto(base+'/panel/admin.php?tab=products',wait_until='domcontentloaded')
+        with sqlite3.connect(case.database) as db:
+            db.execute("UPDATE products SET status='rejected',stage1_decision='rejected',rejection_reason=?,rejection_by='style',rejection_side='استایل',rejections_history=? WHERE id='one'",('نور تصویر اصلاح شود',json.dumps([{'user':'style','side':'استایل','reason':'کادر تصویر اصلاح شود','at':1700000000}])))
+        page.goto(base+'/panel/admin.php?tab=products&filter=rejected',wait_until='domcontentloaded')
+        for width in (1440,390):
+            page.set_viewport_size({'width':width,'height':900})
+            details=page.locator('.product-rejection-details').first
+            details.locator('summary').click()
+            assert details.get_by_text('نور تصویر اصلاح شود',exact=True).is_visible()
+            assert details.get_by_text('کادر تصویر اصلاح شود',exact=True).is_visible()
+            assert not page.locator('#manualModal').is_visible()
+            details.locator('summary').click()
+        page.set_viewport_size({'width':1440,'height':1000})
+
         assert page.locator('.library-product-management button').count()>0
         page.locator('.library-product-management button').first.click()
         assert page.locator('#editModal').is_visible()

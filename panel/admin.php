@@ -8558,7 +8558,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         $dataSearch = strtolower(implode(' ', array_filter(array_map('trim', $searchParts))));
                         ?>
                         <div tabindex="0" role="button" aria-label="<?php echo htmlspecialchars('مشاهدهٔ محصول '.($p['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" class="ig-post-card group product-item relative" data-name="<?php echo strtolower($p['name']); ?>" data-sku="<?php echo strtolower($p['sku']??''); ?>" data-search="<?php echo htmlspecialchars($dataSearch); ?>" onclick="showManualInfo(<?php echo htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8'); ?>)">
-                            <?php ProductMediaGallery::render($p);echo ProductApprovalFlow::html($p,$project); ?>
+                            <?php ProductMediaGallery::render($p);echo ProductApprovalFlow::html($p,$project);echo ProductApprovalFlow::rejectionHtml($p); ?>
                             <?php if (hasPermission('products')): ?>
                                 <div class="library-product-management" onclick="event.stopPropagation()">
                                     <button type="button" onclick="openEdit(<?php echo htmlspecialchars(json_encode($p), ENT_QUOTES, 'UTF-8'); ?>)" aria-label="ویرایش محصول <?php echo htmlspecialchars($p['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">🛠 ویرایش و مدیریت محصول</button>
@@ -24519,7 +24519,7 @@ ${desc2}
             const rejectionText = document.getElementById('m-rejection-text');
             if (p.status === 'rejected' || p.rejectionReason) {
                 rejectionMsg.classList.remove('hidden');
-                rejectionText.innerText = p.rejectionReason || 'نامشخص';
+                rejectionText.innerText = p.rejection_reason || p.rejectionReason || 'توضیحی ثبت نشده است.';
             } else {
                 rejectionMsg.classList.add('hidden');
             }

@@ -102,6 +102,11 @@ class ProductApprovalFlow(unittest.TestCase):
                 code,raw=self.case.upload(opener,csrf,'replacement.png',fixtures.PNG)
                 self.assertEqual(code,200,raw[:200]);product=self.case.record();self.assertEqual(product['status'],'pending');self.assertEqual(product['stage1_decision'],'pending');self.assertEqual(product['stage2_decision'],'pending')
 
+    def test_rejection_details_escape_comments_and_accept_legacy_history(self):
+        script="require $argv[1];echo ProductApprovalFlow::rejectionHtml(['status'=>'rejected','rejectionReason'=>'<script>unsafe</script>','rejections_history'=>json_encode([['user'=>'reviewer','side'=>'style','reason'=>'old reason','at'=>1700000000]])]);"
+        result=subprocess.run([fixtures.PHP,'-r',script,str(self.case.app/'panel/inc/functions.php')],capture_output=True,text=True,check=True)
+        self.assertIn('مشاهدهٔ علت رد',result.stdout);self.assertIn('&lt;script&gt;',result.stdout);self.assertNotIn('<script>',result.stdout);self.assertIn('old reason',result.stdout)
+
     def test_next_team_queue_opens_after_first_approval(self):
         viewer,_=self.case.login('conform');code,page=self.case.request(viewer,'/panel/portal.php?tab=pending');self.assertEqual(code,200)
         self.assertNotIn('data-product-id="one"',page.split('id="tab-pending"')[1].split('id="tab-calendar"')[0])

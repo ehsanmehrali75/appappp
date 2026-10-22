@@ -75,6 +75,17 @@ class ProductApprovalFlow {
         self::record($p,$settings);refreshProductSplitStatus($p,$project);
         if (($p['status']??'')==='active') unset($p['rejectionReason']);
     }
+    public static function rejectionHtml($p){
+        if(($p['status']??'')!=='rejected'&&($p['stage1_decision']??'')!=='rejected'&&($p['stage2_decision']??'')!=='rejected')return '';
+        $escape=static fn($v)=>htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');
+        $history=$p['rejections_history']??[];if(is_string($history))$history=json_decode($history,true);if(!is_array($history))$history=[];
+        $reason=trim((string)($p['rejection_reason']??''));if($reason==='')$reason=trim((string)($p['rejectionReason']??''));
+        $html='<details class="product-rejection-details" onclick="event.stopPropagation()"><summary>مشاهدهٔ علت رد</summary><div class="product-rejection-body">';
+        $html.='<strong>علت رد فعلی</strong><p>'.$escape($reason!==''?$reason:($history?'علت را در سابقهٔ بررسی زیر ببینید.':'برای این مورد توضیح رد ثبت نشده است.')).'</p>';
+        if(!empty($p['rejection_by'])||!empty($p['rejection_side']))$html.='<small>'.$escape($p['rejection_by']??'').' · '.$escape($p['rejection_side']??'').'</small>';
+        if($history){$html.='<strong>سابقهٔ بررسی‌ها</strong>';foreach(array_reverse($history) as $item){if(!is_array($item))continue;$html.='<article><small>'.$escape($item['user']??'بررسی‌کننده').' · '.$escape($item['side']??'').(!empty($item['at'])&&is_numeric($item['at'])?' · '.$escape(formatPersianDate((int)$item['at'],'Y/m/d H:i')):'').'</small><p>'.$escape($item['reason']??'').'</p></article>';}}
+        return $html.'</div></details>';
+    }
     public static function html($p,$project){
         if(!self::enabled($project['settings']??[])||($p['status']??'')!=='pending')return '';
         $state=self::state($p,$project['settings']);$html='<div class="approval-deadlines" data-approval-product="'.htmlspecialchars((string)($p['id']??''),ENT_QUOTES,'UTF-8').'">';
