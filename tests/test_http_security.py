@@ -30,7 +30,7 @@ class HttpSecurity(unittest.TestCase):
     def setUpClass(cls):
         cls.temp = tempfile.TemporaryDirectory(prefix='maarksho-http-security-')
         cls.app = Path(cls.temp.name) / 'site'
-        shutil.copytree(ROOT, cls.app, ignore=shutil.ignore_patterns('.git', '.env', 'db', 'uploads', 'tests', 'app', 'node_modules', '__pycache__'))
+        shutil.copytree(ROOT, cls.app, ignore=shutil.ignore_patterns('.git', '.env', 'db', 'uploads', 'tests', 'app', 'node_modules', 'work', '__pycache__'))
         private = cls.app / 'panel/db'
         private.mkdir(parents=True)
         (cls.app / 'panel/uploads').mkdir()
@@ -94,8 +94,10 @@ class HttpSecurity(unittest.TestCase):
     def login(self, username='fixture_owner'):
         opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
         self.request(opener, '/', {'login': '1', 'user': username, 'pass': 'Fixture-password-123!'})
-        if username == 'fixture_owner':
-            self.request(opener, '/panel/admin.php?switch_project=p')
+        code, chooser = self.request(opener, '/panel/workspace.php')
+        csrf = re.search(r'<meta name="app-csrf" content="([a-f0-9]+)">', chooser)
+        self.assertIsNotNone(csrf)
+        self.request(opener, '/panel/workspace.php', {'select_project':'p','app_csrf':csrf[1]})
         code, page = self.request(opener, '/panel/admin.php?tab=products' if username != 'viewer' else '/panel/portal.php?tab=library')
         self.assertEqual(code, 200)
         token = re.search(r'<meta name="app-csrf" content="([a-f0-9]+)">', page)

@@ -178,7 +178,7 @@ if (isset($_POST['verify_code'])) {
                 redirect('panel/support.php');
             }
             
-            redirect(ProjectOnboarding::landing(canAccessManagement() ? 'panel/admin.php' : 'panel/portal.php'));
+            $_SESSION['project_selection_required']=true;redirect(ProjectOnboarding::landing(canAccessManagement() ? 'panel/admin.php' : 'panel/portal.php'));
         } else {
             $login_error = 'کد وارد شده صحیح نیست یا منقضی شده است.';
             $temp_mobile = $mobile;
@@ -202,7 +202,7 @@ if(isset($_POST['login'])&&!LoginThrottle::check(trim((string)($_POST['user']??'
         LoginThrottle::check($u,true);
         session_regenerate_id(true);
         SessionIdentity::beginGlobal($u);
-        redirect('panel/admin.php');
+        $_SESSION['project_selection_required']=true;redirect('/panel/workspace.php');
         exit;
     }
     $db = getDB();
@@ -221,7 +221,7 @@ if(isset($_POST['login'])&&!LoginThrottle::check(trim((string)($_POST['user']??'
                 LoginThrottle::check($u,true);
                 session_regenerate_id(true);
                 SessionIdentity::beginGlobal($u, 'global');
-                redirect('panel/admin.php');
+                $_SESSION['project_selection_required']=true;redirect('/panel/workspace.php');
             }
         }
     }
@@ -242,7 +242,7 @@ if(isset($_POST['login'])&&!LoginThrottle::check(trim((string)($_POST['user']??'
                     LoginThrottle::check($u,true);
                     session_regenerate_id(true);
                     if (!SessionIdentity::beginPassword($u, $p, $project['id'])) continue;
-                    redirect(ProjectOnboarding::landing(canAccessManagement() ? 'panel/admin.php' : 'panel/portal.php'));
+                    $_SESSION['project_selection_required']=true;redirect(ProjectOnboarding::landing(canAccessManagement() ? 'panel/admin.php' : 'panel/portal.php'));
                 }
             }
         }

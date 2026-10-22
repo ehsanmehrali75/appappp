@@ -20,7 +20,7 @@ try:
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH') or shutil.which('chromium'),headless=True,args=['--no-sandbox'])
         context=browser.new_context(viewport={'width':1440,'height':1000});context.route('**/*',route);page=context.new_page();page.on('pageerror',lambda e:errors.append(str(e)))
-        page.goto(base+'/');page.evaluate('openLoginModal();switchLoginTab("admin")');page.fill('[name=user]','fixture_owner');page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state();page.goto(base+'/panel/admin.php?switch_project=p')
+        page.goto(base+'/');page.evaluate('openLoginModal();switchLoginTab("admin")');page.fill('[name=user]','fixture_owner');page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state();page.goto(base+'/panel/workspace.php',wait_until='domcontentloaded');page.locator('button[value=p]').click();page.wait_for_load_state('domcontentloaded')
         page.goto(base+'/panel/admin.php?tab=extract&wc_queue=missing_photo')
         def row():return page.locator('.website-catalog-row[data-product-id="one"]')
         def mark(kind):

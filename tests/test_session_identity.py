@@ -72,11 +72,12 @@ class SessionIdentity(unittest.TestCase):
         import subprocess
         hashed = subprocess.check_output([fixtures.PHP, '-r', 'echo password_hash("Fixture-password-123!", PASSWORD_DEFAULT);'], text=True)
         self.other_project(password=hashed, role='manager')
-        opener, _ = self.case.login('limited')
-        code, body = self.case.request(opener, '/panel/admin.php?tab=products&switch_project=identity-q')
-        self.assertEqual(code, 200)
-        self.assertIn('Unrelated-private-identity-product', body)
-        self.assertEqual(self.case.request(opener, '/panel/admin.php?tab=products&switch_project=p')[0], 200)
+        opener, token = self.case.login('limited')
+        self.assertEqual(self.case.request(opener, '/panel/admin.php?tab=products&switch_project=identity-q')[0],403)
+        code, body = self.case.request(opener, '/panel/workspace.php', {'select_project':'identity-q','app_csrf':token})
+        self.assertEqual(code,200)
+        self.assertIn('Unrelated-private-identity-product',body)
+        self.assertEqual(self.case.request(opener, '/panel/workspace.php', {'select_project':'p','app_csrf':token})[0],200)
 
     def test_member_password_reset_or_removal_revokes_existing_session(self):
         opener, token = self.case.login('limited')

@@ -27,13 +27,14 @@ class ProductImport {
                 $count=$body['chunks']??0;
                 if(!is_int($count)||$count<1||$count>1000)throw new RuntimeException('تعداد بخش‌ها معتبر نیست.');
                 $job=bin2hex(random_bytes(32));
-                $state=['job'=>$job,'project'=>$pid,'owner'=>$owner,'expires'=>time()+86400,'chunks'=>$count,'uploaded'=>0,'rows'=>0,'bytes'=>0,'mode'=>($body['mode']??'')==='sportland'?'sportland':'standard','state'=>'uploading','cursor'=>0];
+                $state=['recovery_revision'=>(int)($project['settings']['data_recovery_revision']??0),'job'=>$job,'project'=>$pid,'owner'=>$owner,'expires'=>time()+86400,'chunks'=>$count,'uploaded'=>0,'rows'=>0,'bytes'=>0,'mode'=>($body['mode']??'')==='sportland'?'sportland':'standard','state'=>'uploading','cursor'=>0];
                 $path=$dir.'/'.$job;mkdir($path,0700);self::write($path.'/state.json',$state);
             } else {
                 $job=$body['job']??'';
                 if(!is_string($job)||!preg_match('/^[a-f0-9]{64}$/D',$job))throw new RuntimeException('شناسهٔ واردسازی معتبر نیست.');
                 $path=$dir.'/'.$job;$state=json_decode(@file_get_contents($path.'/state.json')?:'null',true);
                 if(!$state||$state['project']!==$pid||!hash_equals($state['owner'],$owner)||$state['expires']<time())throw new RuntimeException('واردسازی منقضی شده یا متعلق به این نشست نیست.');
+                if((int)($state['recovery_revision']??0)!==(int)($project['settings']['data_recovery_revision']??0))throw new RuntimeException('پروژه بازیابی شده است؛ واردسازی قبلی ادامه پیدا نمی‌کند. پیش‌نمایش جدید بگیرید.');
                 if($action==='upload') {
                     if($state['state']!=='uploading')throw new RuntimeException('مرحلهٔ ارسال پایان یافته است.');
                     $index=$body['index']??-1;$rows=$body['rows']??null;
@@ -73,7 +74,7 @@ class ProductImport {
                         if(!$conn->begin_transaction())throw new RuntimeException('شروع تراکنش ناموفق بود.');
                         try {
                             InventoryVersions::lockProject($pid);
-                            $fresh=getCurrentProject($pid,true);$current=[];foreach($fresh['products']??[] as $p)$current[(string)$p['id']]=$p;
+                            $fresh=getCurrentProject($pid,true);if((int)($state['recovery_revision']??0)!==(int)($fresh['settings']['data_recovery_revision']??0))throw new RuntimeException('پروژه بازیابی شده است؛ پیش‌نمایش جدید بگیرید.');$current=[];foreach($fresh['products']??[] as $p)$current[(string)$p['id']]=$p;
                             foreach($batch as $p) {
                                 $id=(string)$p['id'];
                                 if(($base[$id]??null)!==(isset($current[$id])?self::hash($current[$id]):null))throw new RuntimeException('یکی از محصولات حین واردسازی ویرایش شده است. برای حفظ تغییرات، فایل را دوباره پیش‌نمایش کنید.');

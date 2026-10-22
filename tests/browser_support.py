@@ -24,7 +24,7 @@ def route(r):
     return r.fulfill(status=200,content_type='image/svg+xml' if r.request.resource_type=='image' else 'text/plain',body='<svg xmlns="http://www.w3.org/2000/svg"/>' if r.request.resource_type=='image' else '')
 def login(browser,name):
     context=browser.new_context(viewport={'width':1440,'height':1000});context.route('**/*',route);page=context.new_page();page.on('pageerror',lambda e:errors.append(str(e)));page.on('dialog',lambda d:d.accept())
-    page.goto(base+'/');page.evaluate('openLoginModal();switchLoginTab("admin")');page.fill('[name=user]',name);page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state()
+    page.goto(base+'/');page.evaluate('openLoginModal();switchLoginTab("admin")');page.fill('[name=user]',name);page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state();page.goto(base+'/panel/workspace.php',wait_until='domcontentloaded');page.locator('button[value=p]').click();page.wait_for_load_state('domcontentloaded')
     return context,page
 try:
     with sync_playwright() as p:

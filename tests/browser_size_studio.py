@@ -55,6 +55,7 @@ try:
         page.fill('[name=pass]', 'Fixture-password-123!')
         page.click('button[name=login]')
         page.wait_for_load_state()
+        page.goto(fixture.base+'/panel/workspace.php',wait_until='domcontentloaded');page.locator('button[value=p]').click();page.wait_for_load_state('domcontentloaded')
         page.goto(fixture.base + '/panel/size/?project=p')
         page.wait_for_function('typeof scs_settings !== "undefined" && typeof $ === "function"')
         for preset in ['persepolis', 'glass', 'minimal', 'dark_luxury', 'navy', 'transparent']:

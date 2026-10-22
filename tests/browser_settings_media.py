@@ -22,12 +22,12 @@ try:
         page.on('dialog',lambda d:(dialogs.append(d.message),d.accept()))
         def login(name):
             page.goto(base+'/');page.evaluate('openLoginModal();switchLoginTab("admin")')
-            page.fill('[name=user]',name);page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state()
+            page.fill('[name=user]',name);page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state();page.goto(base+'/panel/workspace.php',wait_until='domcontentloaded');page.locator('button[value=p]').click();page.wait_for_load_state('domcontentloaded')
         page.goto(base+'/panel/')
         assert page.url.endswith('/?action=login'),page.url
         assert page.locator('#login-modal').is_visible()
         login('fixture_owner');page.goto(base+'/panel/');assert page.url.endswith('/panel/admin.php')
-        page.goto(base+'/panel/admin.php?switch_project=p')
+        page.goto(base+'/panel/workspace.php',wait_until='domcontentloaded');page.locator('button[value=p]').click();page.wait_for_load_state('domcontentloaded')
         page.goto(base+'/panel/admin.php?tab=settings')
         page.locator('.settings-nav').wait_for()
         assert page.locator('.settings-nav button').count()>=8

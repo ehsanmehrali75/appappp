@@ -172,12 +172,16 @@ class ModuleProjectAccess(unittest.TestCase):
             db.execute('INSERT INTO project_users(project_id,username,password,role,permissions) VALUES (?,?,?,?,?)',('q','limited','Fixture-password-123!','manager',json.dumps(['vm','analysis'])))
             db.execute('UPDATE project_users SET permissions=? WHERE project_id="p" AND username="limited"',(json.dumps(['products']),))
         opener, token = self.case.login('limited')
+        self.assertEqual(self.case.request(opener,'/panel/vm/index.php?project_slug=q')[0],403)
+        self.assertEqual(self.case.request(opener,'/panel/workspace.php',{'select_project':'q','app_csrf':token})[0],200)
         for path in ['/panel/vm/index.php?project_slug=q','/admin/projects/q/vm','/panel/seo_intel/api.php?action=get_overview&business=q','/admin/projects/q/seo']:
             with self.subTest(path=path):self.assertEqual(self.case.request(opener,path)[0],200)
         self.assertEqual(self.case.request(opener,'/panel/vm/index.php?project_slug=p')[0],403)
 
     def test_owner_retains_cross_project_module_access(self):
-        opener, _ = self.case.login()
+        opener, token = self.case.login()
+        self.assertEqual(self.case.request(opener,'/panel/vm/index.php?project_slug=q')[0],403)
+        self.assertEqual(self.case.request(opener,'/panel/workspace.php',{'select_project':'q','app_csrf':token})[0],200)
         for path in ['/panel/vm/index.php?project_slug=q','/panel/vm/api.php?action=get_stores&project_id=q','/panel/seo_intel/api.php?action=get_overview&business=q','/admin/projects/q/seo']:
             with self.subTest(path=path):self.assertEqual(self.case.request(opener,path)[0],200)
 

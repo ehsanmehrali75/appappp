@@ -38,7 +38,7 @@ class RequestSecurity {
     public static function protectBrowser() {
         if(PHP_SAPI==='cli')return;
         $path=str_replace('\\','/',$_SERVER['SCRIPT_FILENAME']??'');
-        if(!in_array(basename($path),['onboarding.php','insights.php','data-hub.php','ai-connect.php','admin.php','portal.php','task_manager.php','prompthub.php','system-admin-setup.php','support.php','sale.php','seo.php','wp-crm.php','chat.php','user_chat.php'],true)
+        if(!in_array(basename($path),['workspace.php','backups.php','onboarding.php','insights.php','data-hub.php','ai-connect.php','admin.php','portal.php','task_manager.php','prompthub.php','system-admin-setup.php','support.php','sale.php','seo.php','wp-crm.php','chat.php','user_chat.php'],true)
             &&!preg_match('~/(?:size|vm|seo_intel|pro)/index\.php$~',$path))return;
         self::token();self::enforce();
         if(!empty($_FILES)) {
@@ -61,7 +61,7 @@ class RequestSecurity {
         }
         return null;
     }
-    private static function postForm($tag) {
+    private static function postForm($tag,$requirePost=true) {
         $attributes=[];
         preg_match_all('~\s([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s>]+)))?~',$tag,$matches,PREG_SET_ORDER|PREG_UNMATCHED_AS_NULL);
         foreach($matches as $attribute) {
@@ -69,14 +69,15 @@ class RequestSecurity {
             // Browsers use the first occurrence of a duplicate attribute.
             if(!array_key_exists($name,$attributes))$attributes[$name]=html_entity_decode($attribute[2]??$attribute[3]??$attribute[4]??'',ENT_QUOTES,'UTF-8');
         }
-        return strtolower($attributes['method']??'get')==='post'&&self::sameOrigin($attributes['action']??'');
+        return (!$requirePost||strtolower($attributes['method']??'get')==='post')&&self::sameOrigin($attributes['action']??'');
     }
     public static function decorateHtml($html) {
         foreach(headers_list() as $header)if(stripos($header,'Content-Type:')===0&&stripos($header,'text/html')===false)return $html;
         if(stripos($html,'<html')===false)return $html;
         $token=htmlspecialchars(self::token(),ENT_QUOTES,'UTF-8');
-        $assets='<meta name="app-csrf" content="'.$token.'"><script src="/panel/assets/request-security.js?v=1"></script>';
-        $hidden='<input type="hidden" name="app_csrf" value="'.$token.'">';
+        $context=htmlspecialchars($_SESSION['project_id']??'',ENT_QUOTES,'UTF-8');
+        $assets='<meta name="project-context" content="'.$context.'"><meta name="app-csrf" content="'.$token.'"><script src="/panel/assets/request-security.js?v=2"></script>';
+        $hidden='<input type="hidden" name="_project_context" value="'.$context.'"><input type="hidden" name="app_csrf" value="'.$token.'">';
         $parts=[];$offset=0;$copied=0;$headAdded=false;
         // Match only small opening tokens. A whole-page .*? regex can exhaust
         // pcre.backtrack_limit on the multi-megabyte product JSON and erase output.
@@ -97,12 +98,22 @@ class RequestSecurity {
             if(strcasecmp($opening,'</head')===0&&!$headAdded) {
                 $parts[]=substr($html,$copied,$start-$copied);$parts[]=$assets;
                 $copied=$start;$headAdded=true;
-            } elseif(strcasecmp($opening,'<form')===0&&self::postForm(substr($html,$start,$end-$start))) {
-                $parts[]=substr($html,$copied,$end-$copied);$parts[]=$hidden;$copied=$end;
+            } elseif(strcasecmp($opening,'<form')===0&&self::postForm(substr($html,$start,$end-$start),false)) {
+                $parts[]=substr($html,$copied,$end-$copied);$parts[]=self::postForm(substr($html,$start,$end-$start))?$hidden:'<input type="hidden" name="_project_context" value="'.$context.'">';$copied=$end;
             }
             $offset=$end;
         }
         $parts[]=substr($html,$copied);
-        return implode('',$parts);
+        $html=implode('',$parts);
+        if(function_exists('isUser')&&isUser()&&in_array(basename($_SERVER['SCRIPT_FILENAME']??''),['admin.php','portal.php'],true)){
+            $central=basename($_SERVER['SCRIPT_FILENAME']??'')==='admin.php'&&isMainAdmin()&&ProjectSelection::centralTab($_GET['tab']??'');
+            $toolbar='<link rel="stylesheet" href="/panel/assets/workspace-shell.css"><nav class="project-toolbar"><a href="/panel/workspace.php">میزکار مرکزی</a><form method="post" action="/panel/workspace.php">'.$hidden.'<label>پروژه <select name="select_project">';
+            if(isMainAdmin())$toolbar.='<option value="__central__" '.($central?'selected':'').'>مدیریت مرکزی</option>';
+            foreach(ProjectSelection::projects() as $p)if(isMainAdmin()||SessionIdentity::member($p))$toolbar.='<option value="'.htmlspecialchars($p['id'],ENT_QUOTES,'UTF-8').'" '.((!$central&&$p['id']===($_SESSION['project_id']??''))?'selected':'').'>'.htmlspecialchars($p['name'],ENT_QUOTES,'UTF-8').'</option>';
+            $toolbar.='</select></label><button>انتخاب</button></form>';
+            if(!$central&&!empty($_SESSION['project_id'])&&canAccessManagement()&&(isMainAdmin()||isProjectAdmin()))$toolbar.='<a href="/panel/backups.php?project='.rawurlencode($_SESSION['project_id']).'">بک‌آپ پروژه</a>';
+            $toolbar.='</nav>';$html=preg_replace_callback('~(<body\b[^>]*>)~i',static fn($m)=>$m[1].$toolbar,$html,1);
+        }
+        return $html;
     }
 }

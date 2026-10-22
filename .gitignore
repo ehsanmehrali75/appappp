@@ -13,3 +13,7 @@ __pycache__/
 
 # Encrypted AI credentials, OAuth grants and financial/runtime state
 /panel/db/ai-private/
+
+/work/
+/panel/db/project-backups/
+/panel/uploads/restored/

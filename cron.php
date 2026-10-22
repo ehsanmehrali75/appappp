@@ -13,6 +13,10 @@ if (PHP_SAPI !== 'cli') {
     if (!isMainAdmin()) AccessControl::deny();
 }
 
+require_once __DIR__.'/panel/inc/ProjectBackups.php';
+require_once __DIR__.'/panel/inc/InventoryVersions.php';
+try{ProjectBackups::weekly();}catch(Throwable $e){error_log('Project backup maintenance could not run; check private storage permissions.');}
+
 require_once __DIR__.'/panel/inc/BackgroundWorker.php';
 BackgroundWorker::begin();
 
@@ -71,6 +75,7 @@ while ($pendingJobs && BackgroundWorker::hasTime() && ($job = $pendingJobs->fetc
     
     try {
         $project = getCurrentProject($pid);
+        if(!empty($project['settings']['backup_restore_paused']))continue;
         if (!$project) throw new Exception("Project not found");
 
         if ($type === 'discovery') {
@@ -153,7 +158,7 @@ if (isSqlActive()) {
     if ($res) {
         while ($row = $res->fetch_assoc()) {
             $proj = getCurrentProject($row['id']);
-            if ($proj) {
+            if ($proj && empty($proj['settings']['backup_restore_paused'])) {
                 autoApprovePendingProducts($proj);
                 checkAndSendDailyAggregatedNotifications($proj);
                 saveProject($proj);
@@ -185,7 +190,7 @@ if ($stmt) {
         logSystem("[Scheduler] Dispatching post ID: $tid");
         
         $proj = getCurrentProject($task['project_id']);
-        if ($proj) {
+        if ($proj && empty($proj['settings']['backup_restore_paused'])) {
             $product = null;
             if ($task['product_id']) {
                 foreach(($proj['products'] ?? []) as $p) {

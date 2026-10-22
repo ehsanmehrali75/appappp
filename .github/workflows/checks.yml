@@ -48,6 +48,7 @@ jobs:
           python tests/browser_transfer_payment.py
           python tests/browser_project_overview.py
           python tests/browser_wordpress_workspace.py
+          python tests/browser_project_recovery.py
           python tests/browser_project_onboarding.py
           python tests/browser_settings_media.py
           python tests/browser_workspace.py

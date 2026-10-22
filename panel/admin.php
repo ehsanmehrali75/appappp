@@ -9,6 +9,8 @@ require_once __DIR__.'/inc/ProjectMembers.php';
 require_once __DIR__.'/inc/ProjectOnboarding.php';
 require_once 'inc/cors.php';
 
+if(isUser()&&!(isMainAdmin()&&ProjectSelection::centralTab($_GET['tab']??''))&&!isset($_GET['project'])&&!isset($_GET['switch_project'])&&($_SERVER['REQUEST_METHOD']??'GET')==='GET'&&!isset($_SESSION['project_id']))redirect('/panel/workspace.php');
+if(($_SERVER['REQUEST_METHOD']??'GET')==='POST'&&isset($_POST['_project_context'])&&($_POST['_project_context']!==($_SESSION['project_id']??'')))RequestSecurity::reject('پروژه در صفحهٔ دیگری تغییر کرده است؛ صفحه را تازه کنید.');
 // Authentication (Standard UI access)
 if (!isUser()) {
     redirect('/?action=login');
@@ -205,7 +207,7 @@ if (isSuperAdmin()) {
         ProjectMembers::prepareStorage();
         if(!db_save_project($createdProject))throw new RuntimeException('ساخت پروژه تکمیل نشد.');
         SessionIdentity::select($createdProject);
-        redirect(ProjectOnboarding::url($createdProject['id']));
+        redirect('/panel/workspace.php');
     }
 
     if (isset($_POST['reset_project']) || isset($_POST['delete_project'])) {
@@ -219,11 +221,12 @@ if (isSuperAdmin()) {
 }
 
 // Load current project data if available
-$project = getCurrentProject();
+$centralDesk=isMainAdmin()&&ProjectSelection::centralTab($tab);
+$project = $centralDesk?null:getCurrentProject();
 if (!canAccessManagement()) { if(canAccessPortal())redirect('portal.php'); AccessControl::deny(); }
 
 // Lazy Cron Emulator for Direct Tiam Connection
-if ($project && isset($project['settings']['tiam']['enabled']) && $project['settings']['tiam']['enabled'] == 1) {
+if ($project && empty($project['settings']['backup_restore_paused']) && isset($project['settings']['tiam']['enabled']) && $project['settings']['tiam']['enabled'] == 1) {
     if (!empty($project['settings']['tiam']['endpoint']) || !empty($project['settings']['tiam']['erp_server_ip'])) {
         $syncHour = $project['settings']['tiam']['sync_hour'] ?? '03:00';
         $todayStr = date('Y-m-d');
@@ -244,7 +247,7 @@ if ($project && isset($project['settings']['tiam']['enabled']) && $project['sett
 }
 
 // Lazy Cron Emulator for Auto Admin
-if ($project && isset($project['settings']['auto_admin']['active']) && (int)$project['settings']['auto_admin']['active'] == 1) {
+if ($project && empty($project['settings']['backup_restore_paused']) && isset($project['settings']['auto_admin']['active']) && (int)$project['settings']['auto_admin']['active'] == 1) {
     $scheduleHour = $project['settings']['auto_admin']['schedule_hour'] ?? '09:00';
     $todayStr = date('Y-m-d');
     $lastRun = $project['settings']['auto_admin']['last_auto_admin_run_date'] ?? '';
@@ -3152,174 +3155,10 @@ $sections_json
             exit;
         }
 
-        $isBackup = false;
-        $productsToImport = [];
-        $schedulesToImport = [];
-        $settingsToImport = null;
-        $logsToImport = [];
-        $usersToImport = [];
-
-        if (isset($items['project_id']) && isset($items['products']) && is_array($items['products'])) {
-            // A complete backup also replaces project users and access settings.
-            if (!isMainAdmin()) AccessControl::deny();
-            $isBackup = true;
-            $productsToImport = $items['products'];
-            if (isset($items['schedules']) && is_array($items['schedules'])) {
-                $schedulesToImport = $items['schedules'];
-            }
-            if (isset($items['settings']) && is_array($items['settings'])) {
-                $settingsToImport = $items['settings'];
-            }
-            if (isset($items['logs']) && is_array($items['logs'])) {
-                $logsToImport = $items['logs'];
-            }
-            if (isset($items['users']) && is_array($items['users'])) {
-                $usersToImport = $items['users'];
-            }
-        } elseif (is_array($items) && !empty($items) && !isset($items[0]) && isset($items['id'])) {
-            // It's a single product object exported/backed up directly
-            $productsToImport = [$items];
-            $isBackup = true;
-        } elseif (is_array($items) && !empty($items) && isset($items[0]) && isset($items[0]['id'])) {
-            // It's a list of product objects (an exported list of products)
-            $productsToImport = $items;
-            $isBackup = true;
-        }
-
-        if ($isBackup) {
-            $newCount = 0;
-            $updatedCount = 0;
-            
-            // Restore project name and duration details if available
-            if (isset($items['name']) && !empty($items['name'])) {
-                $project['name'] = $items['name'];
-            }
-            if (isset($items['activeFrom']) && !empty($items['activeFrom'])) {
-                $project['activeFrom'] = $items['activeFrom'];
-            }
-            if (isset($items['activeTo']) && !empty($items['activeTo'])) {
-                $project['activeTo'] = $items['activeTo'];
-            }
-            
-            // Build map of existing products by ID to update easily
-            $existingMap = [];
-            if (isset($project['products']) && is_array($project['products'])) {
-                foreach ($project['products'] as $idx => $p) {
-                    if (!empty($p['id'])) {
-                        $existingMap[(string)$p['id']] = $idx;
-                    }
-                }
-            } else {
-                $project['products'] = [];
-            }
-            
-            foreach ($productsToImport as $imp) {
-                if (!is_array($imp)) continue;
-                
-                $id = (string)($imp['id'] ?? $imp['sku'] ?? '');
-                if ($id === '') {
-                    $id = uniqid();
-                }
-                
-                // Construct standard votes mapping
-                $userVotesRaw = is_array($imp['userVotes'] ?? null) ? $imp['userVotes'] : (json_decode($imp['user_votes'] ?? '[]', true) ?: []);
-                $voterVotesRaw = is_array($imp['voterVotes'] ?? null) ? $imp['voterVotes'] : (is_array($imp['userVotes'] ?? null) ? $imp['userVotes'] : []); 
-                
-                $voterVotes = [];
-                foreach ($userVotesRaw as $vid => $vdata) {
-                    $voterVotes[$vid] = is_array($vdata) ? ($vdata['type'] ?? 'like') : $vdata;
-                }
-                foreach ($voterVotesRaw as $vid => $vdata) {
-                    $voterVotes[$vid] = is_array($vdata) ? ($vdata['type'] ?? 'like') : $vdata;
-                }
-
-                // Map every field accurately
-                $mappedProduct = [
-                    'id' => $id,
-                    'sku' => (string)($imp['sku'] ?? $id),
-                    'name' => (string)($imp['name'] ?? 'بی‌نام'),
-                    'image' => (string)($imp['image'] ?? ''),
-                    'social_image' => (string)($imp['social_image'] ?? $imp['socialImage'] ?? ''),
-                    'gallery' => is_array($imp['gallery'] ?? null) ? $imp['gallery'] : (json_decode($imp['gallery'] ?? '[]', true) ?: []),
-                    'link' => (string)($imp['link'] ?? ''),
-                    'price' => (string)($imp['price'] ?? 'نامشخص'),
-                    'extractedAt' => (int)($imp['extractedAt'] ?? $imp['extracted_at'] ?? time()),
-                    'manualEdit' => (bool)($imp['manualEdit'] ?? $imp['manual_edit'] ?? false),
-                    'likes' => (int)($imp['likes'] ?? 0),
-                    'dislikes' => (int)($imp['dislikes'] ?? 0),
-                    'userVotes' => $userVotesRaw,
-                    'voterVotes' => $voterVotes, 
-                    'userFeedback' => is_array($imp['userFeedback'] ?? null) ? $imp['userFeedback'] : (json_decode($imp['user_feedback'] ?? '[]', true) ?: []),
-                    'platformsSent' => is_array($imp['platformsSent'] ?? null) ? $imp['platformsSent'] : (json_decode($imp['platforms_sent'] ?? '{}', true) ?: []),
-                    'status' => (string)($imp['status'] ?? 'active'),
-                    'color' => (string)($imp['color'] ?? ''),
-                    'sizes' => is_array($imp['sizes'] ?? null) ? $imp['sizes'] : (json_decode($imp['sizes'] ?? '[]', true) ?: []),
-                    'variants' => is_array($imp['variants'] ?? null) ? $imp['variants'] : (json_decode($imp['variants'] ?? '[]', true) ?: []),
-                    'size_chart' => (string)($imp['size_chart'] ?? $imp['sizeChart'] ?? ''),
-                    'description' => (string)($imp['description'] ?? ''),
-                    'stock_online' => (string)($imp['stock_online'] ?? $imp['stockOnline'] ?? ''),
-                    'stock_total' => (string)($imp['stock_total'] ?? $imp['stockTotal'] ?? ''),
-                    'priority' => (int)($imp['priority'] ?? 0),
-                    'utm_source' => (string)($imp['utm_source'] ?? $imp['utmSource'] ?? ''),
-                    'utm_medium' => (string)($imp['utm_medium'] ?? $imp['utmMedium'] ?? ''),
-                    'utm_campaign' => (string)($imp['utm_campaign'] ?? $imp['utmCampaign'] ?? ''),
-                    'uploaded_to_site' => (int)($imp['uploaded_to_site'] ?? $imp['uploadedToSite'] ?? 0),
-                    'uploaded_by' => (string)($imp['uploaded_by'] ?? ''),
-                    'is_manual_image' => (bool)($imp['is_manual_image'] ?? false),
-                    'content_gen_requested' => (bool)($imp['content_gen_requested'] ?? false),
-                    'publish_priority' => (bool)($imp['publish_priority'] ?? $imp['publishPriority'] ?? false),
-                    'stage1_decision' => (string)($imp['stage1_decision'] ?? $imp['stage1Decision'] ?? 'pending'),
-                    'stage2_decision' => (string)($imp['stage2_decision'] ?? $imp['stage2Decision'] ?? 'pending'),
-                    'approvals_stage1' => is_array($imp['approvals_stage1'] ?? null) ? $imp['approvals_stage1'] : (json_decode($imp['approvals_stage1'] ?? '[]', true) ?: []),
-                    'approvals_stage2' => is_array($imp['approvals_stage2'] ?? null) ? $imp['approvals_stage2'] : (json_decode($imp['approvals_stage2'] ?? '[]', true) ?: []),
-                    'rejection_reason' => (string)($imp['rejection_reason'] ?? $imp['rejectionReason'] ?? ''),
-                    'rejection_by' => (string)($imp['rejection_by'] ?? ''),
-                    'rejection_side' => (string)($imp['rejection_side'] ?? ''),
-                    'rejections_history' => is_array($imp['rejections_history'] ?? null) ? $imp['rejections_history'] : (json_decode($imp['rejections_history'] ?? '[]', true) ?: []),
-                    'has_image' => isset($imp['has_image']) ? (bool)$imp['has_image'] : (!empty($imp['image']) && strpos($imp['image'], 'placehold') === false),
-                    'media_status' => (string)($imp['media_status'] ?? $imp['mediaStatus'] ?? 'missing'),
-                    'images_list' => is_array($imp['images_list'] ?? null) ? $imp['images_list'] : (is_array($imp['images'] ?? null) ? $imp['images'] : []),
-                    'website_sync' => is_array($imp['website_sync'] ?? null) ? $imp['website_sync'] : [],
-                    'reference_gallery' => is_array($imp['reference_gallery'] ?? null) ? $imp['reference_gallery'] : (json_decode($imp['reference_gallery'] ?? '[]', true) ?: [])
-                ];
-
-                if (isset($existingMap[$id])) {
-                    $idx = $existingMap[$id];
-                    $project['products'][$idx] = $mappedProduct;
-                    $updatedCount++;
-                } else {
-                    $project['products'][] = $mappedProduct;
-                    $existingMap[$id] = count($project['products']) - 1;
-                    $newCount++;
-                }
-            }
-            
-            // Also restore schedules, settings, logs if they are available and this is a full system backup
-            if (!empty($schedulesToImport)) {
-                $project['schedules'] = $schedulesToImport;
-            }
-            if ($settingsToImport !== null) {
-                if (!isset($project['settings']) || !is_array($project['settings'])) {
-                    $project['settings'] = [];
-                }
-                $project['settings'] = array_merge($project['settings'], $settingsToImport);
-            }
-            if (!empty($logsToImport)) {
-                if (!isset($project['logs']) || !is_array($project['logs'])) {
-                    $project['logs'] = [];
-                }
-                $project['logs'] = array_merge($project['logs'], $logsToImport);
-            }
-            if (!empty($usersToImport)) {
-                $project['users'] = $usersToImport;
-            }
-            
-            // Save the project with all imported data!
-            saveProject($project);
-            
-            $msgDesc = "پشتیبان جامع پشتیبانی با موفقیت بازگردانی شد: {$newCount} محصول جدید، {$updatedCount} محصول بروزرسانی شده به همراه نظرات، بازخوردها، تصاویر شبکه‌های اجتماعی، تاییدها و مرجوعی‌ها همگام شدند. همچنین " . count($schedulesToImport) . " زمان‌بندی تقویم، کل اطلاعات سئو، فروش و فاکتورها، " . count($usersToImport) . " کاربر پروژه، تنظیمات ارتباطات و لاگ‌های سیستم بازیابی گردید.";
-            echo json_encode(['status' => 'success', 'msg' => $msgDesc]);
-            exit();
+        $isBackup=isset($items['products'])||isset($items['id'])||isset($items[0]['id']);
+        if($isBackup){
+            if(!isMainAdmin())AccessControl::deny();
+            http_response_code(422);echo json_encode(['status'=>'failed','msg'=>'برای حفظ دسترسی کاربران و جلوگیری از اجرای صف‌های قدیمی، فایل پشتیبان را از صفحهٔ «بک‌آپ پروژه» با پیش‌نمایش و تأیید بازیابی کنید.'],JSON_UNESCAPED_UNICODE);exit;
         }
 
         $erpMode = $_POST['erp_mode'] ?? 'standard';
@@ -4955,6 +4794,7 @@ if ($project) {
 
         // Save Business Category, Platform Type, Billing Package and Active Modules list
         if (isset($_POST['platform_type'])) {
+            if(!in_array($_POST['platform_type'],['wordpress','tiam','custom'],true))AccessControl::deny();
             $project['settings']['platform_type'] = $_POST['platform_type'];
         }
         if (isset($_POST['settings_category'])) {
@@ -6450,7 +6290,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     </div>
                 </div>
 
-                <?php if(isSuperAdmin()): ?>
+                <?php if(isSuperAdmin()&&$centralDesk): ?>
                     <div class="nav-category-group mb-3">
                         <div class="px-3 mb-1.5 text-[10px] font-black text-indigo-600 uppercase tracking-wider flex items-center justify-between">
                             <span>👑 مدیریت کلان وب‌سایت</span>
@@ -6528,34 +6368,14 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                 <?php endif; ?>
 
                 <?php if($project): 
-                    $user_allowed_projects = [];
-                    foreach ($db['projects'] as $p_item) {
-                        if (isSuperAdmin()) {
-                            $user_allowed_projects[] = $p_item;
-                        } else if (SessionIdentity::member($p_item)) $user_allowed_projects[] = $p_item;
-                    }
-                    if (count($user_allowed_projects) > 1): ?>
-                        <div class="px-2 mb-4">
-                            <label class="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1 px-1">🚀 سوییچ سریع پروژه</label>
-                            <select onchange="window.location.href='?switch_project=' + this.value" class="w-full px-3 py-2 bg-slate-100 hover:bg-slate-200/60 border border-slate-200/50 rounded-xl text-xs font-bold outline-none text-slate-700 focus:border-indigo-500 cursor-pointer transition-all">
-                                <?php foreach($user_allowed_projects as $p_item): ?>
-                                    <option value="<?php echo htmlspecialchars($p_item['id']); ?>" <?php echo $p_item['id'] === $project['id'] ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($p_item['name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                    <?php else: ?>
-                        <div class="neo-single-project px-3 mb-3 text-[10px] font-black text-indigo-700 bg-indigo-50/80 py-2 rounded-xl border border-indigo-100 text-center shadow-xs">
-                            پروژه: <?php echo htmlspecialchars($project['name']); ?>
-                        </div>
-                    <?php endif; ?>
+                    ?><div class="neo-single-project px-3 mb-3 text-xs">پروژه: <?php echo htmlspecialchars($project['name']); ?> · <a href="/panel/workspace.php">انتخاب پروژه</a></div>
 
                     <!-- Category 1: General & Overview -->
                     <div class="nav-category-group mb-3">
                         <div class="px-3 mb-1.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">📊 اصلی و عمومی</div>
                         
                         <?php if(canAccessFeature('dashboard')): ?>
+                        <a href="/panel/workspace.php" class="nav-link">⌂ میزکار مرکزی و انتخاب پروژه</a>
                         <a href="?tab=dashboard" class="nav-link <?php echo $tab=='dashboard'?'active':''; ?>"><span>📈</span> <span>میز کار (Insight)</span><?php echo getModuleVisibilityBadge('dashboard', $project); ?></a>
                         <?php endif; ?>
 
@@ -7500,7 +7320,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                 </div>
                                 
                                 <div class="flex flex-wrap gap-4">
-                                    <a href="?switch_project=<?php echo $p['id']; ?>" class="btn btn-primary flex-1 py-4 shadow-xl shadow-primary/20">مدیریت پروژه</a>
+                                    <form method="post" action="/panel/workspace.php" class="flex-1"><button name="select_project" value="<?php echo htmlspecialchars($p['id'],ENT_QUOTES,'UTF-8'); ?>" class="btn btn-primary w-full py-4 shadow-xl shadow-primary/20">انتخاب و مدیریت پروژه</button></form>
                                     <form method="POST" onsubmit="return confirm('کالاها، تقویم، گزارش‌ها و صف این پروژه پاک شوند؟ اعضا و تنظیمات حفظ می‌شوند.')" class="flex-none">
                                         <input type="hidden" name="pid" value="<?php echo htmlspecialchars($p['id'],ENT_QUOTES,'UTF-8'); ?>">
                                         <button name="reset_project" class="btn btn-outline" title="پاک‌سازی داده‌های عملیاتی؛ حفظ تنظیمات و اعضا">ریست داده‌ها</button>
@@ -9677,7 +9497,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                 <link rel="stylesheet" href="/panel/assets/extract-workspace.css?v=<?php echo filemtime(__DIR__.'/assets/extract-workspace.css'); ?>">
                 <script src="/panel/assets/extract-workspace.js?v=<?php echo filemtime(__DIR__.'/assets/extract-workspace.js'); ?>" defer></script>
                 <?php require __DIR__.'/inc/WebsiteCatalogView.php'; ?>
-                <?php $ext_platform = $project['settings']['platform_type'] ?? 'wordpress'; ?>
+                <?php $ext_platform = $project['settings']['platform_type'] ?? 'custom'; ?>
                 <div id="extract-tools-workspace" class="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
                     <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
                         <div class="flex-1">
@@ -10098,15 +9918,15 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         <div class="flex flex-col md:flex-row gap-10 items-center">
                             <div class="w-20 h-20 bg-emerald-600 text-white rounded-[2rem] shadow-xl shadow-emerald-200 flex items-center justify-center text-3xl shrink-0">💾</div>
                             <div class="flex-1">
-                                <h4 class="text-xl font-black text-slate-900 mb-2">دریافت خروجی کامل نسخه پشتیبان (JSON Export)</h4>
-                                <p class="text-xs text-slate-500 leading-relaxed mb-3">یک خروجی کامل و جامع به صورت فایل استاندارد JSON از تمام محصولات، نظرات، لایک‌ها، واکنش‌ها، تنظیمات کلی و جزئیات زمان‌بندی سیستم خود دانلود کنید. از این فایل می‌توانید در هر شرایطی برای گارانتی و بازگردانی سریع کل مجموعه استفاده نمایید.</p>
+                                <h4 class="text-xl font-black text-slate-900 mb-2">پشتیبان‌گیری کتابخانه و تصاویر پروژه</h4>
+                                <p class="text-xs text-slate-500 leading-relaxed mb-3">از کتابخانهٔ محصولات و تصاویر محلی بک‌آپ دستی بگیرید، نسخه‌های هفتگی را ببینید و پس از پیش‌نمایش بازیابی کنید. کاربران، مجوزها، پرداخت‌ها و صف‌های ارسال با این بازیابی جایگزین نمی‌شوند.</p>
                                 <p class="text-[10px] text-emerald-600 font-black tracking-wider uppercase flex items-center gap-2">
                                     <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                                    خروجی دادهٔ پروژه؛ فایل‌های تصاویر باید جداگانه پشتیبان‌گیری شوند
+                                    تصاویر محلی ارجاع‌شده در نسخه‌های جدید جاسازی می‌شوند؛ محدودهٔ دقیق در صفحهٔ بک‌آپ توضیح داده شده است.
                                 </p>
                             </div>
                             <div class="shrink-0 flex flex-col gap-2 text-center">
-                                <?php if(isMainAdmin()): ?><a href="?tab=extract&download_full_backup=1" class="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-xl shadow-emerald-200 hover:-translate-y-1 transition-all">📥 خروجی جامع JSON</a><?php endif; ?>
+                                <?php if(isMainAdmin()): ?><a href="/panel/backups.php?project=<?php echo rawurlencode($project['id']); ?>" class="px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black shadow-xl shadow-emerald-200 hover:-translate-y-1 transition-all">📥 مرکز بک‌آپ و بازیابی</a><?php endif; ?>
                                 <p class="text-[9px] text-slate-400 font-black uppercase tracking-widest">Complete System Backup</p>
                             </div>
                         </div>
@@ -10274,7 +10094,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
 
                             <script>
                             document.addEventListener('DOMContentLoaded', function() {
-                                <?php if (($project['settings']['platform_type'] ?? 'wordpress') === 'tiam'): ?>
+                                <?php if (($project['settings']['platform_type'] ?? 'custom') === 'tiam'): ?>
                                     toggleERPMethod('tiam');
                                 <?php else: ?>
                                     toggleERPMethod('manual');
@@ -18145,7 +17965,7 @@ export default function CampaignLanding() {
                             $cur_cat = $project['settings']['category'] ?? 'clothing';
                             $cur_tier = $project['settings']['billing_tier'] ?? 'standard';
                             $cur_price = $project['settings']['billing_price'] ?? 0;
-                            $cur_platform = $project['settings']['platform_type'] ?? 'wordpress';
+                            $cur_platform = $project['settings']['platform_type'] ?? 'custom';
                             $cur_modules = $project['settings']['active_modules'] ?? ['dashboard', 'products', 'extract', 'calendar', 'excel', 'website_export', 'seo', 'sale', 'users'];
                             if (!is_array($cur_modules)) {
                                 $cur_modules = ['dashboard', 'products', 'extract', 'calendar', 'excel', 'website_export', 'seo', 'sale', 'users'];
@@ -18628,7 +18448,7 @@ export default function CampaignLanding() {
                             $t_endpoint = $tcfg['endpoint'] ?? '';
                             $t_api_key = $tcfg['api_key'] ?? '';
                             ?>
-                            <div class="card p-8 bg-white border border-slate-101 shadow-xl shadow-slate-200/40 rounded-[2.5rem] <?php echo ($project['settings']['platform_type'] ?? 'wordpress') === 'tiam' ? '' : 'hidden'; ?>" id="tiam-settings">
+                            <div class="card p-8 bg-white border border-slate-101 shadow-xl shadow-slate-200/40 rounded-[2.5rem] <?php echo ($project['settings']['platform_type'] ?? 'custom') === 'tiam' ? '' : 'hidden'; ?>" id="tiam-settings">
                                 <div class="flex items-center justify-between mb-6 border-b border-slate-100 pb-5">
                                     <div class="flex items-center gap-3 text-right">
                                         <div class="w-12 h-12 bg-gradient-to-tr from-indigo-600 to-blue-600 text-white rounded-2xl flex items-center justify-center text-xl font-black shadow-lg shadow-indigo-600/30">🔌</div>

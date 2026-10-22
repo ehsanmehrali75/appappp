@@ -37,7 +37,7 @@ class SessionIdentity {
     }
 
     private static function clear() {
-        foreach (['user', 'project_id', 'auth_identity', 'portal_user', 'portal_user_icon', 'portal_user_display_name', 'display_name', 'user_icon'] as $key) unset($_SESSION[$key]);
+        foreach (['user', 'project_id', 'project_selection_required', 'auth_identity', 'portal_user', 'portal_user_icon', 'portal_user_display_name', 'display_name', 'user_icon'] as $key) unset($_SESSION[$key]);
     }
 
     public static function beginPassword($username, $password, $originProject) {
@@ -51,7 +51,7 @@ class SessionIdentity {
             }
         }
         $_SESSION['auth_identity'] = ['kind' => 'password', 'origin_project' => (string)$originProject, 'grants' => $grants];
-        return self::select(['id' => (string)$originProject]);
+        return self::select(['id' => (string)$originProject],true);
     }
 
     public static function beginOtp($mobile) {
@@ -66,7 +66,7 @@ class SessionIdentity {
         }
         $_SESSION['auth_identity'] = ['kind' => 'otp', 'mobile' => $mobile, 'grants' => $grants];
         $_SESSION['portal_user'] = $mobile;
-        if ($grants) return self::select(['id' => (string)array_keys($grants)[0]]);
+        if ($grants) return self::select(['id' => (string)array_keys($grants)[0]],true);
         $_SESSION['user'] = ['username' => 'portal-'.$mobile, 'role' => 'portal_viewer', 'permissions' => []];
         return false;
     }
@@ -106,8 +106,10 @@ class SessionIdentity {
         return null;
     }
 
-    public static function select($project) {
+    /** Trusted context is reserved for verified login and temporary permission enumeration. */
+    public static function select($project,$trustedContext=false) {
         if (!is_array($project) || !is_string($project['id'] ?? null) || $project['id'] === '') return false;
+        if(!$trustedContext&&PHP_SAPI!=='cli'&&basename($_SERVER['SCRIPT_FILENAME']??'')!=='workspace.php'&&($_SESSION['project_id']??null)!==$project['id'])return false;
         if (FeatureFlags::isMainAdmin()) { $_SESSION['project_id'] = $project['id']; return true; }
         $member = self::member($project);
         if (!$member) return false;

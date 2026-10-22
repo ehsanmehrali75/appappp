@@ -49,6 +49,8 @@ class ProjectOnboarding(unittest.TestCase):
             db.execute('INSERT OR REPLACE INTO project_users(project_id,username,password,role,permissions) VALUES (?,?,?,?,?)',('p','setupowner','Fixture-password-123!','project_admin','["all"]'))
         opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
         self.case.request(opener,'/',{'login':'1','user':'setupowner','pass':'Fixture-password-123!'})
+        _,chooser=self.case.request(opener,'/panel/workspace.php');pick=re.search(r'name="app-csrf" content="([a-f0-9]+)"',chooser)[1]
+        self.case.request(opener,'/panel/workspace.php',{'select_project':'p','app_csrf':pick})
         _,page=self.case.request(opener,'/panel/onboarding.php?project=p');token=re.search(r'name="app-csrf" content="([a-f0-9]+)"',page)[1]
         code,page=self.case.request(opener,'/panel/onboarding.php?project=p&step=identity',{'setup_action':'pause','revision':0},{'X-CSRF-Token':token})
         self.assertEqual(code,200);self.assertIn('project-settings-form',page)
@@ -83,7 +85,7 @@ class ProjectOnboarding(unittest.TestCase):
     def test_only_system_admin_can_create_a_free_project(self):
         other,token=self.case.login('limited');fields={'add_project':'1','name':'free','admin_user':'newowner','admin_pass':'new-password-123','activeFrom':'2026-01-01','activeTo':'2030-01-01','platform_type':'tiam'}
         self.assertEqual(self.case.request(other,'/panel/admin.php?tab=products',fields,{'X-CSRF-Token':token})[0],403)
-        code,page=self.case.request(self.owner,'/panel/admin.php?tab=projects',fields,{'X-CSRF-Token':self.csrf});self.assertEqual(code,200);self.assertIn('project-setup-form',page)
+        code,page=self.case.request(self.owner,'/panel/admin.php?tab=projects',fields,{'X-CSRF-Token':self.csrf});self.assertEqual(code,200);self.assertIn('میزکار شما',page)
         with sqlite3.connect(self.case.database) as db:
             pid,password=db.execute("SELECT project_id,password FROM project_users WHERE username='newowner'").fetchone();s=json.loads(db.execute('SELECT settings FROM projects WHERE id=?',(pid,)).fetchone()[0]);self.assertTrue(s['onboarding']['created_at']);self.assertNotEqual(password,'new-password-123')
     def test_test_gateway_cannot_create_a_project(self):

@@ -22,7 +22,7 @@ try:
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path=shutil.which('chromium'),headless=True,args=['--no-sandbox'])
         page=browser.new_page(viewport={'width':1440,'height':1000});page.route('**/*',route);page.on('pageerror',lambda e:errors.append(str(e)))
-        page.goto(base+'/',wait_until='domcontentloaded');page.evaluate('openLoginModal();switchLoginTab("admin")');page.fill('[name=user]','fixture_owner');page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state('domcontentloaded');page.goto(base+'/panel/admin.php?switch_project=p',wait_until='domcontentloaded')
+        page.goto(base+'/',wait_until='domcontentloaded');page.evaluate('openLoginModal();switchLoginTab("admin")');page.fill('[name=user]','fixture_owner');page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state('domcontentloaded');page.goto(base+'/panel/workspace.php',wait_until='domcontentloaded');page.locator('button[value=p]').click();page.wait_for_load_state('domcontentloaded')
         page.goto(base+'/panel/wp-crm.php?project=p',wait_until='domcontentloaded')
         page.locator('[name=site_url]').fill('https://shop.fixture');page.locator('button[value=save]').click();page.wait_for_load_state('domcontentloaded')
         assert page.locator('[aria-label="توکن API"]').input_value()

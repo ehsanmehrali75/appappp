@@ -10,6 +10,8 @@ Read [deployment instructions](docs/deployment.md) before updating a live host. 
 
 There is no new default administrator. Existing accounts continue working; legacy passwords are hashed on successful login. Create an unrestricted owner through `panel/system-admin-setup.php` using an existing global administrator or the documented one-time host recovery flow. See [owner recovery](docs/admin-recovery.md); the setup page itself supplies recovery instructions.
 
+See [project selection and recovery](docs/project-recovery.md) for the central desk, safe library backups, ERP snapshot storage, WordPress setup and weekly Cron deployment.
+
 ## Local checks
 
 ```sh

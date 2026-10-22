@@ -22,9 +22,7 @@ class ProjectOnboarding {
     public static function landing($fallback) {
         $id=$_SESSION['purchase_project_id']??'';unset($_SESSION['purchase_project_id']);
         if($id){$p=getCurrentProject($id,true);if($p&&SessionIdentity::select($p)){unset($_SESSION['purchase_project_id']);return self::url($id);}}
-        $p=getCurrentProject();$s=$p['settings']['onboarding']??[];
-        if($p&&!empty($s['created_at'])&&empty($s['started_at'])&&empty($s['paused_at'])&&empty($s['finished_at'])&&(isMainAdmin()||isProjectAdmin()||hasPermission('settings','use')))return self::url($p['id']);
-        return $fallback;
+        return !empty($_SESSION['project_selection_required'])||empty($_SESSION['project_id'])?'/panel/workspace.php':$fallback;
     }
     public static function website($url) {
         $url=trim((string)$url);if($url==='')return '';

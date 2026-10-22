@@ -42,7 +42,7 @@ class ModuleProjectAccess {
         $visible = [];
         foreach ($projects as $candidate) {
             $project = self::findProject($candidate['id'] ?? null);
-            if (!$project || !SessionIdentity::select($project)) continue;
+            if (!$project || !SessionIdentity::select($project,true)) continue;
             if (self::allowed($parent, $permission)) $visible[] = $candidate;
         }
         $_SESSION['project_id'] = $savedProject;
@@ -88,7 +88,7 @@ class ModuleProjectAccess {
         $visible = [];
         foreach ($businesses as $business) {
             $project = self::businessProject($business);
-            if ($project ? !SessionIdentity::select($project) : !isMainAdmin()) continue;
+            if ($project ? !SessionIdentity::select($project,true) : !isMainAdmin()) continue;
             if (self::allowed('seo_intel', 'analysis')) $visible[] = $business;
         }
         $_SESSION['project_id'] = $savedProject;

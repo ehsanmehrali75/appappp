@@ -22,14 +22,14 @@ try:
         page.on('dialog',lambda d:(dialogs.append(d.message),d.accept()))
         def login(name):
             page.goto(base+'/');page.evaluate('openLoginModal();switchLoginTab("admin")')
-            page.fill('[name=user]',name);page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state()
-        login('fixture_owner');page.goto(base+'/panel/admin.php?switch_project=p')
+            page.fill('[name=user]',name);page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state();page.goto(base+'/panel/workspace.php',wait_until='domcontentloaded');page.locator('button[value=p]').click();page.wait_for_load_state('domcontentloaded')
+        login('fixture_owner');page.goto(base+'/panel/workspace.php',wait_until='domcontentloaded');page.locator('button[value=p]').click();page.wait_for_load_state('domcontentloaded')
         page.goto(base+'/panel/admin.php?tab=extract&ex_view=central')
         rows=[dict(sku='ERP-'+str(i),name='محصول '+str(i),color='سبز',stock_tedad=7) for i in range(1000)]
         page.evaluate("rows => {window.testImport=importERPInBatches('p', rows, 'standard');}",rows)
         page.locator('.iv-dialog').wait_for(timeout=60000)
         with sqlite3.connect(case.database) as db:assert db.execute('SELECT count(*) FROM products WHERE project_id="p"').fetchone()[0]==5
-        assert page.locator('.iv-dialog .iv-summary').is_visible()
+        page.locator('.iv-dialog .iv-summary').wait_for(timeout=60000)
         with page.expect_event("dialog",timeout=60000):
             page.locator('.iv-dialog button',has_text='تأیید و اعمال').click()
         page.wait_for_timeout(500)

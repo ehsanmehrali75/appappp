@@ -20,8 +20,7 @@ try:
         page=browser.new_page(viewport={'width':1440,'height':1000});page.route('**/*',route)
         page.on('pageerror',lambda e:errors.append(str(e)))
         page.goto(base+'/',wait_until='domcontentloaded');page.evaluate('openLoginModal();switchLoginTab("admin")')
-        page.fill('[name=user]','fixture_owner');page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state('domcontentloaded')
-        page.goto(base+'/panel/admin.php?switch_project=p',wait_until='domcontentloaded')
+        page.fill('[name=user]','fixture_owner');page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state('domcontentloaded');page.goto(base+'/panel/workspace.php',wait_until='domcontentloaded');page.locator('button[value=p]').click();page.wait_for_load_state('domcontentloaded')
         with sqlite3.connect(case.database) as db:
             db.execute("UPDATE products SET status='rejected',stage1_decision='rejected',rejection_reason=?,rejection_by='style',rejection_side='استایل',rejections_history=? WHERE id='one'",('نور تصویر اصلاح شود',json.dumps([{'user':'style','side':'استایل','reason':'کادر تصویر اصلاح شود','at':1700000000}])))
         page.goto(base+'/panel/admin.php?tab=products&filter=rejected',wait_until='domcontentloaded')

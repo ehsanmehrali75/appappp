@@ -50,15 +50,7 @@ if(!in_array($active_tab,['overview','pending','library','calendar','out-of-stoc
 
 // بررسی وجود پروژه (از طریق session یا پارامتر GET)
 $projectId = $_GET['project'] ?? ($_SESSION['project_id'] ?? null);
-if (!$projectId) {
-    // تلاش برای یافتن اولین پروژه در صورت لزوم (اختیاری)
-    $db = getDB();
-    if (!empty($db['projects'])) {
-        $projectId = $db['projects'][0]['id'];
-    } else {
-        die('پروژه‌ای انتخاب نشده است. لطفاً با مدیر سایت تماس بگیرید.');
-    }
-}
+if (!$projectId) redirect('/panel/workspace.php');
 
 $project = getCurrentProject($projectId);
 if (!$project) {

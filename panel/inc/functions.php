@@ -532,10 +532,12 @@ function getVoterId() {
 }
 
 function getCurrentProject($id = null, $forceReload = false) {
+    if($id===null&&!empty($_SESSION['project_selection_required'])&&PHP_SAPI!=='cli')return null;
     if(ProjectLifecycle::isDeleted($id??($_SESSION['project_id']??'')))return null;
     if ($id === null && isset($_SESSION['project_id'])) {
         $id = $_SESSION['project_id'];
     }
+    if ($id === null && PHP_SAPI !== 'cli' && isUser() && (!empty($_SESSION['project_selection_required']) || !isset($_SESSION['project_id']))) return null;
     if ($id === null) {
         if (isSqlActive()) {
             $conn = getConn();
@@ -1322,6 +1324,7 @@ function isModuleActive($module) {
     }
 
     $id = $_SESSION['project_id'] ?? null;
+    if($id===null&&isUser())return isMainAdmin()&&ProjectSelection::centralTab($module);
     if ($id === null) {
         if (isSqlActive()) {
             $conn = getConn();
@@ -7566,5 +7569,17 @@ function enforceFeatureRequestAccess() {
     if (!canAccessFeature($key, $mode)) AccessControl::deny();
 }
 require_once __DIR__.'/SessionIdentity.php';
-if (PHP_SAPI !== 'cli') SessionIdentity::refresh();
+require_once __DIR__.'/ProjectSelection.php';
+if (PHP_SAPI !== 'cli') {
+    SessionIdentity::refresh();
+    if(isUser()&&basename($_SERVER['SCRIPT_FILENAME']??'')!=='workspace.php') {
+        $context=$_SERVER['HTTP_X_PROJECT_CONTEXT']??($_POST['_project_context']??($_GET['_project_context']??null));
+        if($context!==null&&(!is_string($context)||$context!==($_SESSION['project_id']??'')))RequestSecurity::reject('پروژه تغییر کرده است؛ صفحه را تازه کنید.');
+        if(!empty($_SESSION['project_selection_required'])&&realpath($_SERVER['SCRIPT_FILENAME']??'')!==realpath(__DIR__.'/../../index.php')&&!in_array(basename($_SERVER['SCRIPT_FILENAME']??''),['support.php','logout.php','transfer-payment.php','ai_oauth.php','ai_mcp.php'],true)){if(($_SERVER['REQUEST_METHOD']??'GET')==='GET')redirect('/panel/workspace.php');RequestSecurity::reject('ابتدا پروژه را انتخاب کنید.');}
+        if(!isset($_SESSION['project_id'])&&in_array(basename($_SERVER['SCRIPT_FILENAME']??''),['sale.php','seo.php','prompthub.php','task_manager.php','user_chat.php','chat.php','portal.php','wp-crm.php','backups.php','onboarding.php','insights.php','data-hub.php','ai-connect.php'],true)){if(($_SERVER['REQUEST_METHOD']??'GET')==='GET')redirect('/panel/workspace.php');RequestSecurity::reject('ابتدا پروژه را انتخاب کنید.');}
+        $explicit=$_GET['project']??$_GET['switch_project']??$_GET['project_id']??$_POST['project_id']??(basename($_SERVER['SCRIPT_FILENAME']??'')==='seo.php'?($_GET['pid']??null):null);
+        if($explicit==='__support_account__'&&basename($_SERVER['SCRIPT_FILENAME']??'')==='support.php')$explicit=null;
+        if($explicit!==null&&(!is_string($explicit)||$explicit!==($_SESSION['project_id']??'')))RequestSecurity::reject('ابتدا پروژه را از انتخابگر میزکار انتخاب کنید.');
+    }
+}
 enforceFeatureRequestAccess();

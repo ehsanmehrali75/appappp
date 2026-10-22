@@ -10,6 +10,7 @@
  * @return array Multi-dimensional array with status and logs/message
  */
 function runAutoAdmin(&$project, $manual = false) {
+    if(!empty($project['settings']['backup_restore_paused']))return ['status'=>'paused','message'=>'پس از بازیابی، پردازش خودکار متوقف است.'];
     if (!$project) {
         return ['status' => 'error', 'message' => 'پروژه معتبری جهت پردازش یافت نشد.'];
     }

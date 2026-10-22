@@ -32,8 +32,8 @@ try:
     context=browser.new_context(viewport={'width':1440,'height':1000},device_scale_factor=1)
     context.route('**/*',route)
     page=context.new_page();page.on('pageerror',lambda error:errors.append(str(error)));page.on('dialog',lambda d:d.accept())
-    page.goto(base+'/');page.evaluate('openLoginModal();switchLoginTab("admin")');page.fill('[name=user]','fixture_owner');page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state()
-    page.goto(base+'/panel/admin.php?switch_project=p');page.wait_for_load_state()
+    page.goto(base+'/');page.evaluate('openLoginModal();switchLoginTab("admin")');page.fill('[name=user]','fixture_owner');page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state();page.goto(base+'/panel/workspace.php',wait_until='domcontentloaded');page.locator('button[value=p]').click();page.wait_for_load_state('domcontentloaded')
+    page.wait_for_load_state()
     page.goto(base+'/panel/admin.php?tab=extract&wc_queue=image_request');page.wait_for_load_state()
     page.wait_for_selector('.website-catalog-row[data-product-id="one"]')
     row=page.locator('.website-catalog-row[data-product-id="one"]');row.locator('.wc-compare>summary').click()
@@ -81,6 +81,8 @@ try:
     media=dict(presence='seen',publication='uploaded',page_urls=[media_page],main_image_url=media_main,image_urls=[media_main,media_gallery],has_description=False,has_size_chart=False)
     with sqlite3.connect(case.database) as db:
       db.execute('UPDATE products SET website_sync=?,images_list=?,uploaded_to_site=1 WHERE id="one"',(json.dumps(media),json.dumps([dict(url=url,source='site',approved=True) for url in [media_main,media_gallery]])))
+    # Direct fixture SQL bypasses the app's normal cache invalidation.
+    for cache in (case.app/'panel/db/cache').glob('*.cache'):cache.unlink()
     for width in [1440,375]:
       page.set_viewport_size({'width':width,'height':950})
       page.goto(base+'/panel/admin.php?tab=website_export&we_view=work&wc_queue=site_visible');page.wait_for_load_state()

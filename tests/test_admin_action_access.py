@@ -134,13 +134,13 @@ class AdminActionAccess(unittest.TestCase):
         self.assertNotIn('prod_require_reference', self.settings())
         self.assertIsNotNone(self.case.record())
 
-    def test_owner_can_still_restore_complete_backup(self):
+    def test_owner_must_use_previewed_recovery_instead_of_legacy_restore(self):
         opener, token = self.case.login()
         payload = {'project_id': 'p', 'products': [], 'settings': {'fixture_restore': True}}
         code, body = self.post(opener, token, {'ajax_action': 'import_json', 'data': json.dumps(payload)}, '/panel/admin.php')
-        self.assertEqual(code, 200)
-        self.assertEqual(json.loads(body)['status'], 'success')
-        self.assertTrue(self.settings()['fixture_restore'])
+        self.assertEqual(code,422)
+        self.assertEqual(json.loads(body)['status'],'failed')
+        self.assertNotIn('fixture_restore',self.settings())
 
     def test_adding_project_user_preserves_memberships_in_other_projects(self):
         opener, token = self.case.login('limited')

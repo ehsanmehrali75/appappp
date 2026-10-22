@@ -16,8 +16,8 @@ try:
     with sync_playwright() as p:
         browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH') or shutil.which('chromium'),headless=True,args=['--no-sandbox'])
         page=browser.new_page(viewport={'width':1440,'height':1000});page.route('**/*',route);page.on('pageerror',lambda e:errors.append(str(e)))
-        page.goto(base+'/',wait_until='domcontentloaded');page.evaluate('openLoginModal();switchLoginTab("admin")');page.fill('[name=user]','fixture_owner');page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state('domcontentloaded');page.goto(base+'/panel/admin.php?switch_project=p',wait_until='domcontentloaded')
-        page.goto(base+'/panel/admin.php?tab=settings',wait_until='domcontentloaded');page.get_by_role('link',name='شروع / ادامهٔ راه‌اندازی').click();page.wait_for_url('**/onboarding.php?project=p')
+        page.goto(base+'/',wait_until='domcontentloaded');page.evaluate('openLoginModal();switchLoginTab("admin")');page.fill('[name=user]','fixture_owner');page.fill('[name=pass]','Fixture-password-123!');page.click('button[name=login]');page.wait_for_load_state('domcontentloaded');page.goto(base+'/panel/workspace.php',wait_until='domcontentloaded');page.locator('button[value=p]').click();page.wait_for_load_state('domcontentloaded')
+        page.goto(base+'/panel/admin.php?tab=settings',wait_until='domcontentloaded');page.get_by_role('link',name='شروع / ادامهٔ راه‌اندازی').click();page.wait_for_url('**/onboarding.php?project=p*',wait_until='domcontentloaded')
         assert page.locator('#project-setup-form').is_visible();assert page.locator('nav[aria-label="مراحل راه‌اندازی"] a').count()>=6
         page.fill('[name=project_name]','فروشگاه آزمایشی');page.fill('[name=website_url]','https://example.com');page.check('[name=platform_type][value=tiam]')
         with page.expect_navigation(wait_until='domcontentloaded'):page.get_by_role('button',name='ذخیره و ادامه').click()

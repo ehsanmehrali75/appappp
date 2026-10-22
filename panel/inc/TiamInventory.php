@@ -272,6 +272,7 @@ class TiamInventory {
         return $job;
     }
     public static function apply(&$project, $job) {
+        if(!empty($project['settings']['backup_restore_paused']))throw new RuntimeException('پس از بازیابی، همگام‌سازی متوقف است؛ ابتدا کتابخانه و اتصال را بررسی کنید.');
         if(($job['state']??'')==='applied')return $job;
         $cfg = $project['settings']['tiam_inventory'] ?? [];
         if (($job['state'] ?? '') !== 'preview' || ($job['expires'] ?? 0) <= time() || !hash_equals($job['base'], self::base($project)) || !hash_equals($job['config_hash'], self::fingerprint($cfg))) throw new RuntimeException('پیش‌نمایش منقضی یا داده‌ها تغییر کرده‌اند؛ دوباره دریافت کنید.');

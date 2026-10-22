@@ -45,7 +45,8 @@ class PanelEntryAccess(unittest.TestCase):
         with sqlite3.connect(self.case.database) as db:
             members=db.execute('SELECT project_id,panel_access FROM project_users WHERE username="panel-created" ORDER BY project_id').fetchall()
         self.assertEqual([r[0] for r in members],['other','p']);self.assertTrue(all(json.loads(r[1])==['portal'] for r in members))
-        user,_=self.case.login('panel-created')
+        user,token=self.case.login('panel-created')
+        self.assertEqual(self.case.request(user,'/panel/workspace.php',{'select_project':'other','app_csrf':token})[0],200)
         self.assertEqual(self.case.request(user,'/panel/portal.php?project=other')[0],200)
         self.assertEqual(self.case.request(user,'/panel/portal.php?project=private')[0],403)
         self.assertIn('/portal.php',self.destination(user,'/panel/admin.php'))
@@ -54,8 +55,11 @@ class PanelEntryAccess(unittest.TestCase):
         with sqlite3.connect(self.case.database) as db:
             db.execute('INSERT INTO projects(id,name,active_from,active_to,settings) VALUES (?,?,?,?,?)',('other','Other','2026-01-01','2030-01-01',json.dumps(self.case.settings)))
             db.execute('INSERT INTO project_users(project_id,username,password,role,permissions,panel_access) SELECT "other",username,password,role,permissions,? FROM project_users WHERE project_id="p" AND username="limited"',(json.dumps(['admin']),))
-        user,_=self.case.login('limited')
-        self.assertIn('/admin.php',self.destination(user,'/panel/admin.php?switch_project=other'))
+        user,token=self.case.login('limited')
+        self.assertEqual(self.case.request(user,'/panel/admin.php?switch_project=other')[0],403)
+        self.assertEqual(self.case.request(user,'/panel/workspace.php',{'select_project':'other','app_csrf':token})[0],200)
+        self.assertIn('/admin.php',self.destination(user,'/panel/admin.php'))
+        self.assertEqual(self.case.request(user,'/panel/workspace.php',{'select_project':'p','app_csrf':token})[0],200)
         self.assertIn('/portal.php',self.destination(user,'/panel/portal.php?project=p'))
         self.assertIn('/portal.php',self.destination(user,'/panel/admin.php'))
 

@@ -46,6 +46,7 @@ if (!$pid) {
     exit();
 }
 
+if(isUser()&&$pid!==($_SESSION['project_id']??''))RequestSecurity::reject('ابتدا پروژه را از انتخابگر انتخاب کنید.');
 $project = getCurrentProject($pid);
 if (!$project) {
     echo json_encode(['status' => 'error', 'msg' => 'Project not found: ' . $pid]);
