@@ -49,7 +49,7 @@ if (($_SERVER['REQUEST_METHOD']??'GET')==='POST' && isset($_POST['submit_checkou
             $_SESSION['transfer_orders'][$transfer['order_id']]=true;
             redirect('/panel/transfer-payment.php?order='.rawurlencode($transfer['order_id']));
         }
-        $purchase=(new ProjectPurchases())->start($_POST,$site_settings,($secure?'https':'http').'://'.$host.'/index.php');
+        $purchase=(new ProjectPurchases())->start($_POST,$site_settings,zarinpalCallbackUrl($site_settings));
         redirect($purchase['payment_url']);
     }catch(Throwable $e){$order_error=$e instanceof RuntimeException?$e->getMessage():'ثبت سفارش تکمیل نشد؛ دوباره تلاش کنید.';}
 }

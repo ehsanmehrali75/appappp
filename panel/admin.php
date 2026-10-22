@@ -101,6 +101,8 @@ if (isSuperAdmin()) {
         if(($card!==''&&!preg_match('/^[0-9]{16}$/D',$card))||($iban!==''&&!preg_match('/^IR[0-9]{24}$/D',$iban))||($transfer['enabled']&&($card===''||$transfer['holder']===''))){redirect('admin.php?tab=main_settings&msg='.urlencode('شماره کارت ۱۶ رقمی، شبا با IR و ۲۴ رقم و نام صاحب حساب را بررسی کنید.'));}
         foreach(['holder','bank','instructions'] as $k)if(mb_strlen($transfer[$k])>2000)AccessControl::deny();
         $curr['bank_transfer']=$transfer;
+        $curr['zarinpal_callback_url']=trim($_POST['zarinpal_callback_url']??'');
+        try{zarinpalCallbackUrl($curr);}catch(RuntimeException $e){redirect('admin.php?tab=main_settings&msg='.urlencode($e->getMessage()));}
         $curr['zarinpal_enabled'] = isset($_POST['zarinpal_enabled']);
         $curr['zarinpal_merchant_id'] = trim($_POST['zarinpal_merchant_id'] ?? '');
         $curr['zarinpal_access_token'] = trim($_POST['zarinpal_access_token'] ?? '');
@@ -7332,7 +7334,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
 
                     <!-- ZarinPal Payment Gateway Configuration -->
                     <section class="card p-6 space-y-4"><h3 class="font-black">پرداخت کارت‌به‌کارت</h3><?php $transferSettings=$s['bank_transfer']??[];?><label><input type="checkbox" name="transfer_enabled" <?php echo !empty($transferSettings['enabled'])?'checked':''; ?>> فعال‌سازی کارت‌به‌کارت با بررسی دستی رسید</label><div class="grid grid-2 gap-4"><?php foreach(['card'=>'شماره کارت مقصد (۱۶ رقم)','iban'=>'شماره شبا (IR...)','holder'=>'نام صاحب حساب','bank'=>'نام بانک','instructions'=>'راهنمای واریز'] as $key=>$label):?><label><?php echo $label;?><input class="input" name="transfer_<?php echo $key;?>" value="<?php echo htmlspecialchars($transferSettings[$key]??'',ENT_QUOTES,'UTF-8');?>"></label><?php endforeach;?></div><p class="text-xs">رسیدها در سفارشات و پرداخت‌ها بررسی می‌شوند؛ تا تأیید مدیر اصلی پروژه ایجاد نمی‌شود.</p></section>
-                    <div id="zarinpal-section" class="space-y-6 pt-6 border-t border-slate-200 bg-amber-50/40 p-6 rounded-3xl border border-amber-200/80">
+                    <div id="zarinpal-section" class="space-y-6 pt-6 border-t border-slate-200 bg-amber-50/40 p-6 rounded-3xl border border-amber-200/80"><label class="block text-xs font-bold">آدرس بازگشت پرداخت (اختیاری)<input name="zarinpal_callback_url" class="input mt-2" dir="ltr" placeholder="https://maarksho.com/index.php" value="<?php echo htmlspecialchars($s['zarinpal_callback_url']??'',ENT_QUOTES,'UTF-8');?>"><span class="block text-xs mt-2">خالی: دامنهٔ همین صفحه استفاده می‌شود. دامنه باید با پذیرندهٔ زرین‌پال یکسان باشد؛ www را هم مطابق آن وارد کنید. این آدرس برای خرید و تست استفاده می‌شود. پیش از تست تغییرات را ذخیره کنید.</span></label>
                         <div class="flex flex-wrap items-center justify-between gap-4">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-black shadow-md shadow-amber-500/20 text-lg">

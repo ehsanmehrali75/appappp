@@ -7254,7 +7254,21 @@ function zarinpalGetTerminals($accessToken = null) {
 /**
  * تست جامع اتصال به درگاه زرین‌پال و GraphQL
  */
-function zarinpalTestConnection($merchantId = null, $accessToken = null, $sandbox = false) {
+/** One canonical callback for checkout and connection probes. */
+function zarinpalCallbackUrl($settings = []) {
+    $url=trim($settings['zarinpal_callback_url']??'');
+    if($url===''){
+        $host=$_SERVER['HTTP_HOST']??'';
+        if(!preg_match('/^[a-zA-Z0-9.:-]+$/D',$host))throw new RuntimeException('دامنهٔ بازگشت پرداخت معتبر نیست.');
+        $secure=($_SERVER['HTTPS']??'')==='on'||($_SERVER['HTTP_X_FORWARDED_PROTO']??'')==='https';
+        $url=($secure?'https':'http').'://'.$host.'/index.php';
+    }
+    $p=parse_url($url);
+    if(!filter_var($url,FILTER_VALIDATE_URL)||!in_array($p['scheme']??'',['http','https'],true)||isset($p['user'])||isset($p['pass'])||isset($p['query'])||isset($p['fragment'])||!preg_match('~/index\.php$~',$p['path']??''))throw new RuntimeException('آدرس بازگشت باید آدرس کامل index.php سایت، بدون پارامتر یا اطلاعات ورود باشد.');
+    return $url;
+}
+
+function zarinpalTestConnection($merchantId = null, $accessToken = null, $sandbox = false, $request = null) {
     $settings = getSiteSettings();
     $mId = ($merchantId !== null) ? trim($merchantId) : trim($settings['zarinpal_merchant_id'] ?? '');
     $token = ($accessToken !== null) ? trim($accessToken) : trim($settings['zarinpal_access_token'] ?? '');
@@ -7278,7 +7292,10 @@ function zarinpalTestConnection($merchantId = null, $accessToken = null, $sandbo
 
     // Probe above the gateway minimum; creating an authority does not charge the customer.
     if (!empty($mId)) {
-        $probeRes = zarinpalRequestPayment(10000, 'تست ارتباط آزمایشی درگاه مارکشو فلو', 'https://example.com/callback', '09120000000', '', 'TEST-PROBE', [
+        try{$callback=zarinpalCallbackUrl($settings);}catch(RuntimeException $e){$report['rest_gateway_status']='error';$report['messages'][]=$e->getMessage();return $report;}
+        $report['callback_url']=$callback;
+        $request=$request?:'zarinpalRequestPayment';
+        $probeRes = $request(10000, 'تست ارتباط آزمایشی درگاه مارکشو فلو', $callback.'?payment_callback=zarinpal&order_id=TEST-PROBE', '09120000000', '', 'TEST-PROBE', [
             'zarinpal_merchant_id' => $mId,
             'zarinpal_sandbox' => $isSand,
             'zarinpal_currency' => 'IRT'

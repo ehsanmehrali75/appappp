@@ -132,6 +132,13 @@ class ProjectOnboarding(unittest.TestCase):
             self.assertEqual(row,('failed','Synthetic parser failure'))
         finally:source_path.write_text(original)
 
+    def test_gateway_probe_uses_real_site_callback_and_sufficient_amount(self):
+        r=self.php(r'''$_SERVER['HTTP_HOST']='www.shop.example';$_SERVER['HTTPS']='on';$s=getSiteSettings();unset($s['zarinpal_callback_url']);saveSiteSettings($s);$captured=[];$probe=zarinpalTestConnection('fixture-merchant','',false,function($amount,$description,$callback)use(&$captured){$captured=[$amount,$callback];return ['success'=>true,'authority'=>'test-authority'];});echo json_encode(['captured'=>$captured,'status'=>$probe['rest_gateway_status'],'override'=>zarinpalCallbackUrl(['zarinpal_callback_url'=>'https://shop.example/index.php'])]);''')
+        self.assertEqual(r['captured'],[10000,'https://www.shop.example/index.php?payment_callback=zarinpal&order_id=TEST-PROBE']);self.assertEqual(r['status'],'connected');self.assertEqual(r['override'],'https://shop.example/index.php')
+    def test_gateway_callback_rejects_credentials_query_and_invalid_host(self):
+        r=self.php(r'''$blocked=0;foreach(['https://user:pass@shop.example/index.php','https://shop.example/index.php?token=secret','javascript:alert(1)','https://shop.example/other.php'] as $url)try{zarinpalCallbackUrl(['zarinpal_callback_url'=>$url]);}catch(RuntimeException $e){$blocked++;}$_SERVER['HTTP_HOST']='invalid host';try{zarinpalCallbackUrl([]);}catch(RuntimeException $e){$blocked++;}echo json_encode($blocked);''')
+        self.assertEqual(r,5)
+
     def test_gateway_validation_errors_are_visible_without_creating_project(self):
         r=self.php(r'''$svc=new ProjectPurchases();$i=['plan_id'=>'plan_pro','billing_cycle'=>'monthly','customer_name'=>'Buyer','customer_mobile'=>'09121112233','customer_business'=>'Project','account_username'=>'buyer','account_password'=>'Fixture-password-123!'];$site=['zarinpal_enabled'=>true,'zarinpal_merchant_id'=>'fake','zarinpal_sandbox'=>false];try{$svc->start($i,$site,'https://panel.example/index.php',static fn()=>['success'=>false,'error'=>'The amount must be at least 1500','code'=>-9]);}catch(RuntimeException $e){echo json_encode(['message'=>$e->getMessage(),'projects'=>count(getDB()['projects'])]);}''')
         self.assertIn('The amount must be at least 1500',r['message']);self.assertIn('-9',r['message']);self.assertEqual(r['projects'],1)
