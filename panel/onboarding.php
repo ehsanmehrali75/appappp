@@ -20,11 +20,11 @@ if(($_SERVER['REQUEST_METHOD']??'GET')==='POST'){
             if(!in_array($platform,['wordpress','telegram','instagram'],true))throw new RuntimeException('تست معتبر نیست.');
             $r=$healthEngine->probe($project,AiAccess::principal($project),$platform);if($r['success'])$message='تست خواندن اتصال موفق بود.';else $error=$r['error']??'تست موفق نبود؛ تنظیمات اتصال را بررسی کنید.';
         }elseif($action==='tiam_test'){
-            if(($project['settings']['platform_type']??'')!=='tiam'||!ProjectPlans::allows('extract',$project['settings']))throw new RuntimeException('تست تیام برای این بستر فعال نیست.');
+            if(($project['settings']['platform_type']??'')!=='tiam'||!ProjectPlans::allows('extract',$project['settings'])||!canAccessFeature('extract','use'))throw new RuntimeException('تست تیام برای این بستر فعال نیست.');
             TiamInventory::locked($project['id'],fn()=>TiamInventory::createJob($project,'view_test',TiamInventory::owner()));$message='تست خواندن ویو در صف ایجنت قرار گرفت؛ نتیجه را پس از اجرای ایجنت با تازه‌سازی ببینید.';
         }else{
             ProjectOnboarding::save($project,$step,$_POST,$action);
-            if(in_array($action,['finish','pause'],true))redirect('/panel/admin.php?tab=products');
+            if(in_array($action,['finish','pause'],true))redirect(ProjectOnboarding::exitUrl($project));
             $next=$keys[min(array_search($step,$keys,true)+1,count($keys)-1)];redirect(ProjectOnboarding::url($project['id'],$next));
         }
     }catch(Throwable $e){$error=$e instanceof RuntimeException?$e->getMessage():'عملیات تکمیل نشد؛ دوباره تلاش کنید.';}
@@ -35,8 +35,8 @@ $progress=count(array_filter(array_intersect_key($state['steps']??[],array_diff_
 function setup_h($v){return htmlspecialchars((string)$v,ENT_QUOTES,'UTF-8');}
 function setup_link($url,$label){echo '<a class="setup-button secondary" target="_blank" rel="noopener" href="'.setup_h($url).'">'.setup_h($label).' ↗</a>';}
 function setup_checked($value){echo $value?' checked':'';}
-?><!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>راه‌اندازی <?=setup_h($project['name'])?></title><link rel="stylesheet" href="/panel/assets/project-onboarding.css?v=1"></head><body><main class="setup-shell">
-<header class="setup-header"><div><span class="setup-eyebrow">مارکشو · راه‌اندازی پروژه</span><h1><?=setup_h($project['name'])?></h1><p>قدم‌به‌قدم آمادهٔ کار شوید؛ تنظیمات فعلی شما حفظ می‌شوند.</p></div><div class="setup-header-actions"><a href="/panel/admin.php?tab=settings">تنظیمات پروژه</a><a href="<?=isMainAdmin()?'/panel/admin.php?tab=projects':'/#pricing'?>"><?=isMainAdmin()?'ساخت پروژهٔ دیگر':'خرید پروژهٔ دیگر'?></a></div></header>
+?><!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>راه‌اندازی <?=setup_h($project['name'])?></title><link rel="stylesheet" href="/panel/assets/project-onboarding.css?v=<?=filemtime(__DIR__.'/assets/project-onboarding.css')?>"></head><body><main class="setup-shell">
+<header class="setup-header"><div><span class="setup-eyebrow">مارکشو · راه‌اندازی پروژه</span><h1><?=setup_h($project['name'])?></h1><p>قدم‌به‌قدم آمادهٔ کار شوید؛ تنظیمات فعلی شما حفظ می‌شوند.</p></div><div class="setup-header-actions"><a href="<?=setup_h($base.'&tab=settings')?>">تنظیمات پروژه</a><a href="<?=isMainAdmin()?'/panel/admin.php?tab=projects':'/#pricing'?>"><?=isMainAdmin()?'ساخت پروژهٔ دیگر':'خرید پروژهٔ دیگر'?></a></div></header>
 <div class="setup-layout"><aside class="setup-nav"><div class="setup-progress"><strong><?=$progress?> از <?=$total?> بخش تنظیم شده</strong><progress value="<?=$progress?>" max="<?=$total?>"></progress><small>تنظیم یک بخش، به معنی موفقیت تست اتصال نیست.</small></div><nav aria-label="مراحل راه‌اندازی"><?php foreach($steps as $key=>$item):$status=$state['steps'][$key]['state']??'pending';?><a href="<?=setup_h(ProjectOnboarding::url($pid,$key))?>" <?=$key===$step?'aria-current="step"':''?>><span class="step-dot"><?=array_search($key,$keys,true)+1?></span><span><?=setup_h($item['name'])?><small><?=['configured'=>'تنظیم شده','skipped'=>'برای بعد','pending'=>'در انتظار'][$status]??'در انتظار'?></small></span></a><?php endforeach;?></nav><p class="setup-plan">پلن: <?=setup_h($settings['subscription']['plan_name']??'اختصاصی / ثبت مدیر')?></p></aside>
 <section class="setup-main"><div class="setup-step-heading"><span class="setup-eyebrow">مرحله <?=array_search($step,$keys,true)+1?> از <?=count($steps)?></span><h2><?=setup_h($steps[$step]['name'])?></h2><p><?=setup_h($steps[$step]['why'])?></p></div>
 <?php if($error):?><p role="alert" class="setup-alert error"><?=setup_h($error)?></p><?php endif;?><?php if($message):?><p role="status" class="setup-alert"><?=setup_h($message)?></p><?php endif;?>

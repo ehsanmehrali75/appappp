@@ -6370,7 +6370,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
     <?php if ($neoWorkspace): ?><script src="/panel/assets/neo-workspace.js?v=<?php echo filemtime(__DIR__.'/assets/neo-workspace.js'); ?>" defer></script><?php endif; ?>
     <script src="/panel/assets/neo-shell.js?v=<?php echo filemtime(__DIR__.'/assets/neo-shell.js'); ?>" defer></script>
 <?php endif; ?>
-<link rel="stylesheet" href="/panel/assets/product-media.css?v=1"><script defer src="/panel/assets/product-media.js?v=1"></script>
+<link rel="stylesheet" href="/panel/assets/product-media.css?v=<?php echo filemtime(__DIR__.'/assets/product-media.css'); ?>"><script defer src="/panel/assets/product-media.js?v=<?php echo filemtime(__DIR__.'/assets/product-media.js'); ?>"></script>
 </head>
 <body class="tab-<?php echo htmlspecialchars($tab ?? 'none'); ?><?php echo $neoShell?' maarksho-shell':''; ?><?php echo $neoWorkspace?' neo-workspace':''; ?><?php echo $neoPilot?' maarksho-pilot':''; ?>">
     <div id="global-loader">

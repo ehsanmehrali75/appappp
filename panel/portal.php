@@ -141,7 +141,7 @@ if (!isModuleActive('products')) {
             <link rel="stylesheet" href="/panel/assets/neo-tokens.css?v=1">
 <link rel="stylesheet" href="/panel/assets/portal-workspace.css?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.css'); ?>">
 <script src="/panel/assets/portal-workspace.js?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.js'); ?>" defer></script>
-<link rel="stylesheet" href="/panel/assets/product-media.css?v=1"><script defer src="/panel/assets/product-media.js?v=1"></script>
+<link rel="stylesheet" href="/panel/assets/product-media.css?v=<?php echo filemtime(__DIR__.'/assets/product-media.css'); ?>"><script defer src="/panel/assets/product-media.js?v=<?php echo filemtime(__DIR__.'/assets/product-media.js'); ?>"></script>
 </head>
             <body class="bg-slate-50 min-h-screen flex items-center justify-center font-sans p-6 select-none">
                 <div class="max-w-md w-full bg-white border border-slate-100 rounded-[3rem] p-10 text-center shadow-2xl shadow-indigo-500/5">
@@ -1631,7 +1631,7 @@ if (!PortalAccess::canProducts()) {
 <link rel="stylesheet" href="/panel/assets/neo-tokens.css?v=1">
 <link rel="stylesheet" href="/panel/assets/portal-workspace.css?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.css'); ?>">
 <script src="/panel/assets/portal-workspace.js?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.js'); ?>" defer></script>
-<link rel="stylesheet" href="/panel/assets/product-media.css?v=1"><script defer src="/panel/assets/product-media.js?v=1"></script>
+<link rel="stylesheet" href="/panel/assets/product-media.css?v=<?php echo filemtime(__DIR__.'/assets/product-media.css'); ?>"><script defer src="/panel/assets/product-media.js?v=<?php echo filemtime(__DIR__.'/assets/product-media.js'); ?>"></script>
 </head>
 <body class="portal-workspace" data-portal-tab="<?php echo htmlspecialchars($active_tab,ENT_QUOTES,'UTF-8'); ?>">
 <style id="portal-action-permissions">

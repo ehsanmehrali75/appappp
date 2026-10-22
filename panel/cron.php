@@ -155,7 +155,7 @@ while ($pendingJobs && BackgroundWorker::hasTime() && ($job = $pendingJobs->fetc
         if(!$conn->query("UPDATE scraping_jobs SET status = 'completed', completed_at = CURRENT_TIMESTAMP, result_summary = '$summary' WHERE id = '$jid'"))throw new RuntimeException('ثبت نتیجهٔ صف ناموفق بود.');
         logSystem("[Scraper] ✅ Job $jid completed.");
 
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         $msg = $conn->real_escape_string($e->getMessage());
         $conn->query("UPDATE scraping_jobs SET status = 'failed', error_message = '$msg' WHERE id = '$jid'");
         logSystem("[Scraper] ❌ Job $jid failed: " . $e->getMessage());

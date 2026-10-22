@@ -13,6 +13,12 @@ class ProjectOnboarding {
         $out['review']=['name'=>'مرور و شروع کار','why'=>'وضعیت تنظیمات، اتصال‌های تست‌شده و موارد باقی‌مانده را ببینید. هر بخش را بعداً هم می‌توانید تکمیل کنید.'];return $out;
     }
     public static function url($id,$step='') {return '/panel/onboarding.php?project='.rawurlencode($id).($step!==''?'&step='.rawurlencode($step):'');}
+    /** Keep all exits tied to the wizard project, including plans without a product library. */
+    public static function exitUrl($project) {
+        $settings=$project['settings']??[];
+        $tab=ProjectPlans::allows('products',$settings)&&canAccessFeature('products','view')?'products':'settings';
+        return '/panel/admin.php?project='.rawurlencode($project['id']).'&tab='.$tab;
+    }
     public static function landing($fallback) {
         $id=$_SESSION['purchase_project_id']??'';unset($_SESSION['purchase_project_id']);
         if($id){$p=getCurrentProject($id,true);if($p&&SessionIdentity::select($p)){unset($_SESSION['purchase_project_id']);return self::url($id);}}
@@ -61,7 +67,7 @@ class ProjectOnboarding {
                 }
                 $state['steps'][$step]=['state'=>'configured','at'=>time()];
             }elseif($action==='skip')$state['steps'][$step]=['state'=>'skipped','at'=>time()];
-            elseif($action==='finish')$state['finished_at']=time();
+            elseif($action==='finish'){if($step!=='review')throw new RuntimeException('پایان راه‌اندازی فقط از مرحلهٔ مرور انجام می‌شود.');$state['finished_at']=time();}
             elseif($action==='pause')$state['paused_at']=time();
             else throw new RuntimeException('عملیات معتبر نیست.');
             $state['started_at']=$state['started_at']??time();$keys=array_keys(self::steps($p));$state['current_step']=in_array($action,['save','skip'],true)?$keys[min(array_search($step,$keys,true)+1,count($keys)-1)]:$step;$state['revision']=(int)($state['revision']??0)+1;$p['settings']['onboarding']=$state;return $state;

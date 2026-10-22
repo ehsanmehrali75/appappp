@@ -35,6 +35,33 @@ class ProjectOnboarding(unittest.TestCase):
         code,page=self.post('identity',revision=0,platform_type='wordpress',project_name='stale',website_url='https://example.com');self.assertIn('صفحهٔ دیگری',page)
         self.post('inventory',setup_action='pause');s=self.state()['onboarding'];self.assertTrue(s['paused_at']);self.assertTrue(s['steps']['identity'])
         self.assertEqual(self.case.request(self.owner,'/panel/onboarding.php?project=p')[0],200)
+    def test_exit_links_keep_project_scope_and_finish_requires_review(self):
+        code,page=self.case.request(self.owner,'/panel/onboarding.php?project=p')
+        self.assertEqual(code,200);self.assertIn('/panel/admin.php?project=p&amp;tab=settings',page)
+        code,page=self.post('identity',setup_action='finish')
+        self.assertIn('پایان راه‌اندازی فقط',page);self.assertNotIn('finished_at',self.state().get('onboarding',{}))
+        code,page=self.post('review',setup_action='finish')
+        self.assertEqual(code,200);self.assertTrue(self.state()['onboarding']['finished_at'])
+    def test_pause_without_products_returns_to_own_settings(self):
+        s=self.state();s['subscription']={'modules':['settings','users']};s['active_modules']=['settings','users']
+        with sqlite3.connect(self.case.database) as db:
+            db.execute('UPDATE projects SET settings=? WHERE id="p"',(json.dumps(s),))
+            db.execute('INSERT OR REPLACE INTO project_users(project_id,username,password,role,permissions) VALUES (?,?,?,?,?)',('p','setupowner','Fixture-password-123!','project_admin','["all"]'))
+        opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        self.case.request(opener,'/',{'login':'1','user':'setupowner','pass':'Fixture-password-123!'})
+        _,page=self.case.request(opener,'/panel/onboarding.php?project=p');token=re.search(r'name="app-csrf" content="([a-f0-9]+)"',page)[1]
+        code,page=self.case.request(opener,'/panel/onboarding.php?project=p&step=identity',{'setup_action':'pause','revision':0},{'X-CSRF-Token':token})
+        self.assertEqual(code,200);self.assertIn('project-settings-form',page)
+    def test_tiam_test_requires_extract_use_even_with_settings_access(self):
+        s=self.state();s['platform_type']='tiam';s['subscription']={'modules':['settings','users','products','extract']};s['active_modules']=['settings','users','products','extract']
+        with sqlite3.connect(self.case.database) as db:
+            db.execute('UPDATE projects SET settings=? WHERE id="p"',(json.dumps(s),))
+            db.execute('INSERT OR REPLACE INTO project_users(project_id,username,password,role,permissions) VALUES (?,?,?,?,?)',('p','setupowner','Fixture-password-123!','manager','["products","settings"]'))
+        opener,token=self.case.login('setupowner')
+        code,page=self.case.request(opener,'/panel/onboarding.php?project=p&step=inventory',{'setup_action':'tiam_test'},{'X-CSRF-Token':token})
+        self.assertEqual(code,200);self.assertIn('تست تیام برای این بستر فعال نیست',page)
+        jobs=list((self.case.app/'panel/db/tiam-inventory').rglob('state.json'))
+        self.assertFalse(jobs)
     def test_private_or_credential_urls_do_not_replace_the_website(self):
         for url in ['http://127.0.0.1','https://user:pass@example.com','https://localhost','https://10.0.0.1','https://example.com?token=secret']:
             with self.subTest(url=url):code,page=self.post('identity',platform_type='custom',project_name='test',website_url=url);self.assertEqual(code,200);self.assertIn('آدرس عمومی',page);self.assertNotIn('sourceUrl',self.state())
@@ -90,6 +117,19 @@ class ProjectOnboarding(unittest.TestCase):
             for field in ['sku','name','image','stock_total','description','gallery']:self.assertEqual(after[field] or '',before[field] or '',field)
             with sqlite3.connect(self.case.database) as db:self.assertEqual(db.execute('SELECT count(*) FROM products WHERE project_id="p"').fetchone()[0],5)
             code,body=self.case.request(self.owner,'/panel/onboarding.php?project=p&download_crawl=1');rows=json.loads(body);self.assertEqual(len(rows),1);self.assertEqual(rows[0]['name'],'Observed model');self.assertEqual(rows[0]['main_image'],'https://shop.example/main.webp')
+        finally:source_path.write_text(original)
+
+    def test_crawl_worker_marks_php_errors_failed_instead_of_leaving_running_jobs(self):
+        source_path=self.case.app/'panel/inc/OnboardingCrawl.php';original=source_path.read_text()
+        try:
+            source_path.write_text(original.replace('public static function fetch($url) {',"public static function fetch($url) { throw new Error('Synthetic parser failure');"))
+            with sqlite3.connect(self.case.database) as db:
+                db.execute("INSERT INTO scraping_jobs(project_id,url,type,status) VALUES ('p','https://shop.example/product/123','onboarding_product','pending')")
+            proc=subprocess.run([fixtures.PHP,'cron.php'],cwd=self.case.app/'panel',env=dict(os.environ,MAARKSHO_WORKER_BATCH_SIZE='1',MAARKSHO_WORKER_BUDGET_SECONDS='30'),capture_output=True,text=True,timeout=30)
+            self.assertEqual(proc.returncode,0,proc.stderr)
+            with sqlite3.connect(self.case.database) as db:
+                row=db.execute('SELECT status,error_message FROM scraping_jobs').fetchone()
+            self.assertEqual(row,('failed','Synthetic parser failure'))
         finally:source_path.write_text(original)
 
     def test_canceled_or_unverified_payment_never_provisions(self):
