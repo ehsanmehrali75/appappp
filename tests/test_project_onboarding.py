@@ -132,6 +132,46 @@ class ProjectOnboarding(unittest.TestCase):
             self.assertEqual(row,('failed','Synthetic parser failure'))
         finally:source_path.write_text(original)
 
+    def test_gateway_validation_errors_are_visible_without_creating_project(self):
+        r=self.php(r'''$svc=new ProjectPurchases();$i=['plan_id'=>'plan_pro','billing_cycle'=>'monthly','customer_name'=>'Buyer','customer_mobile'=>'09121112233','customer_business'=>'Project','account_username'=>'buyer','account_password'=>'Fixture-password-123!'];$site=['zarinpal_enabled'=>true,'zarinpal_merchant_id'=>'fake','zarinpal_sandbox'=>false];try{$svc->start($i,$site,'https://panel.example/index.php',static fn()=>['success'=>false,'error'=>'The amount must be at least 1500','code'=>-9]);}catch(RuntimeException $e){echo json_encode(['message'=>$e->getMessage(),'projects'=>count(getDB()['projects'])]);}''')
+        self.assertIn('The amount must be at least 1500',r['message']);self.assertIn('-9',r['message']);self.assertEqual(r['projects'],1)
+
+    def transfer_checkout(self):
+        self.php("$s=getSiteSettings();$s['bank_transfer']=['enabled'=>true,'card'=>'6037991234567890','holder'=>'Fixture owner','iban'=>'IR'+str_repeat('1',24),'bank'=>'Fixture Bank'];saveSiteSettings($s);echo '{}';".replace("'IR'+str_repeat", "'IR'.str_repeat"))
+        opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+        _,home=self.case.request(opener,'/');nonce=re.search(r'name="checkout_nonce" value="([a-f0-9]+)"',home)[1];csrf=re.search(r'name="app_csrf" value="([a-f0-9]+)"',home)[1]
+        fields={'submit_checkout_order':'1','app_csrf':csrf,'checkout_nonce':nonce,'payment_gateway':'bank_transfer','plan_id':'plan_pro','billing_cycle':'monthly','customer_name':'Buyer','customer_mobile':'09121112233','customer_business':'Transfer project','account_username':'transferbuyer','account_password':'Fixture-password-123!'}
+        code,page=self.case.request(opener,'/',fields);self.assertEqual(code,200,page[:200]);oid=re.search(r'ORD-[0-9]{8}-[a-f0-9]{16}',page)[0]
+        return opener,csrf,oid,fields
+    def transfer_upload(self,opener,csrf,oid,content=None):
+        import uuid
+        boundary='----transfer-'+uuid.uuid4().hex;body=bytearray()
+        for key,value in {'app_csrf':csrf,'last_four':'1234','reference':'BANK-123','paid_date':'1405/08/01 12:30'}.items():body.extend(f'--{boundary}\r\nContent-Disposition: form-data; name="{key}"\r\n\r\n{value}\r\n'.encode())
+        body.extend(f'--{boundary}\r\nContent-Disposition: form-data; name="receipt"; filename="receipt.png"\r\nContent-Type: image/png\r\n\r\n'.encode());body.extend(fixtures.PNG if content is None else content);body.extend(f'\r\n--{boundary}--\r\n'.encode())
+        return self.case.request(opener,'/panel/transfer-payment.php?order='+oid,raw=bytes(body),headers={'Content-Type':'multipart/form-data; boundary='+boundary})
+    def test_transfer_waits_for_receipt_then_main_admin_and_is_idempotent(self):
+        buyer,token,oid,fields=self.transfer_checkout()
+        with sqlite3.connect(self.case.database) as db:self.assertEqual(db.execute('SELECT count(*) FROM projects').fetchone()[0],1)
+        self.assertEqual(self.case.request(self.owner,'/panel/transfer-payment.php?order='+oid,{'app_csrf':self.csrf,'review':'approve'})[0],200)
+        code,page=self.transfer_upload(buyer,token,oid);self.assertEqual(code,200);self.assertIn('در انتظار تأیید مدیر',page)
+        self.assertEqual(self.case.request(urllib.request.build_opener(),'/panel/transfer-payment.php?order='+oid+'&image=1')[0],403)
+        self.assertEqual(self.case.request(buyer,'/panel/transfer-payment.php?order='+oid,{'app_csrf':token,'review':'approve'})[0],403)
+        for _ in range(2):
+            code,page=self.case.request(self.owner,'/panel/transfer-payment.php?order='+oid,{'app_csrf':self.csrf,'review':'approve','note':'Bank checked'});self.assertEqual(code,200);self.assertIn('پروژه فعال شد',page)
+        with sqlite3.connect(self.case.database) as db:self.assertEqual(db.execute('SELECT count(*) FROM projects').fetchone()[0],2)
+        code,page=self.case.request(buyer,'/panel/transfer-payment.php?order='+oid);self.assertIn('پروژه فعال شد',page)
+    def test_transfer_rejection_requires_note_and_allows_resubmission(self):
+        buyer,token,oid,fields=self.transfer_checkout();self.transfer_upload(buyer,token,oid)
+        code,page=self.case.request(self.owner,'/panel/transfer-payment.php?order='+oid,{'app_csrf':self.csrf,'review':'reject'});self.assertIn('علت را وارد کنید',page)
+        self.case.request(self.owner,'/panel/transfer-payment.php?order='+oid,{'app_csrf':self.csrf,'review':'reject','note':'مبلغ درست نیست'})
+        code,page=self.case.request(buyer,'/panel/transfer-payment.php?order='+oid);self.assertIn('مبلغ درست نیست',page)
+        code,page=self.transfer_upload(buyer,token,oid);self.assertIn('در انتظار تأیید مدیر',page)
+        with sqlite3.connect(self.case.database) as db:self.assertEqual(db.execute('SELECT count(*) FROM projects').fetchone()[0],1)
+    def test_transfer_rejects_disguised_receipts_and_csrf(self):
+        buyer,token,oid,fields=self.transfer_checkout()
+        code,page=self.transfer_upload(buyer,token,oid,b'<?php echo 1; ?>');self.assertIn('تصویر معتبر',page)
+        self.assertEqual(self.case.request(buyer,'/panel/transfer-payment.php?order='+oid,{'last_four':'1234'})[0],403)
+
     def test_canceled_or_unverified_payment_never_provisions(self):
         r=self.php(r'''$svc=new ProjectPurchases();$i=['plan_id'=>'plan_pro','billing_cycle'=>'monthly','customer_name'=>'Buyer','customer_mobile'=>'09121112233','customer_business'=>'Project','account_username'=>'buyer','account_password'=>'Fixture-password-123!'];$site=['zarinpal_enabled'=>true,'zarinpal_merchant_id'=>'fake','zarinpal_sandbox'=>false];$a=$svc->start($i,$site,'https://panel.example/index.php',static fn()=>['success'=>true,'authority'=>'failed','payment_url'=>'https://gateway.example/pay']);$blocked=0;foreach(['NOK','OK'] as $status)try{$svc->confirm($a['order']['order_id'],'failed',$status,static fn()=>['success'=>false]);}catch(RuntimeException $e){$blocked++;}echo json_encode(['blocked'=>$blocked,'projects'=>count(getDB()['projects'])]);''')
         self.assertEqual(r,{'blocked':2,'projects':1})

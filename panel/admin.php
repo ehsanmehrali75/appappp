@@ -71,6 +71,8 @@ if (isSuperAdmin()) {
     if (isset($_POST['update_order_status'])) {
         $oid = $_POST['order_id'] ?? '';
         $st = $_POST['status'] ?? 'completed';
+        require_once __DIR__.'/inc/TransferPurchases.php';
+        try{(new TransferPurchases())->order($oid);redirect('transfer-payment.php?order='.rawurlencode($oid));}catch(RuntimeException $e){}
         updateOrderStatus($oid, $st);
         redirect('admin.php?tab=main_orders&msg=' . urlencode('وضعیت سفارش با موفقیت به روز شد.'));
     }
@@ -93,6 +95,12 @@ if (isSuperAdmin()) {
         $curr['enamad_enabled'] = isset($_POST['enamad_enabled']);
         
         // ZarinPal Payment Gateway Settings
+        if(!isMainAdmin())AccessControl::deny();
+        $card=preg_replace('/[\s-]+/u','',faToEn($_POST['transfer_card']??''));$iban=strtoupper(preg_replace('/\s+/u','',faToEn($_POST['transfer_iban']??'')));
+        $transfer=['enabled'=>isset($_POST['transfer_enabled']),'card'=>$card,'iban'=>$iban,'holder'=>trim($_POST['transfer_holder']??''),'bank'=>trim($_POST['transfer_bank']??''),'instructions'=>trim($_POST['transfer_instructions']??'')];
+        if(($card!==''&&!preg_match('/^[0-9]{16}$/D',$card))||($iban!==''&&!preg_match('/^IR[0-9]{24}$/D',$iban))||($transfer['enabled']&&($card===''||$transfer['holder']===''))){redirect('admin.php?tab=main_settings&msg='.urlencode('شماره کارت ۱۶ رقمی، شبا با IR و ۲۴ رقم و نام صاحب حساب را بررسی کنید.'));}
+        foreach(['holder','bank','instructions'] as $k)if(mb_strlen($transfer[$k])>2000)AccessControl::deny();
+        $curr['bank_transfer']=$transfer;
         $curr['zarinpal_enabled'] = isset($_POST['zarinpal_enabled']);
         $curr['zarinpal_merchant_id'] = trim($_POST['zarinpal_merchant_id'] ?? '');
         $curr['zarinpal_access_token'] = trim($_POST['zarinpal_access_token'] ?? '');
@@ -7083,7 +7091,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         <select name="status_filter" onchange="this.form.submit()" class="px-3 py-2 bg-slate-100 rounded-xl text-xs font-bold outline-none border border-slate-200">
                             <option value="all" <?php echo $status_filter === 'all' ? 'selected' : ''; ?>>همگی وضعیت‌ها</option>
                             <option value="completed" <?php echo $status_filter === 'completed' ? 'selected' : ''; ?>>✅ پرداخت شده / فعال</option>
-                            <option value="pending" <?php echo $status_filter === 'pending' ? 'selected' : ''; ?>>⏳ در انتظار پرداخت</option>
+                            <option value="awaiting_review" <?php echo $status_filter==='awaiting_review'?'selected':''; ?>>در انتظار بررسی رسید</option><option value="rejected" <?php echo $status_filter==='rejected'?'selected':''; ?>>رسید رد شده</option><option value="pending" <?php echo $status_filter === 'pending' ? 'selected' : ''; ?>>⏳ در انتظار پرداخت</option>
                             <option value="canceled" <?php echo $status_filter === 'canceled' ? 'selected' : ''; ?>>❌ لغو شده</option>
                         </select>
                         <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black">فیلتر</button>
@@ -7131,7 +7139,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                                     <?php if (($ord['payment_gateway'] ?? '') === 'zarinpal'): ?>
                                                         <span class="px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded font-black text-[9px]">زرین‌پال ⚡</span>
                                                     <?php else: ?>
-                                                        <span class="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded font-black text-[9px]">تست 🧪</span>
+                                                        <span class="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded font-black text-[9px]"><?php echo ($ord['payment_gateway']??'')==='bank_transfer'?'کارت‌به‌کارت':'تست';?></span>
                                                     <?php endif; ?>
                                                 </div>
                                                 <div class="text-slate-500 font-mono mt-0.5">کد رهگیری: <span class="text-slate-800 font-black"><?php echo htmlspecialchars($ord['ref_code'] ?? '-'); ?></span></div>
@@ -7145,7 +7153,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                             <td class="p-4">
                                                 <?php if(($ord['status']??'') === 'completed'): ?>
                                                     <span class="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[10px] font-black">✅ پرداخت‌شده / فعال</span>
-                                                <?php elseif(($ord['status']??'') === 'pending'): ?>
+                                                <?php elseif(($ord['status']??'') === 'awaiting_review'): ?><span>در انتظار بررسی رسید</span><?php elseif(($ord['status']??'') === 'rejected'): ?><span>رسید رد شده</span><?php elseif(($ord['status']??'') === 'pending'): ?>
                                                     <span class="px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg text-[10px] font-black">⏳ در انتظار پرداخت</span>
                                                 <?php elseif(($ord['status']??'') === 'failed'): ?>
                                                     <span class="px-2.5 py-1 bg-rose-50 text-rose-700 rounded-lg text-[10px] font-black">❌ ناموفق</span>
@@ -7157,12 +7165,13 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                             <td class="p-4">
                                                 <form method="POST" class="flex items-center gap-1">
                                                     <input type="hidden" name="order_id" value="<?php echo htmlspecialchars($ord['order_id'] ?? ''); ?>">
-                                                    <select name="status" class="px-2 py-1 bg-slate-100 rounded text-[10px] font-bold outline-none border border-slate-200">
+                                                    <?php if(($ord['payment_gateway']??'')==='bank_transfer'):?><a class="btn btn-primary" href="transfer-payment.php?order=<?php echo rawurlencode($ord['order_id']);?>">بررسی رسید</a><?php endif;?>
+                                                    <?php if(($ord['payment_gateway']??'')!=='bank_transfer'):?><select name="status" class="px-2 py-1 bg-slate-100 rounded text-[10px] font-bold outline-none border border-slate-200">
                                                         <option value="completed" <?php echo ($ord['status']??'')==='completed'?'selected':''; ?>>تایید / فعال</option>
                                                         <option value="pending" <?php echo ($ord['status']??'')==='pending'?'selected':''; ?>>در انتظار</option>
                                                         <option value="canceled" <?php echo ($ord['status']??'')==='canceled'?'selected':''; ?>>لغو سفارش</option>
                                                     </select>
-                                                    <button type="submit" name="update_order_status" class="px-2 py-1 bg-indigo-600 text-white rounded text-[10px] font-bold">ثبت</button>
+                                                    <button type="submit" name="update_order_status" class="px-2 py-1 bg-indigo-600 text-white rounded text-[10px] font-bold">ثبت</button><?php endif;?>
                                                 </form>
                                             </td>
                                         </tr>
@@ -7322,6 +7331,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                     </div>
 
                     <!-- ZarinPal Payment Gateway Configuration -->
+                    <section class="card p-6 space-y-4"><h3 class="font-black">پرداخت کارت‌به‌کارت</h3><?php $transferSettings=$s['bank_transfer']??[];?><label><input type="checkbox" name="transfer_enabled" <?php echo !empty($transferSettings['enabled'])?'checked':''; ?>> فعال‌سازی کارت‌به‌کارت با بررسی دستی رسید</label><div class="grid grid-2 gap-4"><?php foreach(['card'=>'شماره کارت مقصد (۱۶ رقم)','iban'=>'شماره شبا (IR...)','holder'=>'نام صاحب حساب','bank'=>'نام بانک','instructions'=>'راهنمای واریز'] as $key=>$label):?><label><?php echo $label;?><input class="input" name="transfer_<?php echo $key;?>" value="<?php echo htmlspecialchars($transferSettings[$key]??'',ENT_QUOTES,'UTF-8');?>"></label><?php endforeach;?></div><p class="text-xs">رسیدها در سفارشات و پرداخت‌ها بررسی می‌شوند؛ تا تأیید مدیر اصلی پروژه ایجاد نمی‌شود.</p></section>
                     <div id="zarinpal-section" class="space-y-6 pt-6 border-t border-slate-200 bg-amber-50/40 p-6 rounded-3xl border border-amber-200/80">
                         <div class="flex flex-wrap items-center justify-between gap-4">
                             <div class="flex items-center gap-3">

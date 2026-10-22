@@ -7017,8 +7017,8 @@ function zarinpalRequestPayment($amount, $description, $callbackUrl, $mobile = '
         ],
         CURLOPT_TIMEOUT => 30,
         CURLOPT_CONNECTTIMEOUT => 10,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_SSL_VERIFYHOST => false
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2
     ]);
 
     $response = curl_exec($ch);
@@ -7120,8 +7120,8 @@ function zarinpalVerifyPayment($authority, $amount, $customSettings = null) {
         ],
         CURLOPT_TIMEOUT => 30,
         CURLOPT_CONNECTTIMEOUT => 10,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_SSL_VERIFYHOST => false
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2
     ]);
 
     $response = curl_exec($ch);
@@ -7210,8 +7210,8 @@ function zarinpalGraphqlQuery($query, $variables = null, $accessToken = null) {
         CURLOPT_HTTPHEADER => $headers,
         CURLOPT_TIMEOUT => 25,
         CURLOPT_CONNECTTIMEOUT => 10,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_SSL_VERIFYHOST => false
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2
     ]);
 
     $response = curl_exec($ch);
@@ -7276,9 +7276,9 @@ function zarinpalTestConnection($merchantId = null, $accessToken = null, $sandbo
         return $report;
     }
 
-    // 1. Test Gateway Payment Request with 1000 Tomans probe
+    // Probe above the gateway minimum; creating an authority does not charge the customer.
     if (!empty($mId)) {
-        $probeRes = zarinpalRequestPayment(1000, 'تست ارتباط آزمایشی درگاه مارکشو فلو', 'https://example.com/callback', '09120000000', '', 'TEST-PROBE', [
+        $probeRes = zarinpalRequestPayment(10000, 'تست ارتباط آزمایشی درگاه مارکشو فلو', 'https://example.com/callback', '09120000000', '', 'TEST-PROBE', [
             'zarinpal_merchant_id' => $mId,
             'zarinpal_sandbox' => $isSand,
             'zarinpal_currency' => 'IRT'

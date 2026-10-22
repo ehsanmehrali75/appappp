@@ -5,7 +5,7 @@ require_once __DIR__.'/ProjectMembers.php';
 require_once __DIR__.'/ai/Store.php';
 /** A private purchase ledger binds bank verification, account and one project to the same order. */
 class ProjectPurchases {
-    private $store;
+    protected $store;
     public function __construct($store=null){$this->store=$store?:new AiStore(dirname(__DIR__).'/db/purchases');}
     public static function account($input) {
         $member=isUser()?SessionIdentity::member(getCurrentProject()):null;
@@ -29,6 +29,7 @@ class ProjectPurchases {
         $amount=(int)($plan['price_'.$cycle]??0);if($amount<=0)throw new RuntimeException('قیمت این پلن برای خرید آنلاین تنظیم نشده است.');
         $name=trim($input['customer_name']??'');$business=trim($input['customer_business']??'');if($name===''||$business===''||mb_strlen($name)>150||mb_strlen($business)>150)throw new RuntimeException('نام خریدار و نام پروژه را وارد کنید.');
         $currency=strtoupper($site['zarinpal_currency']??'IRT');if(!in_array($currency,['IRR','IRT'],true))throw new RuntimeException('واحد پول درگاه معتبر نیست.');
+        if($amount<1500)throw new RuntimeException('حداقل مبلغ خرید آنلاین ۱۵۰۰ تومان است؛ قیمت پلن را اصلاح کنید یا کارت‌به‌کارت را انتخاب کنید.');
         $gatewayAmount=$amount*($currency==='IRR'?10:1);
         $account=self::account($input);
         $nonce=$input['checkout_nonce']??bin2hex(random_bytes(16));if(!is_string($nonce)||!preg_match('/^[a-f0-9]{32}$/D',$nonce))throw new RuntimeException('شناسهٔ درخواست معتبر نیست.');
@@ -47,7 +48,7 @@ class ProjectPurchases {
         saveOrder($order);
         $request=$request?:'zarinpalRequestPayment';$res=$request($gatewayAmount,'اشتراک '.$plan['name'], $callback.'?payment_callback=zarinpal&order_id='.rawurlencode($id),$account['mobile'],'',$id,$site);
         if(empty($res['success'])||empty($res['authority'])||empty($res['payment_url'])){
-            $order['status']='failed';$this->store->transaction(function(&$s)use($id,$order){$s['orders'][$id]['receipt']=$order;});saveOrder($order);throw new RuntimeException('اتصال درگاه انجام نشد؛ مبلغی در پنل ثبت نشده است.');
+            $order['status']='failed';$this->store->transaction(function(&$s)use($id,$order){$s['orders'][$id]['receipt']=$order;});saveOrder($order);throw new RuntimeException('اتصال درگاه انجام نشد؛ مبلغی در پنل ثبت نشده است. '.mb_substr((string)($res['error']??''),0,300).' (کد: '.(int)($res['code']??0).')');
         }
         $order['authority']=$res['authority'];$this->store->transaction(function(&$s)use($id,$order,$res){$s['orders'][$id]['receipt']=$order;$s['orders'][$id]['payment_url']=$res['payment_url'];});saveOrder($order);
         return ['order'=>$order,'payment_url'=>$res['payment_url']];
@@ -61,9 +62,15 @@ class ProjectPurchases {
             if(!empty($row['project_id'])){if(ProjectLifecycle::isDeleted($row['project_id'])||!getCurrentProject($row['project_id'],true))throw new RuntimeException('پروژهٔ این رسید قبلاً حذف شده است؛ پروژهٔ دیگری خودکار ساخته نمی‌شود.');return $o+['project_id'=>$row['project_id']];}
             if(strtoupper($status)!=='OK')throw new RuntimeException('پرداخت لغو شد یا ناموفق بود؛ پروژه‌ای ساخته نشد.');
             if(empty($row['verified_at'])){
-                $r=$verify($authority,$o['gateway_amount']??$o['amount'],$row['gateway']);if(empty($r['success'])||empty($r['ref_id']))throw new RuntimeException('پرداخت توسط بانک تأیید نشد.');
+                $r=$verify($authority,$o['gateway_amount']??$o['amount'],$row['gateway']);if(empty($r['success'])||empty($r['ref_id']))throw new RuntimeException('پرداخت توسط بانک تأیید نشد. '.mb_substr((string)($r['error']??''),0,300).' (کد: '.(int)($r['code']??0).')');
                 $row['verified_at']=time();$o['status']='completed';$o['ref_code']=(string)$r['ref_id'];$o['paid_at']=date('Y-m-d H:i:s');
             }
+            return $this->provision($row,$id);
+        });
+        saveOrder($result);return $result;
+    }
+    protected function provision(&$row,$id){
+        $o=&$row['receipt'];
             // Deterministic ID and transaction prevent a repeated callback from duplicating projects or membership.
             $pid='buy_'.substr(hash('sha256',$id),0,24);
             if(ProjectLifecycle::isDeleted($pid))throw new RuntimeException('پروژهٔ این سفارش قبلاً حذف شده است؛ با پشتیبانی تماس بگیرید.');
@@ -74,7 +81,6 @@ class ProjectPurchases {
                 if(!db_save_project($p))throw new RuntimeException('پرداخت تأیید شد ولی ساخت پروژه تکمیل نشد؛ دوباره همین رسید را باز کنید.');
             }elseif(($existing['settings']['subscription']['order_id']??'')!==$id)throw new RuntimeException('شناسهٔ پروژه با سفارش مطابقت ندارد.');
             $row['project_id']=$pid;$o['project_id']=$pid;return $o;
-        });
-        saveOrder($result);return $result;
     }
+
 }

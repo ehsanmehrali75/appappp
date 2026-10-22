@@ -43,6 +43,12 @@ if (($_SERVER['REQUEST_METHOD']??'GET')==='POST' && isset($_POST['submit_checkou
         $host=$_SERVER['HTTP_HOST']??'';
         if(!preg_match('/^[a-zA-Z0-9.:-]+$/D',$host))throw new RuntimeException('آدرس بازگشت معتبر نیست.');
         if(!is_string($_POST['checkout_nonce']??null)||!hash_equals($_SESSION['checkout_nonce'],$_POST['checkout_nonce']))throw new RuntimeException('فرم خرید قدیمی است؛ صفحه را تازه کنید و دوباره تلاش کنید.');
+        if(($_POST['payment_gateway']??'')==='bank_transfer'){
+            require_once __DIR__.'/panel/inc/TransferPurchases.php';
+            $transfer=(new TransferPurchases())->startTransfer($_POST,$site_settings);
+            $_SESSION['transfer_orders'][$transfer['order_id']]=true;
+            redirect('/panel/transfer-payment.php?order='.rawurlencode($transfer['order_id']));
+        }
         $purchase=(new ProjectPurchases())->start($_POST,$site_settings,($secure?'https':'http').'://'.$host.'/index.php');
         redirect($purchase['payment_url']);
     }catch(Throwable $e){$order_error=$e instanceof RuntimeException?$e->getMessage():'ثبت سفارش تکمیل نشد؛ دوباره تلاش کنید.';}
@@ -759,10 +765,10 @@ $show_login_modal = ($login_error !== '' || $sms_notification !== '' || isset($_
                 <div><label class="block text-xs font-bold text-slate-400 mb-1">نام کاربری حساب جدید</label><input name="account_username" required minlength="3" maxlength="60" autocomplete="username" dir="ltr" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white"><p class="text-xs text-slate-400">اگر حساب دارید، ابتدا وارد شوید؛ پروژهٔ جدید به همان حساب اضافه می‌شود.</p></div>
                 <div><label class="block text-xs font-bold text-slate-400 mb-1">رمز حساب جدید؛ حداقل ۱۰ کاراکتر</label><input name="account_password" type="password" minlength="10" maxlength="72" required autocomplete="new-password" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white"></div>
                 <?php else: ?><p class="text-xs text-emerald-300">پروژهٔ جدید پس از تأیید پرداخت به حساب فعلی شما اضافه می‌شود.</p><?php endif; ?>
-                <input type="hidden" name="payment_gateway" value="zarinpal"><p class="text-xs text-slate-400">پرداخت از طریق زرین‌پال انجام می‌شود. پس از تأیید بانک، راهنمای راه‌اندازی پروژه در دسترس است.</p>
+                <label class="block text-xs text-slate-300">روش پرداخت<select name="payment_gateway" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 mt-2"><option value="zarinpal">پرداخت آنلاین زرین‌پال</option><?php if(!empty($site_settings['bank_transfer']['enabled'])):?><option value="bank_transfer">کارت‌به‌کارت — تأیید دستی</option><?php endif;?></select></label><p class="text-xs text-slate-400">در پرداخت آنلاین، تأیید بانک لازم است. در کارت‌به‌کارت، پس از ثبت رسید و تأیید مدیر، پروژه فعال می‌شود.</p>
 
                 <button type="submit" name="submit_checkout_order" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl shadow-lg mt-4">
-                    پرداخت آنلاین و تحویل آنی 💳
+                    ادامهٔ پرداخت 💳
                 </button>
             </form>
         </div>
