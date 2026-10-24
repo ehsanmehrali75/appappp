@@ -45,6 +45,16 @@ try:
         page.reload();assert page.get_by_text('گزارش آزمون جداشده',exact=True).is_visible()
         with page.expect_navigation():page.get_by_role('button',name='تأیید و ساخت تسک',exact=True).click()
         assert page.get_by_text('تصمیم پیشنهاد ثبت شد.',exact=True).is_visible()
+        page.goto(base+'/panel/saas-admin.php')
+        form=page.locator('form').filter(has=page.locator('[value=assign_project_ai]')).first
+        form.locator('xpath=ancestor::details').evaluate('(el)=>el.open=true')
+        form.locator('[name="employees[]"][value=ehsan]').check();form.locator('[name=reason]').fill('Browser central assignment fixture')
+        with page.expect_navigation():form.locator('button').click()
+        assert page.get_by_text('تغییرات ثبت شد.',exact=True).is_visible(),page.inner_text('body')
+        assert page.get_by_text('موجودی واقعی تمام سرویس‌دهندگان',exact=True).is_visible()
+        page.goto(base+'/panel/account.php')
+        assert page.locator('[name=employee][value=ehsan]').count()>0
+        assert 'مصرف تسویه‌شده' in page.inner_text('body')
         assert not errors,errors;browser.close()
     print(json.dumps({'pages':7,'analyst_configured':True,'analyst_queued':True,'viewports':[1440,375],'activation':True,'js_errors':errors,'artifacts':str(artifacts)}))
 finally:HttpSecurity.tearDownClass()
