@@ -37,6 +37,7 @@ class WebsiteUpload(unittest.TestCase):
         return result
 
     def test_exact_ten_mib_file_matches_model_and_imports_webp_through_preview_apply(self):
+        original_uploads={p.relative_to(self.case.app).as_posix():p.read_bytes() for p in (self.case.app/'panel/uploads').rglob('*') if p.is_file()}
         with sqlite3.connect(self.case.database) as db:
             db.execute('UPDATE products SET name="Aero   Pro W",color="سفید",image="",images_list="[]",gallery="[]",status="no_image" WHERE id="one"')
         row=dict(url='https://shop.example/product/74634/aero',product_code='74634',color='سفید',name='نیم تنه ورزشی زنانه اسپورتلند Aero Pro W',main_image='https://shop.example/main.webp',gallery=['https://shop.example/main.webp','https://shop.example/gallery.webp'],description='')
@@ -55,6 +56,7 @@ class WebsiteUpload(unittest.TestCase):
         product=self.case.record()
         self.assertEqual(product['name'],'Aero   Pro W')
         self.assertEqual(product['image'],row['main_image'])
+        self.assertEqual(original_uploads,{p.relative_to(self.case.app).as_posix():p.read_bytes() for p in (self.case.app/'panel/uploads').rglob('*') if p.is_file()},'Crawled photos remain source URLs; importing metadata must not create local image files')
         self.assertEqual(product['stock_total'],'10')
         self.assertEqual(len(product['description']),len(row['description']))
         self.assertTrue(all(image['approved'] and image['source']=='site' for image in json.loads(product['images_list'])))
