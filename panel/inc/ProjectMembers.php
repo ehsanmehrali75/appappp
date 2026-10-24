@@ -24,6 +24,7 @@ class ProjectMembers {
     public static function prepareStorage() {if(isSqlActive())self::schema(getConn());}
 
     public static function save($projects, $usernames) {
+        if(class_exists('SaaSAccounts'))SaaSAccounts::validateMembers($projects);
         self::$stage='start';self::$diagnostic=[];
         if (!isSqlActive()) {
             $db=getJsonDB();

@@ -132,21 +132,13 @@ if (isset($project['products']) && is_array($project['products'])) {
 // Support Settings fallback defaults
 $chat_settings = $project['settings']['chat'] ?? [];
 $chat_api_key = $chat_settings['api_key'] ?? '';
-$chat_ai_active = $chat_settings['ai_active'] ?? 1;
+$chat_ai_active = $chat_settings['ai_active'] ?? 0;
 $chat_ai_operator_name = $chat_settings['ai_operator_name'] ?? 'دستیار هوشمند سیستم';
 $chat_ai_instructions = $chat_settings['ai_instructions'] ?? 'شما یک دستیار هوش مصنوعی مجرب برای پاسخگویی به مشتریان هستید. همیشه پاسخ‌های رهنما، مفید و دوستانه بدهید و اطلاعات کلی شرکت را ملاک قرار دهید.';
 $chat_ai_delay = $chat_settings['ai_delay'] ?? 2;
 $chat_collect_leads = $chat_settings['collect_customer_leads'] ?? 1;
-$chat_predefined = $chat_settings['predefined_messages'] ?? [
-    ['title' => 'خوش‌آمدگویی اولیه', 'text' => 'سلام و عرض ادب، جهت ثبت سفارش یا پیگیری در خدمت شما هستیم.'],
-    ['title' => 'آدرس و لوکیشن دفتر', 'text' => 'تهران، خیابان ولیعصر، نرسیده به ونک، ساختمان نگین، طبقه ۴'],
-    ['title' => 'ساعات کاری مجموعه', 'text' => 'روزهای شنبه تا چهارشنبه از ساعت ۹:۰۰ الی ۱۷:۰۰ در خدمت شما هستیم.']
-];
-$chat_auto_replies = $chat_settings['auto_replies'] ?? [
-    ['keyword' => 'قیمت', 'match_type' => 'contains', 'reply' => 'قیمت تمامی محصولات تایید شده ما در بخش پیام‌رسان یا کاتالوگ با تخفیف‌های ویژه درج شده است.'],
-    ['keyword' => 'خرید', 'match_type' => 'contains', 'reply' => 'شما می‌توانید با ثبت نام سریع یا ارسال شماره موبایل خود سفارش مناسب را نهایی کنید.'],
-    ['keyword' => 'شعب', 'match_type' => 'exact', 'reply' => 'شعبه مرکزی: تهران ونک | شعبه دوم: شیراز معالی‌آباد']
-];
+$chat_predefined = $chat_settings['predefined_messages'] ?? [];
+$chat_auto_replies = $chat_settings['auto_replies'] ?? [];
 $chat_departments = $chat_settings['departments'] ?? [
     ['id' => 'sales', 'name' => 'واحد فروش و پشتیبانی سفارشات', 'operators' => ['admin']],
     ['id' => 'technical', 'name' => 'آموزش و پشتیبانی فنی خلاق', 'operators' => ['admin', 'editor']],
@@ -265,96 +257,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // 2. Trigger Mock Bot Send Message (to simulate visitor replying in live chat)
-    if (isset($_POST['mock_client_send']) && $active_chat) {
-        $client_text = trim($_POST['client_text'] ?? '');
-        if (!empty($client_text)) {
-            // Check for Auto reply keyword trigger first
-            $found_autoreply = null;
-            
-            // Check if client message contains any of our real product names or SKUs to automatically trigger a real recommendation
-            if (!empty($products_list)) {
-                foreach ($products_list as $p) {
-                    $p_name = $p['name'];
-                    $p_sku = $p['sku'] ?? '';
-                    if (mb_stripos($client_text, $p_name) !== false || (!empty($p_sku) && mb_stripos($client_text, $p_sku) !== false)) {
-                        $p_price = formatPriceToToman($p['price'] ?? 0);
-                        $p_link = "https://" . $_SERVER['HTTP_HOST'] . "/store_view.php?prod=" . ($p['id'] ?? 'p1');
-                        $found_autoreply = "💎 محصول \"{$p_name}\" با قیمت فوق‌العاده {$p_price} بر روی سیستم تایید شد و موجود است! برای سفارش مستقیم از لینک زیر اقدام بفرمایید:\n{$p_link}";
-                        break;
-                    }
-                }
-            }
-
-            if (!$found_autoreply) {
-                foreach ($chat_auto_replies as $rule) {
-                    if ($rule['match_type'] === 'exact' && strtolower(trim($rule['keyword'])) === strtolower(trim($client_text))) {
-                        $found_autoreply = $rule['reply'];
-                        break;
-                    } else if ($rule['match_type'] === 'contains' && mb_stripos($client_text, $rule['keyword']) !== false) {
-                        $found_autoreply = $rule['reply'];
-                        break;
-                    }
-                }
-            }
-
-            // Append Client message
-            $project['settings']['chat_conversations'][$active_chat_idx]['messages'][] = [
-                'id' => 'msg_cl_' . uniqid(),
-                'sender' => 'client',
-                'text' => $client_text,
-                'time' => date('H:i')
-            ];
-            $project['settings']['chat_conversations'][$active_chat_idx]['unread_count'] += 1;
-            
-            saveProject($project);
-            
-            // If Auto reply was found, trigger automatic machine answer instantly
-            if ($found_autoreply) {
-                $project['settings']['chat_conversations'][$active_chat_idx]['messages'][] = [
-                    'id' => 'msg_bot_' . uniqid(),
-                    'sender' => 'operator',
-                    'text' => "⚡ پاسخ خودکار: " . $found_autoreply,
-                    'time' => date('H:i'),
-                    'operator_name' => 'ربات کلیدواژه سیستم'
-                ];
-                $project['settings']['chat_conversations'][$active_chat_idx]['unread_count'] = 0;
-                saveProject($project);
-            } else if ($chat_ai_active && ($active_chat['ai_active'] ?? true)) {
-                // Compile the real products catalog for the AI context to completely remove demo-feel
-                $real_catalog_text = "";
-                if (!empty($products_list)) {
-                    $real_catalog_text = "\n\nلیست محصولات تایید شده و موجود در پورتال ما:\n";
-                    foreach (array_slice($products_list, 0, 5) as $rIdx => $p) {
-                        $p_name = $p['name'];
-                        $p_price = formatPriceToToman($p['price'] ?? 0);
-                        $p_link = "https://" . $_SERVER['HTTP_HOST'] . "/store_view.php?prod=" . ($p['id'] ?? 'p1');
-                        $real_catalog_text .= ($rIdx + 1) . "- محصول: {$p_name} | قیمت: {$p_price} | لینک ثبت سفارش سریع: {$p_link}\n";
-                    }
-                }
-
-                // Trigger Gemini API with real products context
-                $prompt = "مشتری پیام زیر را ارسال کرده است:\n" . $client_text . "{$real_catalog_text}\n\nپاسخ مناسب و محترمانه را در قالب ۱ الی ۲ خط برای مشتری بنویسید. اگر مشتری در مورد محصول، قیمت، یا نحوه خرید سوال کرد، حتماً محصول مرتبط را به همراه قیمت واقعی و لینک خرید آن معرفی کنید.";
-                $ai_res = geminiGenerateResponse($prompt, $chat_ai_instructions, $chat_api_key);
-                $ai_text = $ai_res['text'] ?? ($ai_res['error'] ?? 'سلام، پیام شما دریافت شد. در اسرع وقت پاسخگوی شما خواهیم بود.');
-                if (isset($ai_res['error'])) {
-                    $ai_text = "سلام، پیام شما با موفقیت ثبت شد. واحد مربوطه به زودی پاسخگوی شما عزیزان خواهد بود.";
-                }
-                
-                $project['settings']['chat_conversations'][$active_chat_idx]['messages'][] = [
-                    'id' => 'msg_gpt_' . uniqid(),
-                    'sender' => 'operator',
-                    'text' => "🤖 [" . $chat_ai_operator_name . "] " . $ai_text,
-                    'time' => date('H:i'),
-                    'operator_name' => $chat_ai_operator_name
-                ];
-                $project['settings']['chat_conversations'][$active_chat_idx]['unread_count'] = 0;
-                saveProject($project);
-            }
-            
-            redirect("chat.php?id=" . $active_chat_id . "&msg=success");
-        }
-    }
+    if(isset($_POST['mock_client_send'])){http_response_code(410);exit('شبیه‌سازی پیام مشتری غیرفعال است.');}
 
     // 3. Register client lead manually from chat window / lead generation form
     if (isset($_POST['register_customer_lead'])) {
@@ -662,18 +565,6 @@ $platform_meta = [
                         </div>
                     </form>
 
-                    <!-- Mock Client Simulator - To demonstrate fully operational AI integration live -->
-                    <div class="mt-3 p-3 bg-slate-50/50 border border-slate-200 border-dashed rounded-2xl flex flex-col md:flex-row items-center justify-between gap-3 text-right">
-                        <div>
-                            <span class="inline-block px-2 py-0.5 text-[8px] bg-sky-500 text-white rounded-md font-black">شبیه‌ساز کاربری</span>
-                            <span class="text-[10px] text-slate-400 font-bold mr-1.5 col-span-1 md:col-span-2">عملکرد ربات کلمات کلیدی و هوش مصنوعی Gemini را فورا تست کنید:</span>
-                        </div>
-                        <form method="POST" action="chat.php?id=<?php echo $active_chat['id']; ?>" class="flex gap-2 w-full md:w-auto">
-                            <input type="hidden" name="mock_client_send" value="1">
-                            <input type="text" name="client_text" class="px-3 py-1.5 bg-white border border-slate-350 rounded-xl text-[10px] font-bold w-full md:w-56" placeholder="مثلا قیمت چقدره؟ یا سوال دلخواه...">
-                            <button type="submit" class="bg-slate-900 border text-white hover:bg-slate-800 text-[10px] px-3 py-1.5 rounded-xl font-bold transition-all">تست پاسخ</button>
-                        </form>
-                    </div>
                 </div>
 
             <?php else: ?>
@@ -929,7 +820,7 @@ $platform_meta = [
 
             <div class="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto scroller pr-1">
                 <?php foreach ($products_list as $prod): 
-                    $p_img = !empty($prod['image']) ? $prod['image'] : 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200';
+                    $p_img = !empty($prod['image']) ? $prod['image'] : 'assets/placeholder.svg';
                     $p_name = $prod['name'];
                     $p_price = formatPriceToToman($prod['price'] ?? 0);
                     

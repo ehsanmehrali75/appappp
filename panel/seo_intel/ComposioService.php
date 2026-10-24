@@ -31,7 +31,7 @@ class ComposioService {
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 3);
             curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ComposioClient/3.1');
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
             $ip = @curl_exec($ch);
             curl_close($ch);
 
@@ -212,7 +212,7 @@ class ComposioService {
                 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 ComposioClient/3.1'
             ]);
             curl_setopt($ch, CURLOPT_TIMEOUT, 6);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 
             $res = curl_exec($ch);
@@ -276,13 +276,13 @@ class ComposioService {
             ]);
 
             return [
-                'success' => true, // Treated as configured so user workflow is unblocked
+                'success' => false,
                 'status' => 'configured',
                 'http_code' => 403,
                 'message' => $msg,
                 'composio_error' => $composioMsg,
                 'outbound_ip' => $outboundIp,
-                'notice' => 'کلید ذخیره شد و در هسته ادغام آماده است.'
+                'notice' => 'کلید ذخیره شده است؛ اتصال تأیید نشده است.'
             ];
         } elseif ($lastHttpCode === 401) {
             $msg = 'خطای احراز هویت (HTTP 401): کلید وارد شده توسط سرور Composio پذیرفته نشد. لطفاً از صحت کلید در داشبورد Composio اطمینان حاصل فرمایید.';
@@ -343,7 +343,7 @@ class ComposioService {
                 'Accept: application/json'
             ]);
             curl_setopt($ch, CURLOPT_TIMEOUT, 6);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
             $res = @curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
@@ -401,14 +401,14 @@ class ComposioService {
                 'Accept: application/json'
             ]);
             curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
 
             $res = curl_exec($ch);
             $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
 
             $decoded = json_decode($res, true);
-            if ($code >= 200 && $code < 300) {
+            if ($code >= 200 && $code < 300 && is_array($decoded) && empty($decoded['error']) && ($decoded['success'] ?? true) !== false) {
                 return [
                     'success' => true,
                     'source' => 'composio_v3_api',
@@ -429,7 +429,7 @@ class ComposioService {
             $cliOutput = @shell_exec($cmd);
             if (!empty($cliOutput)) {
                 $parsed = json_decode($cliOutput, true);
-                if (is_array($parsed) && (isset($parsed['data']) || isset($parsed['success']))) {
+                if (is_array($parsed) && empty($parsed['error']) && ($parsed['success'] ?? true) !== false && (isset($parsed['data']) || isset($parsed['success']))) {
                     return [
                         'success' => true,
                         'source' => 'composio_cli',
@@ -439,14 +439,7 @@ class ComposioService {
             }
         }
 
-        // Option 3: Fallback Normalized Adapter (Safe for offline & sandbox testing)
-        return [
-            'success' => true,
-            'source' => 'composio_normalized_adapter',
-            'action' => $actionName,
-            'entity_id' => $entityId,
-            'data' => self::getSimulatedActionResponse($actionName, $params)
-        ];
+        return ['success'=>false,'source'=>'connection_required','error'=>'اجرای واقعی Composio تأیید نشد.','data'=>null];
     }
 
     /**
@@ -493,7 +486,7 @@ class ComposioService {
                 'Accept: application/json'
             ]);
             curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
 
             $res = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -510,13 +503,7 @@ class ComposioService {
             }
         }
 
-        // Return guided connection response
-        return [
-            'success' => true,
-            'auth_url' => '#connected-mock',
-            'connection_id' => 'conn_' . uniqid(),
-            'message' => 'اتصال شبیه‌سازی شده برای توسعه یا کلید Composio فعال گردید.'
-        ];
+        return ['success'=>false,'auth_url'=>null,'connection_id'=>null,'message'=>'لینک واقعی اتصال دریافت نشد؛ تنظیمات Composio پروژه را بررسی کنید.'];
     }
 
     /**
@@ -580,21 +567,7 @@ class ComposioService {
     /**
      * Fallback simulated responses for development/sandbox
      */
-    private static function getSimulatedActionResponse($actionName, $params) {
-        if (strpos($actionName, 'SEARCH_CONSOLE') !== false) {
-            return [
-                'rows' => [
-                    ['keys' => ['خرید هودی اورسایز'], 'clicks' => 342, 'impressions' => 2850, 'ctr' => 0.12, 'position' => 2.1],
-                    ['keys' => ['شلوار کارگو مشکی'], 'clicks' => 54, 'impressions' => 1890, 'ctr' => 0.028, 'position' => 11.2]
-                ]
-            ];
-        } elseif (strpos($actionName, 'ANALYTICS') !== false) {
-            return [
-                'rows' => [
-                    ['dimensionValues' => [['value' => 'Organic Search']], 'metricValues' => [['value' => '42580'], ['value' => '29400']]]
-                ]
-            ];
-        }
-        return ['status' => 'success', 'executed_at' => date('Y-m-d H:i:s')];
+    private static function getSimulatedActionResponse($actionName,$params) {
+        throw new RuntimeException('پاسخ نمونه غیرفعال است؛ اتصال واقعی پروژه را تنظیم کنید.');
     }
 }

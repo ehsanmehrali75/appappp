@@ -4,12 +4,13 @@ class AiReports {
     private $store,$http;
     public function __construct($store,$http=null){$this->store=$store;$this->http=$http?:[AiHttp::class,'json'];}
     public static function eligible($provider,$principal){return !empty($provider['enabled'])&&in_array($principal['project'],$provider['projects'],true)&&($provider['owner']===$principal['owner']||in_array($principal['username'],$provider['users'],true));}
-    public function providers($principal){$s=$this->store->read();$rows=[];foreach($s['providers']??[] as $p)if($p['owner']===$principal['owner']||self::eligible($p,$principal)){$row=$p;unset($row['key'],$row['principal']);$rows[]=$row;}return $rows;}
+    public function providers($principal){$s=$this->store->read();$rows=[];foreach($s['providers']??[] as $p)if(in_array($principal['project'],$p['projects'],true)&&($p['owner']===$principal['owner']||self::eligible($p,$principal))){$row=$p;unset($row['key'],$row['principal']);$rows[]=$row;}return $rows;}
     public function saveProvider($principal,$input,$allowedProjects){
+        if(SaaSAccounts::projectAccount($principal['project']))throw new RuntimeException('API داخلی این حساب توسط تیم مرکزی مدیریت می‌شود؛ از بخش حساب و کارمندها استفاده کنید.');
         AiAccess::write();$id=$input['id']??'';$s=$this->store->read();$old=$s['providers'][$id]??null;
         if($id!==''&&(!$old||$old['owner']!==$principal['owner']))throw new RuntimeException('منبع متعلق به شما نیست.');
         $platform=!empty($input['platform']);if(($platform||!empty($old['platform']))&&!isMainAdmin())throw new RuntimeException('تعرفهٔ سرویس فقط توسط مدیر اصلی تنظیم می‌شود.');
-        $name=trim($input['name']??'');$model=trim($input['model']??'');$projects=$input['projects']??[];$users=$input['users']??[];
+        $name=trim($input['name']??'');$model=trim($input['model']??'');$projects=$input['projects']??[$principal['project']];if($projects!==[$principal['project']])throw new RuntimeException('کلید API فقط برای پروژهٔ انتخاب‌شده ثبت می‌شود.');$users=$input['users']??[];
         if($name===''||mb_strlen($name)>100||!preg_match('/^[a-zA-Z0-9._-]{3,100}$/D',$model)||!is_array($projects)||!$projects||array_diff($projects,$allowedProjects)||!is_array($users)||count($users)>100)throw new RuntimeException('نام، مدل، پروژه‌ها و کاربران مجاز را بررسی کنید.');
         foreach($users as $user)if(!is_string($user)||strlen($user)>100)throw new RuntimeException('نام کاربر معتبر نیست.');
         $limit=(int)($input['daily_tokens']??0);$output=(int)($input['max_output']??0);$inRate=(int)($input['input_rate']??0);$outRate=(int)($input['output_rate']??0);
@@ -19,7 +20,14 @@ class AiReports {
         $provider=['id'=>$id,'owner'=>$principal['owner'],'principal'=>$principal,'name'=>$name,'model'=>$model,'key'=>$encrypted,'projects'=>array_values(array_unique($projects)),'users'=>array_values(array_unique($users)),'daily_tokens'=>$limit,'max_output'=>$output,'platform'=>$platform,'input_rate'=>$platform?$inRate:0,'output_rate'=>$platform?$outRate:0,'enabled'=>empty($input['disabled']),'updated'=>time(),'revision'=>bin2hex(random_bytes(8))];
         $this->store->transaction(static function(&$s)use($id,$provider,$principal){$s['providers'][$id]=$provider;AiStore::audit($s,$principal,'provider_saved',['id'=>$id]);});return $id;
     }
+    public function probe($principal,$id){
+        AiAccess::write();$p=$this->store->read()['providers'][$id]??null;if(!$p||!self::eligible($p,$principal))throw new RuntimeException('منبع API این پروژه مجاز نیست.');
+        $result=['at'=>time(),'revision'=>$p['revision']??'','success'=>false,'read_only'=>true,'generation_tested'=>false];
+        try{$r=call_user_func($this->http,'https://api.openai.com/v1/models/'.rawurlencode($p['model']),null,['Authorization: Bearer '.$this->store->decrypt($p['key'])]);if(($r['status']??0)!==200||($r['body']['id']??'')!==$p['model'])throw new RuntimeException('OpenAI HTTP '.(int)($r['status']??0).'؛ کلید، مدل و دسترسی حساب را بررسی کنید.');$result['success']=true;$result['note']='احراز هویت و دسترسی خواندن مدل تأیید شد؛ تولید محتوا و اعتبار کافی با این تست اثبات نمی‌شود.';}catch(Throwable $e){$result['error']=$e instanceof RuntimeException?$e->getMessage():'تست API انجام نشد.';}
+        $this->store->transaction(static function(&$s)use($p,$result){if(($s['providers'][$p['id']]['revision']??'')!==($p['revision']??''))throw new RuntimeException('تنظیمات API تغییر کرده؛ دوباره تست کنید.');$s['provider_tests'][$p['id']]=$result;});return $result;
+    }
     public function schedule($project,$principal,$input){
+        if(SaaSAccounts::projectAccount($project['id']))throw new RuntimeException('برای این حساب، فاز فعلی کارمند نهال است؛ گزارش خودکار به کارمند تحلیل‌گر و تعرفهٔ مستقل نیاز دارد.');
         AiAccess::write();$purpose=$input['purpose']??'report';if(!in_array($purpose,['report','calendar_plan'],true))throw new RuntimeException('نوع برنامه معتبر نیست.');if($purpose==='calendar_plan'){AiAccess::need('calendar','use');AiAccess::need('auto_admin','use');}$title=trim($input['title']??'');$prompt=trim($input['prompt']??'');$sources=$input['sources']??[];$filters=$input['filters']??[];
         if($title===''||mb_strlen($title)>200||$prompt===''||mb_strlen($prompt)>4000||!is_array($filters))throw new RuntimeException('عنوان و دستور گزارش را تکمیل کنید.');
         (new AiData($this->store))->snapshot($project,$sources,$filters);
@@ -34,6 +42,7 @@ class AiReports {
     public function disable($principal,$id){$this->store->transaction(static function(&$s)use($principal,$id){$r=$s['schedules'][$id]??null;if(!$r||$r['owner']!==$principal['owner']||$r['project']!==$principal['project'])throw new RuntimeException('گزارش مجاز نیست.');$s['schedules'][$id]['enabled']=false;});}
     public function run($id,$principal=null,$slot=null){
         $state=$this->store->read();$schedule=$state['schedules'][$id]??null;if(!$schedule||!$schedule['enabled']||($principal&&($schedule['owner']!==$principal['owner']||$schedule['project']!==$principal['project'])))throw new RuntimeException('گزارش فعال مجاز یافت نشد.');
+        if(SaaSAccounts::projectAccount($schedule['project']))throw new RuntimeException('اجرای گزارش قدیمی پس از انتقال حساب متوقف است؛ اتصال کارمند تحلیل‌گر لازم است.');
         $author=$schedule['principal'];$provider=$state['providers'][$schedule['provider']]??null;if(!$provider||!self::eligible($provider,$author))throw new RuntimeException('اشتراک منبع API لغو شده است.');
         AiAccess::run($provider['principal'],static function(){if(!AiAccess::pageAllowed())throw new RuntimeException('دسترسی مالک منبع لغو شده است.');AiAccess::write();});
         return AiAccess::run($author,function($project)use($schedule,$provider,$slot){

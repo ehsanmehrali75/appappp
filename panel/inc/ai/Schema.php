@@ -1,0 +1,8 @@
+<?php
+class AiSchema {
+    public static function openapi(){
+        $base=AiOAuth::base();$scopes=['project.read'=>'Read authorized project data','content.write'=>'Save product content','reports.write'=>'Save analyses','datasets.write'=>'Upload analytical datasets','social.write'=>'Coordinate social publications','website.write'=>'Preview and queue confirmed website changes'];$paths=[];
+        foreach(AiTools::definitions(['scopes'=>array_keys($scopes)]) as $d){$write=empty($d['annotations']['readOnlyHint']);$scope=strpos($d['name'],'website_')===0?'website.write':(strpos($d['name'],'social_')===0?'social.write':($d['name']==='save_content'?'content.write':($d['name']==='save_report'?'reports.write':'datasets.write')));$paths['/panel/ai_api.php/'.$d['name']]=['post'=>['operationId'=>$d['name'],'summary'=>$d['description'],'x-openai-isConsequential'=>$write,'security'=>[['OAuth2'=>$write?['project.read',$scope]:['project.read']]],'requestBody'=>['required'=>true,'content'=>['application/json'=>['schema'=>$d['inputSchema']]]],'responses'=>['200'=>['description'=>'Result','content'=>['application/json'=>['schema'=>['type'=>'object','additionalProperties'=>true]]]]]]];}
+        return ['openapi'=>'3.1.0','info'=>['title'=>'Maarksho project assistant','version'=>'1.1.0','description'=>'Project data and confirmed website/content operations; queued is not published.'],'servers'=>[['url'=>$base]],'security'=>[['OAuth2'=>['project.read']]],'components'=>['securitySchemes'=>['OAuth2'=>['type'=>'oauth2','flows'=>['authorizationCode'=>['authorizationUrl'=>$base.'/panel/ai_oauth.php?action=authorize','tokenUrl'=>$base.'/panel/ai_oauth.php?action=token','scopes'=>$scopes]]]]],'paths'=>$paths];
+    }
+}

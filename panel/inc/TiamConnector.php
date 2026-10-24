@@ -13,16 +13,16 @@ class TiamConnector {
      */
     public static function testFullPipeline($tconfig) {
         $vpnEnabled = !empty($tconfig['vpn_enabled']);
-        $vpnServerIp = trim($tconfig['vpn_server_ip'] ?? '79.127.70.17');
-        $vpnUser = trim($tconfig['vpn_username'] ?? 'ehsan');
-        $vpnPass = trim($tconfig['vpn_password'] ?? '12345');
-        $vpnSecret = trim($tconfig['vpn_secret'] ?? '4747');
-        $vpnSubnet = trim($tconfig['vpn_subnet'] ?? '192.168.2.0/24');
+        $vpnServerIp = trim($tconfig['vpn_server_ip'] ?? '');
+        $vpnUser = trim($tconfig['vpn_username'] ?? '');
+        $vpnPass = trim($tconfig['vpn_password'] ?? '');
+        $vpnSecret = trim($tconfig['vpn_secret'] ?? '');
+        $vpnSubnet = trim($tconfig['vpn_subnet'] ?? '');
 
-        $erpServerIp = trim($tconfig['erp_server_ip'] ?? '192.168.2.205');
+        $erpServerIp = trim($tconfig['erp_server_ip'] ?? '');
         $erpPort = intval($tconfig['erp_port'] ?? 8080);
-        $erpUser = trim($tconfig['erp_username'] ?? 'marketing-bi-user');
-        $erpPass = trim($tconfig['erp_password'] ?? '5Tz@1239n@Ns9');
+        $erpUser = trim($tconfig['erp_username'] ?? '');
+        $erpPass = trim($tconfig['erp_password'] ?? '');
         $erpProtocol = trim($tconfig['erp_protocol'] ?? 'auto');
         $erpEndpoint = trim($tconfig['endpoint'] ?? '');
         $warehouse = trim($tconfig['warehouse_code'] ?? '');
@@ -124,6 +124,7 @@ class TiamConnector {
         // -------------------------------------------------------------
         $authResult = self::testErpAuth($tconfig);
         $stage4Success = $authResult['success'];
+        if(!$stage4Success)$overallSuccess=false;
 
         $stages[] = [
             'id' => 'erp_auth',
@@ -175,10 +176,10 @@ class TiamConnector {
      * Test ERP Authentication using username and password
      */
     private static function testErpAuth($tconfig) {
-        $erpServerIp = trim($tconfig['erp_server_ip'] ?? '192.168.2.205');
+        $erpServerIp = trim($tconfig['erp_server_ip'] ?? '');
         $erpPort = intval($tconfig['erp_port'] ?? 8080);
-        $erpUser = trim($tconfig['erp_username'] ?? 'marketing-bi-user');
-        $erpPass = trim($tconfig['erp_password'] ?? '5Tz@1239n@Ns9');
+        $erpUser = trim($tconfig['erp_username'] ?? '');
+        $erpPass = trim($tconfig['erp_password'] ?? '');
         $endpoint = rtrim($tconfig['endpoint'] ?? '', '/');
 
         if (empty($endpoint)) {
@@ -191,13 +192,14 @@ class TiamConnector {
         // If endpoint is SOAP ASMX
         if (stripos($endpoint, '.asmx') !== false || stripos($endpoint, 'wsdl') !== false) {
             return [
-                'success' => true,
+                'success' => false,
                 'latency_ms' => round((microtime(true) - $t0) * 1000, 1),
-                'message' => "وب‌سرویس کلاسیک SOAP تیام فعال است (آماده ارسال پاکت‌های XML با کاربر $erpUser).",
+                'message' => 'آدرس SOAP به‌تنهایی احراز هویت را اثبات نمی‌کند؛ عملیات و پاسخ واقعی وب‌سرویس باید بررسی شوند.',
                 'token' => ''
             ];
         }
 
+        if($erpUser===''||$erpPass==='')return ['success'=>false,'latency_ms'=>0,'message'=>'مشخصات ورود ERP را تنظیم کنید.','token'=>''];
         // Try REST Authentication
         $loginUrl = $endpoint . '/api/login';
         $ch = curl_init();
@@ -223,7 +225,8 @@ class TiamConnector {
 
         if ($code >= 200 && $code < 300 && !empty($res)) {
             $decoded = json_decode($res, true);
-            $token = $decoded['access_token'] ?? $decoded['token'] ?? $decoded['data']['token'] ?? 'authenticated_session';
+            $token = $decoded['access_token'] ?? $decoded['token'] ?? $decoded['data']['token'] ?? '';
+            if(!is_string($token)||$token===''||($decoded['success']??true)===false)return ['success'=>false,'latency_ms'=>$latency,'message'=>'پاسخ ورود توکن معتبر ندارد؛ احراز هویت تأیید نشد.','token'=>''];
             return [
                 'success' => true,
                 'latency_ms' => $latency,
@@ -244,7 +247,7 @@ class TiamConnector {
      * Fetch sample data from Tiam
      */
     private static function fetchSampleData($tconfig, $token = '') {
-        $erpServerIp = trim($tconfig['erp_server_ip'] ?? '192.168.2.205');
+        $erpServerIp = trim($tconfig['erp_server_ip'] ?? '');
         $erpPort = intval($tconfig['erp_port'] ?? 8080);
         $endpoint = rtrim($tconfig['endpoint'] ?? '', '/');
         if (empty($endpoint)) {
@@ -274,7 +277,8 @@ class TiamConnector {
 
         if ($code == 200 && !empty($res)) {
             $decoded = json_decode($res, true);
-            $items = is_array($decoded) ? ($decoded['data'] ?? $decoded['products'] ?? $decoded) : [];
+            $items = is_array($decoded) ? ($decoded['data'] ?? $decoded['products'] ?? $decoded) : null;
+            if(!is_array($items)||!array_is_list($items)||($decoded['success']??true)===false||count(array_filter($items,'is_array'))!==count($items))return ['status'=>'error','latency_ms'=>$latency,'message'=>'پاسخ محصولات با قرارداد دادهٔ واقعی تطبیق ندارد.','sample_items'=>[]];
             return [
                 'status' => 'success',
                 'latency_ms' => $latency,
@@ -296,11 +300,11 @@ class TiamConnector {
         }
 
         $vpnEnabled = !empty($tconfig['vpn_enabled']);
-        $vpnServerIp = trim($tconfig['vpn_server_ip'] ?? '79.127.70.17');
-        $erpServerIp = trim($tconfig['erp_server_ip'] ?? '192.168.2.205');
+        $vpnServerIp = trim($tconfig['vpn_server_ip'] ?? '');
+        $erpServerIp = trim($tconfig['erp_server_ip'] ?? '');
         $erpPort = intval($tconfig['erp_port'] ?? 8080);
-        $erpUser = trim($tconfig['erp_username'] ?? 'marketing-bi-user');
-        $erpPass = trim($tconfig['erp_password'] ?? '5Tz@1239n@Ns9');
+        $erpUser = trim($tconfig['erp_username'] ?? '');
+        $erpPass = trim($tconfig['erp_password'] ?? '');
         $warehouse = trim($tconfig['warehouse_code'] ?? '');
         $priceUnit = trim($tconfig['price_unit'] ?? 'detect');
         $endpoint = rtrim($tconfig['endpoint'] ?? '', '/');

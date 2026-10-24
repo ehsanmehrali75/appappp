@@ -16,7 +16,7 @@ class TransferPurchases extends ProjectPurchases {
         $order=$this->store->transaction(function(&$s)use($key,$plan,$cycle,$amount,$name,$business,$account,$destination){
             foreach($s['orders']??[] as $row)if(($row['request_key']??'')===$key)return $row['receipt'];
             $id='ORD-'.date('Ymd').'-'.bin2hex(random_bytes(8));$o=['order_id'=>$id,'customer_name'=>$name,'customer_business'=>$business,'customer_mobile'=>$account['mobile'],'plan_id'=>$plan['id'],'plan_name'=>$plan['name'],'billing_cycle'=>$cycle,'amount'=>$amount,'payment_gateway'=>'bank_transfer','status'=>'pending','created_at'=>date('Y-m-d H:i:s')];
-            $s['orders'][$id]=['request_key'=>$key,'receipt'=>$o,'account'=>$account,'modules'=>ProjectPlans::modules($plan),'destination'=>$destination];return $o;
+            $s['orders'][$id]=['request_key'=>$key,'receipt'=>$o,'account'=>$account,'plan_snapshot'=>$plan,'modules'=>ProjectPlans::modules($plan),'destination'=>$destination];return $o;
         });saveOrder($order);return $order;
     }
     public function order($id){$s=$this->store->read();$r=$s['orders'][$id]??null;if(!$r||($r['receipt']['payment_gateway']??'')!=='bank_transfer')throw new RuntimeException('سفارش یافت نشد.');return $r;}

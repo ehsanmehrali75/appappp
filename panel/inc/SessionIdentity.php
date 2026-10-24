@@ -40,6 +40,20 @@ class SessionIdentity {
         foreach (['user', 'project_id', 'project_selection_required', 'auth_identity', 'portal_user', 'portal_user_icon', 'portal_user_display_name', 'display_name', 'user_icon'] as $key) unset($_SESSION[$key]);
     }
 
+    public static function customerAccount(){
+        $i=$_SESSION['auth_identity']??[];if(($i['kind']??'')!=='customer')return null;
+        $a=SaaSAccounts::snapshot()['accounts'][$i['account']??'']??null;
+        if(!$a||!hash_equals($i['proof']??'',self::proof($a['owner_member']??[],'password')))return null;
+        return $a['id'];
+    }
+    public static function beginCustomer($account){
+        self::$accounts=null;self::clear();
+        $_SESSION['auth_identity']=['kind'=>'customer','account'=>$account['id'],'origin_project'=>$account['id'],'proof'=>self::proof($account['owner_member'],'password')];
+        $_SESSION['user']=['username'=>$account['owner'],'role'=>'customer','permissions'=>[]];
+        $_SESSION['project_selection_required']=true;
+        return self::customerAccount()!==null;
+    }
+
     public static function beginPassword($username, $password, $originProject) {
         self::$accounts = null;
         self::clear();
@@ -94,6 +108,13 @@ class SessionIdentity {
             foreach ($project['users'] ?? [] as $candidate) if (($candidate['username'] ?? '') === ($_SESSION['user']['username'] ?? '') && self::localRole($candidate['role'] ?? '')) return $candidate;
             return null;
         }
+        if(($identity['kind']??'')==='customer'){
+            $aid=self::customerAccount();$a=$aid?(SaaSAccounts::snapshot()['accounts'][$aid]??null):null;
+            if(!$a||empty($a['projects'][(string)$project['id']]))return null;
+            foreach(self::accounts()['projects'][(string)$project['id']]??[] as $candidate){
+                if(($candidate['username']??'')===$a['owner']&&self::localRole($candidate['role']??'')&&hash_equals($a['owner_member']['password'],$candidate['password']??''))return $candidate;
+            }return null;
+        }
         if (!is_array($identity) || !in_array($identity['kind'] ?? '', ['password', 'otp'], true)) return null;
         $grant = $identity['grants'][(string)$project['id']] ?? null;
         if (!is_array($grant)) return null;
@@ -122,6 +143,7 @@ class SessionIdentity {
     public static function includePurchasedProject($project) {
         if(!is_array($project)||empty($project['id']))return false;
         $identity=$_SESSION['auth_identity']??[];
+        if(($identity['kind']??'')==='customer'){self::$accounts=null;return self::select($project,true);}
         if(!in_array($identity['kind']??'', ['password','otp'],true))return false;
         self::$accounts=null;
         $targets=self::accounts()['projects'][$project['id']]??[];
@@ -162,6 +184,14 @@ class SessionIdentity {
     }
 
     /** Revoke removed/reset accounts and refresh roles before any controller runs. */
+    public static function selectCreated($pid,$anchor){
+        if(isMainAdmin()){self::$accounts=null;return self::select(getCurrentProject($pid,true),true);}
+        if(self::customerAccount()){self::$accounts=null;return self::select(getCurrentProject($pid,true),true);}
+        $source=self::member(getCurrentProject($anchor,true));if(!$source)return false;
+        self::$accounts=null;$project=getCurrentProject($pid,true);$identity=$_SESSION['auth_identity'];$found=null;
+        foreach($project['users']??[] as $m)if($m['username']===$source['username']&&hash_equals($m['password'],$source['password']))$found=$m;
+        if(!$found)return false;$_SESSION['auth_identity']['grants'][$pid]=['username'=>$found['username'],'proof'=>self::proof($found,$identity['kind'])];return self::select($project,true);
+    }
     public static function refresh() {
         if (!isset($_SESSION['user'])) return;
         $identity = $_SESSION['auth_identity'] ?? null;
@@ -190,6 +220,12 @@ class SessionIdentity {
             if (!$account || !in_array($role, ['owner', 'main_admin', 'superadmin'], true) || !hash_equals($identity['proof'] ?? '', self::proof($account, 'password'))) { self::clear(); return; }
             $_SESSION['user'] = ['username' => $account['username'], 'role' => $role];
             return;
+        }
+        if(($identity['kind']??'')==='customer'){
+            $aid=self::customerAccount();if(!$aid){self::clear();return;}
+            $member=self::member(['id'=>(string)($_SESSION['project_id']??'')]);
+            if($member)$_SESSION['user']=$member;
+            else{unset($_SESSION['project_id']);$_SESSION['user']=['username'=>SaaSAccounts::snapshot()['accounts'][$aid]['owner'],'role'=>'customer','permissions'=>[]];$_SESSION['project_selection_required']=true;}return;
         }
         if (($identity['kind'] ?? '') === 'otp' && empty($identity['grants'])) return;
         $member = self::member(['id' => (string)($_SESSION['project_id'] ?? '')]);

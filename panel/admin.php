@@ -139,7 +139,11 @@ if (isSuperAdmin()) {
                 'badge' => trim($p_data['badge'] ?? ''),
                 'featured' => !empty($p_data['featured']),
                 'features' => array_values($feats),
-                'modules'=>ProjectPlans::modules(['id'=>$p_id,'modules'=>array_values(array_filter((array)($p_data['modules']??[]),'is_string'))])
+                'modules'=>ProjectPlans::modules(['id'=>$p_id,'modules'=>array_values(array_filter((array)($p_data['modules']??[]),'is_string'))]),
+                'max_projects'=>(int)($p_data['max_projects']??ProjectPlans::find($p_id)['max_projects']??SaaSAccounts::planLimits(ProjectPlans::find($p_id))['projects']),
+                'max_members'=>(int)($p_data['max_members']??ProjectPlans::find($p_id)['max_members']??SaaSAccounts::planLimits(ProjectPlans::find($p_id))['seats']),
+                'storage_mb'=>(int)($p_data['storage_mb']??ProjectPlans::find($p_id)['storage_mb']??SaaSAccounts::planLimits(ProjectPlans::find($p_id))['storage_mb']),
+                'nahal_projects'=>(int)($p_data['nahal_projects']??ProjectPlans::find($p_id)['nahal_projects']??0)
             ];
         }
         if (!empty($saved)) {
@@ -845,15 +849,15 @@ $sections_json
     if ($action === 'tiam_test_connection') {
         $cfg = [
             'vpn_enabled' => isset($_POST['vpn_enabled']) && ($_POST['vpn_enabled'] == '1' || $_POST['vpn_enabled'] === 'true'),
-            'vpn_server_ip' => trim($_POST['vpn_server_ip'] ?? '79.127.70.17'),
-            'vpn_username' => trim($_POST['vpn_username'] ?? 'ehsan'),
-            'vpn_password' => trim($_POST['vpn_password'] ?? '12345'),
-            'vpn_secret' => trim($_POST['vpn_secret'] ?? '4747'),
-            'vpn_subnet' => trim($_POST['vpn_subnet'] ?? '192.168.2.0/24'),
-            'erp_server_ip' => trim($_POST['erp_server_ip'] ?? '192.168.2.205'),
+            'vpn_server_ip' => trim($_POST['vpn_server_ip'] ?? ''),
+            'vpn_username' => trim($_POST['vpn_username'] ?? ''),
+            'vpn_password' => trim($_POST['vpn_password'] ?? ''),
+            'vpn_secret' => trim($_POST['vpn_secret'] ?? ''),
+            'vpn_subnet' => trim($_POST['vpn_subnet'] ?? ''),
+            'erp_server_ip' => trim($_POST['erp_server_ip'] ?? ''),
             'erp_port' => intval($_POST['erp_port'] ?? 8080),
-            'erp_username' => trim($_POST['erp_username'] ?? 'marketing-bi-user'),
-            'erp_password' => trim($_POST['erp_password'] ?? '5Tz@1239n@Ns9'),
+            'erp_username' => trim($_POST['erp_username'] ?? ''),
+            'erp_password' => trim($_POST['erp_password'] ?? ''),
             'erp_protocol' => trim($_POST['erp_protocol'] ?? 'auto'),
             'endpoint' => trim($_POST['endpoint'] ?? ''),
             'api_key' => trim($_POST['api_key'] ?? ''),

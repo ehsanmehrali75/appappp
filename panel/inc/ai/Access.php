@@ -26,9 +26,9 @@ class AiAccess {
     public static function write(){if(!ModuleProjectAccess::allowed('products','products','ai_connect','use'))throw new RuntimeException('مجوز استفاده از اتصال هوشمند فعال نیست.');self::need('products','use');}
     public static function need($feature,$mode='view'){if(!canAccessFeature($feature,$mode))throw new RuntimeException('دسترسی به این داده یا عملیات مجاز نیست.');}
     public static function scopes($requested) {
-        $known=['project.read','content.write','reports.write','datasets.write','social.write'];$scopes=array_values(array_unique(array_filter(explode(' ',trim($requested)))));
+        $known=['project.read','content.write','reports.write','datasets.write','social.write','website.write'];$scopes=array_values(array_unique(array_filter(explode(' ',trim($requested)))));
         if(!$scopes||array_diff($scopes,$known)||!in_array('project.read',$scopes,true))throw new RuntimeException('دامنهٔ دسترسی معتبر نیست.');
-        if(array_intersect($scopes,['content.write','reports.write','datasets.write','social.write']))self::write();
+        if(array_intersect($scopes,['content.write','reports.write','datasets.write','social.write','website.write']))self::write();
         return $scopes;
     }
     public static function scope($grant,$scope){if(!in_array($scope,$grant['scopes']??[],true))throw new RuntimeException('این اتصال اجازهٔ عملیات درخواستی را ندارد.');}

@@ -2,9 +2,10 @@
 class AiHttp {
     public static function json($url,$payload,$headers=[]) {
         if(!function_exists('curl_init'))throw new RuntimeException('افزونهٔ cURL روی هاست لازم است.');
-        $allowed=['backend.composio.dev','api.openai.com','payment.zarinpal.com','sandbox.zarinpal.com'];$p=parse_url($url);
+        $allowed=['backend.composio.dev','api.openai.com','api.anthropic.com','api.avalai.ir','payment.zarinpal.com','sandbox.zarinpal.com'];$p=parse_url($url);
         if(($p['scheme']??'')!=='https'||!in_array($p['host']??'',$allowed,true))throw new RuntimeException('مقصد سرویس مجاز نیست.');
         $body='';$ch=curl_init($url);curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>json_encode($payload,JSON_UNESCAPED_UNICODE),CURLOPT_HTTPHEADER=>array_merge(['Content-Type: application/json','Accept: application/json'],$headers),CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_CONNECTTIMEOUT=>6,CURLOPT_TIMEOUT=>24,CURLOPT_WRITEFUNCTION=>static function($ch,$part)use(&$body){if(strlen($body)+strlen($part)>3*1024*1024)return 0;$body.=$part;return strlen($part);}]);
+        if($payload===null)curl_setopt($ch,CURLOPT_HTTPGET,true);
         $ok=curl_exec($ch);$status=(int)curl_getinfo($ch,CURLINFO_HTTP_CODE);curl_close($ch);
         if($ok===false)throw new RuntimeException('ارتباط سرویس قطع شد؛ وضعیت مصرف باید بررسی شود.');
         $decoded=json_decode($body,true);return ['status'=>$status,'body'=>is_array($decoded)?$decoded:[]];

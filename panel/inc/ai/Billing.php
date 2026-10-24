@@ -6,6 +6,7 @@ class AiBilling {
     public function __construct($store,$http=null){$this->store=$store;$this->http=$http?:[AiHttp::class,'json'];}
     public static function available($state,$owner){$wallet=$state['wallets'][$owner]??[];return (int)($wallet['balance']??0)-(int)($wallet['reserved']??0);}
     public function checkout($principal,$amount) {
+        if(SaaSAccounts::projectAccount($principal['project']))throw new RuntimeException('شارژ این حساب از بسته‌های کردیت حساب مشتری انجام می‌شود.');
         if(!is_int($amount)||$amount<10000||$amount>100000000)throw new RuntimeException('شارژ باید بین ۱۰ هزار و ۱۰۰ میلیون ریال باشد.');
         $settings=getSiteSettings();if(empty($settings['zarinpal_enabled'])||empty($settings['zarinpal_merchant_id']))throw new RuntimeException('درگاه پرداخت هنوز توسط ادمین تنظیم نشده است.');
         $id=bin2hex(random_bytes(16));$sandbox=!empty($settings['zarinpal_sandbox']);$currency=strtoupper($settings['zarinpal_currency']??'IRT');$gatewayAmount=$currency==='IRT'?(int)ceil($amount/10):$amount;$credit=$currency==='IRT'?$gatewayAmount*10:$amount;

@@ -1,0 +1,4 @@
+<?php
+require_once __DIR__.'/inc/ai/Bootstrap.php';require_once __DIR__.'/inc/saas/Commerce.php';header('Cache-Control: no-store');header('Referrer-Policy: no-referrer');
+try{(new SaaSCommerce())->verify($_GET['id']??'',$_GET['Authority']??'',$_GET['Status']??'');$message='پرداخت تأیید شد و خرید به حساب شما اضافه شد.';}catch(Throwable $e){http_response_code(422);$message=$e instanceof RuntimeException?$e->getMessage():'پرداخت تأیید نشد؛ وضعیت را از پشتیبانی پیگیری کنید.';}
+?><!doctype html><html dir="rtl" lang="fa"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>نتیجهٔ پرداخت</title><link rel="stylesheet" href="/panel/assets/workspace-shell.css"></head><body class="workspace-page"><main class="workspace-shell"><h1>نتیجهٔ خرید</h1><p role="status"><?=htmlspecialchars($message,ENT_QUOTES,'UTF-8')?></p><a href="/panel/account.php">بازگشت به حساب مشتری</a></main></body></html>

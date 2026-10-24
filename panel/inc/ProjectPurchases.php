@@ -13,6 +13,7 @@ class ProjectPurchases {
         else{
             $username=trim($input['account_username']??'');$raw=$input['account_password']??'';
             if(!preg_match('/^[A-Za-z0-9_.-]{3,60}$/D',$username)||!is_string($raw)||strlen($raw)<10||strlen($raw)>72)throw new RuntimeException('نام کاربری ۳ تا ۶۰ کاراکتر و رمز حداقل ۱۰ کاراکتر لازم است.');
+            foreach(SaaSAccounts::snapshot()['accounts']??[] as $existingAccount)if(($existingAccount['owner']??'')===$username)throw new RuntimeException('این حساب قبلاً ثبت شده؛ ابتدا وارد حساب خود شوید.');
             foreach(getDB()['projects']??[] as $p)foreach($p['users']??[] as $u)if(($u['username']??'')===$username)throw new RuntimeException('این نام کاربری قبلاً ثبت شده؛ ابتدا با حساب خود وارد شوید.');
             foreach(getDB()['super_users']??[] as $u)if(($u['username']??'')===$username)throw new RuntimeException('نام کاربری در دسترس نیست.');
             if(isset(SystemAdmins::all()[$username]))throw new RuntimeException('نام کاربری در دسترس نیست.');
@@ -22,6 +23,7 @@ class ProjectPurchases {
         return ['username'=>$username,'password'=>$password,'mobile'=>$mobile,'role'=>'project_admin','permissions'=>['all'],'panel_access'=>['admin','portal']];
     }
     public function start($input,$site,$callback,$request=null) {
+        if(isUser()&&!isMainAdmin()&&(new SaaSAccounts())->owned())throw new RuntimeException('اشتراک حساب دارید؛ برای تمدید، ارتقا یا ساخت پروژه از صفحهٔ حساب و اشتراک اقدام کنید.');
         if(empty($site['zarinpal_enabled'])||empty($site['zarinpal_merchant_id']))throw new RuntimeException('درگاه پرداخت آماده نیست؛ با پشتیبانی تماس بگیرید.');
         if(!empty($site['zarinpal_sandbox'])&&!isMainAdmin())throw new RuntimeException('درگاه در حالت آزمایشی است؛ خرید واقعی هنوز فعال نشده است.');
         if(($input['payment_gateway']??'zarinpal')!=='zarinpal')throw new RuntimeException('درگاه پرداخت معتبر نیست.');
@@ -42,7 +44,7 @@ class ProjectPurchases {
                 if(empty($row['payment_url'])){if(($row['prepared_at']??0)<time()-120)continue;throw new RuntimeException('درخواست پرداخت قبلی در حال آماده‌سازی است؛ کمی بعد دوباره تلاش کنید.');}
                 return ['order'=>$row['receipt'],'payment_url'=>$row['payment_url']];
             }
-            $s['orders'][$order['order_id']]=['prepared_at'=>time(),'request_key'=>$requestKey,'receipt'=>$order,'account'=>$account,'modules'=>ProjectPlans::modules($plan),'gateway'=>array_intersect_key($site,array_flip(['zarinpal_merchant_id','zarinpal_sandbox','zarinpal_currency']))];return null;
+            $s['orders'][$order['order_id']]=['prepared_at'=>time(),'request_key'=>$requestKey,'receipt'=>$order,'account'=>$account,'plan_snapshot'=>$plan,'modules'=>ProjectPlans::modules($plan),'gateway'=>array_intersect_key($site,array_flip(['zarinpal_merchant_id','zarinpal_sandbox','zarinpal_currency']))];return null;
         });
         if($reused)return $reused;
         saveOrder($order);
@@ -80,6 +82,8 @@ class ProjectPurchases {
                 ProjectMembers::prepareStorage();
                 if(!db_save_project($p))throw new RuntimeException('پرداخت تأیید شد ولی ساخت پروژه تکمیل نشد؛ دوباره همین رسید را باز کنید.');
             }elseif(($existing['settings']['subscription']['order_id']??'')!==$id)throw new RuntimeException('شناسهٔ پروژه با سفارش مطابقت ندارد.');
+            require_once __DIR__.'/saas/Accounts.php';$account=(new SaaSAccounts())->provision($o,$row['account'],$row['plan_snapshot']??ProjectPlans::find($o['plan_id']),$pid,strtotime($existing['activeTo']??($o['billing_cycle']==='yearly'?'+1 year':'+1 month')));
+            ProjectOnboarding::mutate($pid,function(&$p)use($account){$p['settings']['subscription']['account_id']=$account['id'];});
             $row['project_id']=$pid;$o['project_id']=$pid;return $o;
     }
 

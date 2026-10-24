@@ -122,9 +122,9 @@ class ModuleProjectAccess(unittest.TestCase):
         self.assertEqual(self.post(opener, '', path, payload)[0], 403)
         self.assertEqual(self.post(opener, token, path.replace('business=p','business=q'), payload)[0], 403)
         code, body = self.post(opener, token, path, payload)
-        self.assertEqual(code, 200)
-        self.assertTrue(json.loads(body)['success'])
-        self.assertEqual(json.loads(body)['connection']['business_id'], 'p')
+        self.assertEqual(code, 410)
+        self.assertEqual(json.loads(body)['status'], 'retired')
+        self.assertFalse((self.private/'seo_warehouse.json').exists() and 'fixture-integration' in (self.private/'seo_warehouse.json').read_text())
 
     def test_viewer_can_read_but_cannot_mutate_even_with_csrf(self):
         opener, token = self.case.login('viewer')

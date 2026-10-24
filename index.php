@@ -226,6 +226,13 @@ if(isset($_POST['login'])&&!LoginThrottle::check(trim((string)($_POST['user']??'
         }
     }
     
+    $customer=SaaSAccounts::authenticate($u,$p);
+    if($customer){
+        LoginThrottle::check($u,true);session_regenerate_id(true);SessionIdentity::beginCustomer($customer);
+        $purchased=$_SESSION['purchase_project_id']??'';
+        if($purchased&&SessionIdentity::select(getCurrentProject($purchased,true),true)){unset($_SESSION['purchase_project_id'],$_SESSION['project_selection_required']);redirect(ProjectOnboarding::url($purchased));}
+        redirect('/panel/workspace.php');
+    }
     foreach ($db['projects'] as $project) {
         if (!isset($project['users'])) continue;
         foreach ($project['users'] as $user) {

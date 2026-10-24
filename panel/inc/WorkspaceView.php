@@ -12,8 +12,12 @@ class WorkspaceView {
         if(isMainAdmin())$html.='<option value="__central__" '.($central||$pid===''?'selected':'').'>مدیریت مرکزی</option>';
         foreach(ProjectSelection::projects() as $p)$html.='<option value="'.self::h($p['id']).'" '.(!$central&&$pid===$p['id']?'selected':'').'>'.self::h($p['name']).'</option>';
         $html.='</select></label><button class="workspace-switch-button" type="submit">تغییر پروژه '.self::icon('arrow').'</button></form><div class="workspace-shortcuts">';
+        if(!$central&&$pid!==''&&canAccessManagement()&&(canAccessFeature('ai_connect','view')||canAccessFeature('settings','view')||canAccessFeature('extract','view')||canAccessFeature('wp_crm','view')))$html.='<a class="workspace-backup-link" href="/panel/connections.php?project='.rawurlencode($pid).'">'.self::icon('grid').'<span>مرکز اتصال‌ها</span></a>';
         if(!$central&&$pid!==''&&canAccessManagement()&&canAccessFeature('wp_crm','view'))$html.='<a class="workspace-key-link" href="/panel/wp-crm.php?project='.rawurlencode($pid).'&view=connection#api-key">'.self::icon('key').'<span>اتصال وردپرس <small>و کلید API</small></span></a>';
         if(!$central&&$pid!==''&&canAccessManagement()&&(isMainAdmin()||isProjectAdmin()))$html.='<a class="workspace-backup-link" href="/panel/backups.php?project='.rawurlencode($pid).'">'.self::icon('box').'<span>بک‌آپ و بازیابی</span></a>';
+        if(isUser())$html.='<a class="workspace-backup-link" href="/panel/account.php">'.self::icon('box').'<span>حساب و اشتراک</span></a>';
+        if(isMainAdmin())$html.='<a class="workspace-backup-link" href="/panel/saas-admin.php">'.self::icon('building').'<span>حساب‌ها و مدل‌های مرکزی</span></a>';
+        if(!$central&&$pid!==''&&canAccessFeature('products','view')&&canAccessFeature('ai_connect','view'))$html.='<a class="workspace-backup-link" href="/panel/employees.php?project='.rawurlencode($pid).'">'.self::icon('grid').'<span>کارمندهای هوشمند</span></a>';
         return $html.'</div></div></nav>';
     }
 }

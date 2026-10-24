@@ -8,7 +8,7 @@ header('Content-Type: application/json');
 $db = getDB();
 
 // 1. Get Project ID from query parameter
-$projectId = $_GET['project'] ?? 'default';
+$projectId = $_GET['project'] ?? '';
 $platform = $_GET['platform'] ?? ''; // telegram, bale
 
 // Find the target project
@@ -22,16 +22,6 @@ foreach ($db['projects'] as $idx => $p) {
     }
 }
 
-if (!$project && !empty($db['projects'])) {
-    // Falback to first if not matches explicitly
-    $project = reset($db['projects']);
-    foreach ($db['projects'] as $idx => $p) {
-        if ($p['id'] === $project['id']) {
-            $projectIdx = $idx;
-            break;
-        }
-    }
-}
 
 if (!$project) {
     echo json_encode(['ok' => false, 'error' => 'پروژه مربوطه یافت نشد']);
@@ -46,157 +36,7 @@ addDebugLog('WEBHOOK_INCOMING', "Incoming text from platform: $platform for Proj
 
 // INTERCEPT SOCIAL MEDIA STATISTICS SYNC PLATFORM
 if ($platform === 'social_sync') {
-    $store_id = $_GET['store_id'] ?? '';
-    // Find store index
-    $store_index = -1;
-    if (isset($project['settings']['stores']) && is_array($project['settings']['stores'])) {
-        foreach ($project['settings']['stores'] as $idx => $st) {
-            if ($st['id'] === $store_id || empty($store_id)) {
-                $store_index = $idx;
-                break;
-            }
-        }
-    }
-    
-    // Extract counters from raw payload
-    $telegramVal = intval($payload['telegram'] ?? $payload['tg_members'] ?? null);
-    $baleVal = intval($payload['bale'] ?? $payload['bl_members'] ?? null);
-    $rubikaVal = intval($payload['rubika'] ?? $payload['rb_members'] ?? null);
-    $instagramVal = intval($payload['instagram'] ?? $payload['ig_followers'] ?? null);
-    
-    // Fallbacks if not provided
-    if ($telegramVal === null && $store_index !== -1) {
-        $telegramVal = intval($project['settings']['stores'][$store_index]['seo_tools']['config']['social_members_tg'] ?? 1500);
-    }
-    if ($baleVal === null && $store_index !== -1) {
-        $baleVal = intval($project['settings']['stores'][$store_index]['seo_tools']['config']['social_members_bale'] ?? 4900);
-    }
-    if ($rubikaVal === null && $store_index !== -1) {
-        $rubikaVal = intval($project['settings']['stores'][$store_index]['seo_tools']['config']['social_members_rubika'] ?? 8200);
-    }
-    if ($instagramVal === null && $store_index !== -1) {
-        $instagramVal = intval($project['settings']['stores'][$store_index]['seo_tools']['config']['social_members_ig'] ?? 46000);
-    }
-
-    $clicksVal = intval($payload['clicks'] ?? $payload['search_console_clicks'] ?? 1450);
-    $impressionsVal = intval($payload['impressions'] ?? $payload['search_console_impressions'] ?? 22400);
-    $visitsVal = intval($payload['visits'] ?? $payload['analytics_visits'] ?? 4800);
-    $viewsVal = intval($payload['views'] ?? $payload['pageviews'] ?? 12400);
-    
-    // Generate Jalali Date
-    $jalali_str = '1405-' . date('m-d');
-    
-    // Setup record array to insert or merge
-    $newRecord = [
-        'date' => $jalali_str,
-        'is_manual' => false,
-        'telegram' => [
-            'members' => $telegramVal ?: 1500,
-            'posts_count' => rand(2, 5),
-            'views' => ($telegramVal ?: 1500) * rand(3, 8),
-        ],
-        'instagram' => [
-            'followers' => $instagramVal ?: 46000,
-            'posts_count' => rand(1, 3),
-            'likes' => ($instagramVal ?: 46000) * 0.05,
-            'engagement' => '5.2%',
-            'reels_views' => ($instagramVal ?: 46000) * 0.15,
-            'bio_clicks' => ($instagramVal ?: 46000) * 0.01,
-            'reach' => ($instagramVal ?: 46000) * 0.22,
-            'impressions' => ($instagramVal ?: 46000) * 0.35,
-            'comments' => ($instagramVal ?: 46000) * 0.002,
-            'saves' => ($instagramVal ?: 46000) * 0.005,
-            'shares' => ($instagramVal ?: 46000) * 0.003,
-            'gender_men' => 48.5,
-            'gender_women' => 51.5,
-            'top_ages' => '25-34 (48%)',
-            'top_cities' => 'تهران، مشهد'
-        ],
-        'rubika' => [
-            'members' => $rubikaVal ?: 8200,
-            'posts_count' => rand(2, 5),
-            'views' => ($rubikaVal ?: 8200) * rand(2, 6),
-            'messages' => rand(15, 45)
-        ],
-        'bale' => [
-            'members' => $baleVal ?: 4900,
-            'posts_count' => rand(2, 5),
-            'views' => ($baleVal ?: 4900) * rand(2, 6),
-            'messages' => rand(15, 45)
-        ],
-        'website' => [
-            'search_console_clicks' => $clicksVal,
-            'search_console_impressions' => $impressionsVal,
-            'search_console_ctr' => $impressionsVal > 0 ? round(($clicksVal / $impressionsVal) * 100, 2) : 3.4,
-            'search_console_position' => 4.2,
-            'analytics_visits' => $visitsVal,
-            'analytics_users' => intval($visitsVal * 0.85),
-            'analytics_sessions' => intval($visitsVal * 1.1),
-            'analytics_engagement' => 64.5,
-            'analytics_conversion' => 2.1,
-            'pageviews' => $viewsVal,
-            'seo_status' => 'سالم و بهینه'
-        ]
-    ];
-    
-    // Save to target index or root
-    if ($store_index !== -1) {
-        if (!isset($project['settings']['stores'][$store_index]['analytics_history'])) {
-            $project['settings']['stores'][$store_index]['analytics_history'] = [];
-        }
-        
-        $foundIndex = -1;
-        foreach($project['settings']['stores'][$store_index]['analytics_history'] as $hKey => $hist) {
-            if (($hist['date'] ?? '') === $jalali_str) {
-                $foundIndex = $hKey;
-                break;
-            }
-        }
-        if ($foundIndex !== -1) {
-            $project['settings']['stores'][$store_index]['analytics_history'][$foundIndex] = $newRecord;
-        } else {
-            $project['settings']['stores'][$store_index]['analytics_history'][] = $newRecord;
-        }
-        
-        // Also update configuration fallback values
-        if (!isset($project['settings']['stores'][$store_index]['seo_tools']['config'])) {
-            $project['settings']['stores'][$store_index]['seo_tools']['config'] = [];
-        }
-        $project['settings']['stores'][$store_index]['seo_tools']['config']['social_members_tg'] = $telegramVal ?: 1500;
-        $project['settings']['stores'][$store_index]['seo_tools']['config']['social_members_bale'] = $baleVal ?: 4900;
-        $project['settings']['stores'][$store_index]['seo_tools']['config']['social_members_rubika'] = $rubikaVal ?: 8200;
-        $project['settings']['stores'][$store_index]['seo_tools']['config']['social_members_ig'] = $instagramVal ?: 46000;
-        
-    } else {
-        if (!isset($project['settings']['analytics_history'])) {
-            $project['settings']['analytics_history'] = [];
-        }
-        $foundIndex = -1;
-        foreach($project['settings']['analytics_history'] as $hKey => $hist) {
-            if (($hist['date'] ?? '') === $jalali_str) {
-                $foundIndex = $hKey;
-                break;
-            }
-        }
-        if ($foundIndex !== -1) {
-            $project['settings']['analytics_history'][$foundIndex] = $newRecord;
-        } else {
-            $project['settings']['analytics_history'][] = $newRecord;
-        }
-    }
-    
-    // Save project changes
-    $db['projects'][$projectIdx] = $project;
-    saveDB($db);
-    
-    echo json_encode([
-        'ok' => true, 
-        'status' => 'success', 
-        'message' => 'همگام‌سازی اطلاعات آماری شبکه‌های اجتماعی تندرست با موفقیت اعمال شد.', 
-        'date' => $jalali_str,
-        'record' => $newRecord
-    ]);
-    exit;
+    http_response_code(410);echo json_encode(['ok'=>false,'error'=>'مسیر قدیمی آمار غیرفعال است؛ داده را با توکن منبع پروژه به integration_ingest.php ارسال کنید.'],JSON_UNESCAPED_UNICODE);exit;
 }
 
 if (!$payload) {

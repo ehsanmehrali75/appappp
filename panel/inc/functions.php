@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__.'/saas/Accounts.php';
+require_once __DIR__.'/saas/Roles.php';
 /**
  * Maarksho Flow v3 - Core Functions
  * اصلاح شده با پشتیبانی کامل از API بله و رفع مشکلات امنیتی
@@ -559,7 +561,7 @@ function getCurrentProject($id = null, $forceReload = false) {
 
     static $memory_cache = [];
     if (!$forceReload && isset($memory_cache[$id])) {
-        return $memory_cache[$id];
+        return SaaSAccounts::decorate($memory_cache[$id]);
     }
 
     if (isSqlActive()) {
@@ -584,7 +586,7 @@ function getCurrentProject($id = null, $forceReload = false) {
                 ProductApprovalFlow::normalizeRejections($cached_project);
                 $GLOBALS['LAST_LOADED_PROJECT'] = $cached_project;
                 $memory_cache[$id] = $cached_project;
-                return $cached_project;
+                return SaaSAccounts::decorate($cached_project);
             }
         }
         
@@ -770,7 +772,7 @@ function getCurrentProject($id = null, $forceReload = false) {
 
         $GLOBALS['LAST_LOADED_PROJECT'] = $project;
         $memory_cache[$id] = $project;
-        return $project;
+        return SaaSAccounts::decorate($project);
     } else {
         $db = getJsonDB();
         foreach ($db['projects'] as &$p) {
@@ -793,7 +795,7 @@ function getCurrentProject($id = null, $forceReload = false) {
                 ProductApprovalFlow::normalizeRejections($p);
                 autoApprovePendingProducts($p);
                 $GLOBALS['LAST_LOADED_PROJECT'] = $p;
-                return $p;
+                return SaaSAccounts::decorate($p);
             }
         }
     }
@@ -1236,11 +1238,14 @@ function hasPermission($perm, $mode = null) {
     $project = getCurrentProject();
     $member = SessionIdentity::member($project);
     if (!$member) return false;
+    if (!SaaSAccounts::allowsProject($project,$key)) return false;
     if (!checkModuleSettingAccess($key, $project['settings'] ?? [])) return false;
     if (!AccessControl::allowed($key, $mode)) return false;
+    $roleDecision=SaaSRoles::decision($project,$member,$key,$mode);
+    if($roleDecision===false)return false;
     $permissions = array_map([AccessControl::class, 'featureKey'], $member['permissions'] ?? []);
     $legacyPermission = ['seo_intel' => 'analysis', 'seo_classic' => 'analysis', 'sale_analysis' => 'analysis'][$key] ?? $key;
-    $base = ($member['role'] ?? '') === 'project_admin' || in_array($key, $permissions, true) || in_array($legacyPermission, $permissions, true);
+    $base = $roleDecision===true || ($member['role'] ?? '') === 'project_admin' || in_array($key, $permissions, true) || in_array($legacyPermission, $permissions, true);
     // An operation grant does not by itself create visibility when view inherits
     // the member's normal permissions. Both levels must be granted.
     $view = AccessControl::audience($key, 'view', $member, $project['id']);
@@ -1250,7 +1255,7 @@ function hasPermission($perm, $mode = null) {
     for ($parent = AccessControl::parentFeature($key); $parent !== null; $parent = AccessControl::parentFeature($parent)) {
         if ($base && AccessControl::audience($parent, 'use', $member, $project['id']) === true) return true;
     }
-    if (($member['role'] ?? '') === 'viewer') return false;
+    if (($member['role'] ?? '') === 'viewer' && $roleDecision!==true) return false;
     return $base;
 }
 
@@ -6763,18 +6768,18 @@ function getSiteSettings() {
         'logo_icon' => 'M',
         'hero_title' => 'تمامی ابزارهای فروش و هوش مصنوعی کسب‌وکار شما در یک پنل',
         'hero_subtitle' => 'با مارکشو فلو کاتالوگ آنلاین، مدیریت مشتریان (CRM)، ویجت چت هوشمند، پرامپت هاب و ابزارهای تولید محتوا را یکجا در اختیار داشته باشید.',
-        'hero_cta_text' => 'شروع رایگان و مشاهده دمو',
+        'hero_cta_text' => 'مشاهدهٔ پلن‌ها و شروع کار',
         'hero_cta_secondary' => 'مشاهده تعرفه‌ها و خرید اشتراک',
-        'phone' => '۰۲۱-۹۱۰۰۱۲۳۴',
-        'mobile' => '۰۹۱۲۰۰۰۰۰۰۰',
-        'email' => 'info@maarksho.com',
-        'address' => 'تهران، خیابان آزادی، ناحیه نوآوری شریف، برج فناوری مارکشو، طبقه ۴',
+        'phone' => '',
+        'mobile' => '',
+        'email' => '',
+        'address' => '',
         'telegram' => 'maarksho_support',
         'instagram' => 'maarksho.official',
-        'whatsapp' => '989120000000',
-        'enamad_code' => '12345678',
+        'whatsapp' => '',
+        'enamad_code' => '',
         'enamad_url' => 'https://enamad.ir',
-        'enamad_enabled' => true,
+        'enamad_enabled' => false,
         'about_title' => 'درباره مارکشو فلو',
         'about_text' => 'مارکشو فلو یک اکوسیستم پیشرفته ابزارهای دیجیتال، مدیریت محتوا و هوش مصنوعی برای کسب‌وکارهای آنلاین، فروشگاه‌ها و تیم‌های مارکتینگ است. ما با هدف آسان‌سازی فرآیندهای فروش، تولید محتوا و ارتباط با مشتری، پیشرفته‌ترین ابزارها را در اختیارتان قرار می‌دهیم.',
         'terms_text' => 'با خرید هر یک از اشتراک‌ها، دسترسی کامل آنلاین به پنل ابزارها بر اساس مدت زمان انتخاب شده برای شما فعال می‌گردد. تمامی سفارشات دارای ۵ روز ضمانت بازگشت وجه کامل می‌باشند.',
@@ -7427,11 +7432,7 @@ function getProjectStorageUsage($projectOrId) {
     $dbPayload = json_encode($project, JSON_UNESCAPED_UNICODE);
     $usedBytes += strlen($dbPayload);
 
-    // Minimum baseline representation so empty projects show realistic small baseline (e.g. 15-45 MB)
-    $minBaseline = 15 * 1024 * 1024;
-    if ($usedBytes < $minBaseline && !empty($project['products'])) {
-        $usedBytes += count($project['products']) * 800 * 1024; // avg 800KB per product image
-    }
+    $privateBytes=0;foreach(SaaSAccounts::snapshot()['image_assets']??[] as $asset)if($asset['project']===$pid)$privateBytes+=(int)$asset['bytes'];$usedBytes+=$privateBytes;
 
     // Determine Quota
     $settings = $project['settings'] ?? [];
@@ -7450,6 +7451,7 @@ function getProjectStorageUsage($projectOrId) {
         }
     }
 
+    $account=SaaSAccounts::projectAccount($pid);if($account)$quotaMB=(int)($account['allocations'][$pid]??0);
     $quotaBytes = $quotaMB * 1024 * 1024;
     $usagePercent = min(100, round(($usedBytes / max(1, $quotaBytes)) * 100, 1));
     $isWarning = $usagePercent >= 80 && $usagePercent < 98;
@@ -7469,6 +7471,7 @@ function getProjectStorageUsage($projectOrId) {
         'used_bytes' => $usedBytes,
         'used_mb' => round($usedBytes / (1024 * 1024), 2),
         'formatted_used' => formatBytes($usedBytes),
+        'private_image_bytes'=>$privateBytes,
         'quota_mb' => $quotaMB,
         'quota_bytes' => $quotaBytes,
         'formatted_quota' => formatBytes($quotaBytes),
@@ -7576,7 +7579,7 @@ if (PHP_SAPI !== 'cli') {
     if(isUser()&&basename($_SERVER['SCRIPT_FILENAME']??'')!=='workspace.php') {
         $context=$_SERVER['HTTP_X_PROJECT_CONTEXT']??($_POST['_project_context']??($_GET['_project_context']??null));
         if($context!==null&&(!is_string($context)||$context!==($_SESSION['project_id']??'')))RequestSecurity::reject('پروژه تغییر کرده است؛ صفحه را تازه کنید.');
-        if(!empty($_SESSION['project_selection_required'])&&realpath($_SERVER['SCRIPT_FILENAME']??'')!==realpath(__DIR__.'/../../index.php')&&!in_array(basename($_SERVER['SCRIPT_FILENAME']??''),['support.php','logout.php','transfer-payment.php','ai_oauth.php','ai_mcp.php'],true)){if(($_SERVER['REQUEST_METHOD']??'GET')==='GET')redirect('/panel/workspace.php');RequestSecurity::reject('ابتدا پروژه را انتخاب کنید.');}
+        if(!empty($_SESSION['project_selection_required'])&&realpath($_SERVER['SCRIPT_FILENAME']??'')!==realpath(__DIR__.'/../../index.php')&&!in_array(basename($_SERVER['SCRIPT_FILENAME']??''),['support.php','logout.php','transfer-payment.php','ai_oauth.php','ai_mcp.php','account.php','account_payment.php','saas-admin.php'],true)){if(($_SERVER['REQUEST_METHOD']??'GET')==='GET')redirect('/panel/workspace.php');RequestSecurity::reject('ابتدا پروژه را انتخاب کنید.');}
         if(!isset($_SESSION['project_id'])&&in_array(basename($_SERVER['SCRIPT_FILENAME']??''),['sale.php','seo.php','prompthub.php','task_manager.php','user_chat.php','chat.php','portal.php','wp-crm.php','backups.php','onboarding.php','insights.php','data-hub.php','ai-connect.php'],true)){if(($_SERVER['REQUEST_METHOD']??'GET')==='GET')redirect('/panel/workspace.php');RequestSecurity::reject('ابتدا پروژه را انتخاب کنید.');}
         $explicit=$_GET['project']??$_GET['switch_project']??$_GET['project_id']??$_POST['project_id']??(basename($_SERVER['SCRIPT_FILENAME']??'')==='seo.php'?($_GET['pid']??null):null);
         if($explicit==='__support_account__'&&basename($_SERVER['SCRIPT_FILENAME']??'')==='support.php')$explicit=null;

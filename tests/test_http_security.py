@@ -70,6 +70,7 @@ class HttpSecurity(unittest.TestCase):
         cls.temp.cleanup()
 
     def setUp(self):
+        shutil.rmtree(self.app/'panel/db/accounts',ignore_errors=True)
         db = sqlite3.connect(self.database)
         db.execute('UPDATE projects SET settings=? WHERE id="p"', (json.dumps(self.settings),))
         db.execute('DELETE FROM products WHERE project_id="p"')
