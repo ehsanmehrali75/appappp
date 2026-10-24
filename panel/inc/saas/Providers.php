@@ -16,8 +16,11 @@ class SaaSProviders {
         if($key!==''&&(strlen($key)<20||strlen($key)>500||preg_match('/[\r\n]/',$key)))throw new RuntimeException('کلید API معتبر نیست.');
         if(!$key&&(($old['provider']??'')!==$provider||empty($old['key'])))throw new RuntimeException('برای ارائه‌دهندهٔ جدید کلید لازم است.');
         $encrypted=$key!==''?$this->accounts->store()->encrypt($key):$old['key'];
-        $row=['id'=>$id,'provider'=>$provider,'model'=>$model,'key'=>$encrypted,'max_output_tokens'=>$limit,'enabled'=>!empty($input['enabled']),'revision'=>bin2hex(random_bytes(16)),'updated_at'=>time()];
-        $this->accounts->change(function(&$s)use($id,$row){$s['central_providers'][$id]=$row;});
+        $credits=(int)($input['credits']??0);if(!empty($input['ehsan_enabled'])&&($credits<1||$credits>1000000))throw new RuntimeException('تعرفهٔ اجرای احسان لازم است.');
+        $description=trim($input['description']??'');if(mb_strlen($description)>500)throw new RuntimeException('معرفی مدل طولانی است.');
+        $instructions=trim($input['ehsan_instructions']??'');if(mb_strlen($instructions)>4000)throw new RuntimeException('راهنمای تخصصی مدل طولانی است.');
+        $row=['ehsan_instructions'=>$instructions,'description'=>$description,'ehsan_default'=>!empty($input['ehsan_default']),'credits'=>$credits,'ehsan_enabled'=>!empty($input['ehsan_enabled']),'id'=>$id,'provider'=>$provider,'model'=>$model,'key'=>$encrypted,'max_output_tokens'=>$limit,'enabled'=>!empty($input['enabled']),'revision'=>bin2hex(random_bytes(16)),'updated_at'=>time()];
+        $this->accounts->change(function(&$s)use($id,$row){if($row['ehsan_default'])foreach($s['central_providers']??[] as $other=>$value)$s['central_providers'][$other]['ehsan_default']=false;$s['central_providers'][$id]=$row;});
     }
     public function catalog(){self::central();$rows=$this->accounts->state()['central_providers']??[];foreach($rows as &$r){unset($r['key']);$r['configured']=true;}return $rows;}
     public static function request($provider,$model,$key,$prompt,$maxOutput=1024){

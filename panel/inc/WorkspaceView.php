@@ -17,7 +17,7 @@ class WorkspaceView {
         if(!$central&&$pid!==''&&canAccessManagement()&&(isMainAdmin()||isProjectAdmin()))$html.='<a class="workspace-backup-link" href="/panel/backups.php?project='.rawurlencode($pid).'">'.self::icon('box').'<span>بک‌آپ و بازیابی</span></a>';
         if(isUser())$html.='<a class="workspace-backup-link" href="/panel/account.php">'.self::icon('box').'<span>حساب و اشتراک</span></a>';
         if(isMainAdmin())$html.='<a class="workspace-backup-link" href="/panel/saas-admin.php">'.self::icon('building').'<span>حساب‌ها و مدل‌های مرکزی</span></a>';
-        if(!$central&&$pid!==''&&canAccessFeature('products','view')&&canAccessFeature('ai_connect','view'))$html.='<a class="workspace-backup-link" href="/panel/employees.php?project='.rawurlencode($pid).'">'.self::icon('grid').'<span>کارمندهای هوشمند</span></a>';
+        if(!$central&&$pid!==''&&canAccessFeature('ai_connect','view'))$html.='<a class="workspace-backup-link" href="/panel/my-employees.php?project='.rawurlencode($pid).'">'.self::icon('grid').'<span>کارمندهای هوشمند</span></a><a class="workspace-backup-link" href="/panel/ehsan.php?project='.rawurlencode($pid).'">احسان / تحلیل جامع</a>';
         return $html.'</div></div></nav>';
     }
 }
