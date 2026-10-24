@@ -1017,6 +1017,8 @@ if (isset($_GET['action'])) {
                     });
                 }
 
+                if ((!t.assignees || !t.assignees.length) && t.assignment_state === 'needs_assignee') assigneesHtml += '<span class="text-xs text-amber-700">نیازمند تعیین مسئول</span>';
+                if (t.aria_calendar_paused) assigneesHtml += '<span class="text-xs text-rose-600">تقویم آریا متوقف است</span>';
                 let subProgressHtml = '';
                 if (totalSubs > 0) {
                     subProgressHtml = `

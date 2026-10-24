@@ -144,7 +144,8 @@ if (isSuperAdmin()) {
                 'max_members'=>(int)($p_data['max_members']??ProjectPlans::find($p_id)['max_members']??SaaSAccounts::planLimits(ProjectPlans::find($p_id))['seats']),
                 'storage_mb'=>(int)($p_data['storage_mb']??ProjectPlans::find($p_id)['storage_mb']??SaaSAccounts::planLimits(ProjectPlans::find($p_id))['storage_mb']),
                 'nahal_projects'=>(int)($p_data['nahal_projects']??ProjectPlans::find($p_id)['nahal_projects']??0),
-                'ehsan_projects'=>(int)($p_data['ehsan_projects']??ProjectPlans::find($p_id)['ehsan_projects']??0)
+                'ehsan_projects'=>(int)($p_data['ehsan_projects']??ProjectPlans::find($p_id)['ehsan_projects']??0),
+                'aria_projects'=>(int)($p_data['aria_projects']??ProjectPlans::find($p_id)['aria_projects']??0)
             ];
         }
         if (!empty($saved)) {

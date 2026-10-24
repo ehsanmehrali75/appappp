@@ -3,9 +3,9 @@
 class SaaSUsage {
     public static function project($state,$pid){
         $out=['charged'=>0,'reserved'=>0,'uncertain'=>0,'requests'=>0,'models'=>[]];
-        foreach(['ehsan_jobs'=>'ehsan','image_jobs'=>'nahal'] as $table=>$employee)foreach($state[$table]??[] as $id=>$job){
+        foreach(['ehsan_jobs'=>'ehsan','aria_jobs'=>'aria','image_jobs'=>'nahal'] as $table=>$employee)foreach($state[$table]??[] as $id=>$job){
             if(($job['project']??'')!==$pid)continue;
-            $profile=$job['model_profile']??[];$current=$state[$employee==='ehsan'?'central_providers':'image_models'][$job['model']??'']??[];
+            $profile=$job['model_profile']??[];$current=$state[$employee!=='nahal'?'central_providers':'image_models'][$job['model']??'']??[];
             // Historic jobs without an immutable profile cannot be attributed to a changed connection.
             if(!$profile&&($current['revision']??null)===($job['model_revision']??null))$profile=$current;
             $provider=$profile['provider']??'unknown';$model=$profile['model']??($job['model']??'unknown');$key=$employee.'|'.$provider.'|'.$model;
@@ -21,6 +21,6 @@ class SaaSUsage {
         $u=self::project($state,$pid);$h=$escape;
         echo '<p>مصرف تسویه‌شده: <b>'.number_format($u['charged']).'</b> کردیت · رزرو: '.number_format($u['reserved']).' · از آن، نامشخص: '.number_format($u['uncertain']).' · درخواست: '.$u['requests'].'</p>';
         echo '<p>از ابتدای ثبت دفتر مصرف؛ رزرو هنوز هزینهٔ قطعی نیست. توکن‌ها فقط از پاسخ سرویس‌دهنده هستند و معادل پول یا کردیت نیستند.</p>';
-        foreach($u['models'] as $r)echo '<div class="saas-project"><strong>'.$h($r['employee']==='ehsan'?'احسان':'نهال').' / '.$h($r['provider']).' / '.$h($r['model']).'</strong><p>مصرف: '.number_format($r['charged']).' کردیت · درخواست: '.$r['requests'].' · پاسخ دارای آمار: '.$r['usage_reports'].'</p><p>'.($r['token_reports']?'توکن ورودی ثبت‌شده: '.number_format($r['input_tokens']).' · خروجی: '.number_format($r['output_tokens']).'؛ فقط '.$r['token_reports'].' پاسخ دارای آمار توکن محاسبه شده است.':'آمار توکن از سرویس‌دهنده ثبت نشده است.').'</p></div>';
+        foreach($u['models'] as $r)echo '<div class="saas-project"><strong>'.$h(['ehsan'=>'احسان','nahal'=>'نهال','aria'=>'آریا'][$r['employee']]).' / '.$h($r['provider']).' / '.$h($r['model']).'</strong><p>مصرف: '.number_format($r['charged']).' کردیت · درخواست: '.$r['requests'].' · پاسخ دارای آمار: '.$r['usage_reports'].'</p><p>'.($r['token_reports']?'توکن ورودی ثبت‌شده: '.number_format($r['input_tokens']).' · خروجی: '.number_format($r['output_tokens']).'؛ فقط '.$r['token_reports'].' پاسخ دارای آمار توکن محاسبه شده است.':'آمار توکن از سرویس‌دهنده ثبت نشده است.').'</p></div>';
     }
 }
