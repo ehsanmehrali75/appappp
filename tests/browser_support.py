@@ -40,8 +40,8 @@ try:
             attachment=json.loads(db.execute('SELECT attachments FROM support_messages WHERE ticket_id=?',(tid,)).fetchone()[0])[0]
         context,admin=login(browser,'fixture_owner');admin.goto(base+'/panel/support.php')
         assert admin.locator('#ticket-list').get_by_text('Browser helpdesk delivery',exact=True).count()==1
-        admin.locator('#ticket-list').get_by_text('Browser helpdesk delivery',exact=True).click()
-        assert 'گزارش و لاگ کامل آزمایشی برای مدیر' in admin.inner_text('body')
+        with admin.expect_navigation():admin.locator('#ticket-list').get_by_text('Browser helpdesk delivery',exact=True).click()
+        assert 'گزارش و لاگ کامل آزمایشی برای مدیر' in admin.inner_text('body'), (admin.url,admin.inner_text('body')[:4500],errors)
         link=admin.locator('a.attachment').first.get_attribute('href');response=context.request.get(base+link)
         assert response.status==200 and response.body()==(case.app/'panel/uploads/original.png').read_bytes()
         reply=admin.locator('form:has(input[name=action][value=reply])');reply.locator('textarea').fill('پاسخ ثبت‌شدهٔ ادمین اصلی')

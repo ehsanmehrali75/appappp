@@ -29,6 +29,10 @@ PHP_BINARY=php python -m unittest discover -s tests -p 'test_*.py' -v
 
 These suites use temporary files and synthetic databases. `tests/support_mysql.php` is separate and only runs against an explicitly configured isolated MySQL test server. GitHub Actions repeats the main checks on PHP 8.2 and 8.4.
 
+## Operational health
+
+Read [the 2026-10-29 system review](docs/system-review-2026-10-29.fa.md) for verified fixes, limits and prioritized follow-up work. Central administrators can open `/panel/health.php?central=1`; project administrators can inspect `/panel/health.php?project=PROJECT_ID` in their selected workspace. Worker heartbeats are recorded by the existing employee/integration CLI workers; the dashboard does not run live API probes or repair balances.
+
 ## Production workflow
 
 Each project can independently require an image-production request and a reference image. Work queues distinguish requests, missing references, references ready for production, final-photo approval, publication, descriptions and size charts. Optional references appear alongside the production queue without blocking it. Known zero inventory stays in the archive and leaves execution queues. Website photos are already approved; manually uploaded final photos retain the approval step. Original final-image files remain available in the library.

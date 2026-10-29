@@ -2593,8 +2593,8 @@ $sections_json
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_MAXREDIRS, 3);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         
         $proxy_log = "نوع مسیر فرستنده: مستقیم (بدون پروکسی)\n";
         if ($use_proxy_type === 'telegram') {
@@ -22200,46 +22200,27 @@ async function handleRequest(request) {
                 return true;
             }
             if (platform === 'rubika') {
-                const endpoints = [
-                    `https://botapi.rubika.ir/v1/bot${payload.token}/sendMessage`,
-                    `https://botapi.rubika.ir/v2/bot${payload.token}/sendMessage`,
-                    `https://botapi.rubika.ir/v3/bot${payload.token}/sendMessage`,
-                    `https://messengerg.urara.me/v1/bot${payload.token}/sendMessage`,
-                    `https://botapi.rubika.ir/v3/${payload.token}/sendMessage`,
-                    `https://messengerg.urara.me/v3/${payload.token}/sendMessage`,
-                    `https://api.rubika.ir/v1/json/`
-                ];
-                let success = false;
-                let lastError = null;
-                const textMsg = payload.caption + (payload.image ? `\n\n[عکس](${payload.image})` : '');
-                
-                for (const url of endpoints) {
-                    try {
-                        const response = await fetch(url, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                chat_id: payload.chatId,
-                                text: textMsg,
-                                parse_mode: 'Markdown'
-                            })
-                        });
-                        const data = await response.json();
-                        if (data && (data.ok === true || data.status === 'OK' || data.success === true)) {
-                            success = true;
-                            break;
-                        } else {
-                            throw new Error(data.description || data.message || 'Rubika API returns ok == false');
-                        }
-                    } catch(err) {
-                        lastError = err;
-                        console.warn(`[Relay Engine] Rubika endpoint ${url} failed:`, err);
+                // Single official Rubika request; never leak credentials to guessed gateways.
+                if (payload.image) throw new Error('ارسال تصویر روبیکا نیازمند مسیر آپلود فایل است؛ پیام متنی جای تصویر ارسال نشد.');
+                if (!/^[A-Za-z0-9_-]{10,300}$/.test(payload.token || '')) throw new Error('توکن روبیکا معتبر نیست.');
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 25000);
+                try {
+                    const response = await fetch(`https://botapi.rubika.ir/v3/${payload.token}/sendMessage`, {
+                        method: 'POST', redirect: 'error', signal: controller.signal,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({chat_id: String(payload.chatId), text: String(payload.caption || '')})
+                    });
+                    const data = await response.json();
+                    const receipt = data?.data?.message_id ?? data?.message_id;
+                    if (!response.ok || (data.status && data.status !== 'OK') || !((typeof receipt === 'string' && receipt.trim()) || (typeof receipt === 'number' && receipt > 0))) {
+                        throw new Error('رسید معتبر روبیکا دریافت نشد؛ قبل از تکرار وضعیت ارسال را بررسی کنید.');
                     }
-                }
-                if (!success) {
-                    throw lastError || new Error('All Rubika endpoints failed');
-                }
-                return true;
+                    return true;
+                } catch (err) {
+                    throw new Error('نتیجهٔ ارسال روبیکا تأیید نشد؛ قبل از تکرار، رسید را بررسی کنید.');
+                } finally { clearTimeout(timeout); }
+                // End official Rubika request
             }
             if (platform === 'bale') {
                 let success = false;

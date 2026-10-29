@@ -373,7 +373,7 @@ function fetchGoogleSheetData($sheetId, $range, $accessToken) {
         "Accept: application/json"
     ]);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -1446,8 +1446,8 @@ function fetchUrl($url, $retries = 2, $timeout = 30, $throttle = true) {
         'Sec-Ch-Ua-Platform: "Windows"',
     ]);
     
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
     curl_setopt($ch, CURLOPT_TIMEOUT, $timeout); 
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
     
@@ -2184,8 +2184,8 @@ function sendToBale($token, $chatId, $message, $photoUrl = null, $proxy = null) 
         }
         
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         
         applyCurlProxySettings($ch, $proxy);
         
@@ -2315,8 +2315,8 @@ function sendToTelegram($token, $chatId, $message, $photoUrl = null, $proxy = nu
         }
         
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         
         applyCurlProxySettings($ch, $proxy);
         
@@ -2399,75 +2399,15 @@ function sendToTelegram($token, $chatId, $message, $photoUrl = null, $proxy = nu
 }
 
 function sendToRubika($token, $chatId, $message, $photoUrl = null, $proxy = null) {
-    if (empty($token) || empty($chatId)) {
-        return "توکن یا شناسه چت روبیکا تنظیم نشده است";
-    }
-    
-    // Attempt multiple endpoints (official API and Iranian proxy bridge) sequentially
-    $endpoints = [
-        "https://botapi.rubika.ir/v1/bot{$token}/sendMessage",
-        "https://botapi.rubika.ir/v2/bot{$token}/sendMessage",
-        "https://botapi.rubika.ir/v3/bot{$token}/sendMessage",
-        "https://messengerg.urara.me/v1/bot{$token}/sendMessage",
-        "https://botapi.rubika.ir/v3/{$token}/sendMessage",
-        "https://messengerg.urara.me/v3/{$token}/sendMessage"
-    ];
-    
-    $lastErr = '';
-    $lastHttpCode = 0;
-    $lastResponse = '';
-    
-    foreach ($endpoints as $url) {
-        $params = [
-            'chat_id' => $chatId,
-            'text' => $message . ($photoUrl ? "\n\n[عکس]($photoUrl)" : ''),
-            'parse_mode' => 'Markdown'
-        ];
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($params));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-        applyCurlProxySettings($ch, $proxy);
-        $response = curl_exec($ch);
-        $err = curl_error($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        
-        $lastErr = $err;
-        $lastHttpCode = $httpCode;
-        $lastResponse = $response;
-        
-        if (empty($err)) {
-            $data = json_decode($response, true);
-            if ($httpCode === 200 && isset($data['ok']) && $data['ok'] === true) {
-                return true;
-            }
-        }
-    }
-    
-    // If all gateways failed, parse and report details of the last attempt
-    if ($lastErr) {
-        return "خطای ارتباط با روبیکا: " . $lastErr;
-    }
-    
-    $data = json_decode($lastResponse, true);
-    if ($lastHttpCode === 200) {
-        if (isset($data['ok']) && $data['ok'] === true) {
-            return true;
-        }
-        return $data['description'] ?? "پاسخ ناموفق از روبیکا (ok == false)";
-    }
-    
-    if ($data && isset($data['description'])) {
-        return "خطای روبیکا (کد $lastHttpCode): " . $data['description'];
-    }
-    
-    return "خطای وب‌سرویس روبیکا با کد وضعیت HTTP " . $lastHttpCode;
+    // A failed request must not disclose a token to alternative gateways or duplicate a message.
+    require_once __DIR__.'/RubikaBot.php';
+    if($photoUrl)return 'ارسال تصویر روبیکا به مسیر آپلود فایل نیاز دارد؛ پیام متنی جای تصویر ارسال نشد.';
+    try{$request=RubikaBot::request($token,$chatId,$message);}catch(RuntimeException $e){return $e->getMessage();}
+    $response='';$ch=curl_init($request['url']);
+    curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>json_encode($request['body'],JSON_UNESCAPED_UNICODE),CURLOPT_HTTPHEADER=>['Content-Type: application/json','Accept: application/json'],CURLOPT_SSL_VERIFYPEER=>true,CURLOPT_SSL_VERIFYHOST=>2,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_CONNECTTIMEOUT=>8,CURLOPT_TIMEOUT=>20,CURLOPT_WRITEFUNCTION=>static function($c,$part)use(&$response){if(strlen($response)+strlen($part)>1048576)return 0;$response.=$part;return strlen($part);}]);
+    applyCurlProxySettings($ch,$proxy);$ok=curl_exec($ch);$status=(int)curl_getinfo($ch,CURLINFO_HTTP_CODE);curl_close($ch);
+    if($ok===false)return 'نتیجهٔ ارسال روبیکا نامشخص است؛ پیش از تکرار، رسید را بررسی کنید.';
+    return RubikaBot::receipt($status,json_decode($response,true))!==null?true:'رسید معتبر روبیکا دریافت نشد؛ پیش از تکرار، وضعیت ارسال را بررسی کنید.';
 }
 
 function sendToInstagram($token, $chatId, $message, $photoUrl = null, $proxy = null, $schedule_date = null) {
@@ -2531,8 +2471,8 @@ function sendToInstagram($token, $chatId, $message, $photoUrl = null, $proxy = n
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($payload));
     curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
     applyCurlProxySettings($ch, $proxy);
     
     $response = curl_exec($ch);
@@ -2566,8 +2506,8 @@ function sendToInstagram($token, $chatId, $message, $photoUrl = null, $proxy = n
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($publish_payload));
     curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
     applyCurlProxySettings($ch, $proxy);
     
     $response = curl_exec($ch);
@@ -2761,8 +2701,8 @@ function sendMediaGroupToTelegram($token, $chatId, $message, $compiled_images, $
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $params);
         curl_setopt($ch, CURLOPT_TIMEOUT, 35);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         applyCurlProxySettings($ch, $proxy);
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -3045,8 +2985,8 @@ function uploadFileToNovinhub($token, $imageUrl) {
         "Authorization: Bearer {$token}"
     ]);
     curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -3133,8 +3073,8 @@ function sendToNovinhub($token, $accountId, $caption, $compiled_images = [], $sc
         "Content-Type: application/json"
     ]);
     curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -4019,8 +3959,8 @@ function sendMelipayamakOTP($to) {
     $ch = curl_init($url);                          
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");                      
     curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 15);
     curl_setopt($ch, CURLOPT_HTTPHEADER, array(
@@ -4147,8 +4087,8 @@ function sendSmsByPattern($to, $textArgs, $project_settings = null, $smsType = '
         'content-type' => 'application/x-www-form-urlencoded'
     ));
     curl_setopt($handle, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($handle, CURLOPT_SSL_VERIFYHOST, false);
-    curl_setopt($handle, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($handle, CURLOPT_SSL_VERIFYHOST, 2);
+    curl_setopt($handle, CURLOPT_SSL_VERIFYPEER, true);
     curl_setopt($handle, CURLOPT_POST, true);
     curl_setopt($handle, CURLOPT_POSTFIELDS, $post_data);
     curl_setopt($handle, CURLOPT_TIMEOUT, 15);
@@ -6017,8 +5957,8 @@ function testProxyToTelegram($host, $port, $protocol, $user = '', $pass = '', $t
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
     curl_setopt($ch, CURLOPT_TIMEOUT, ceil($timeout));
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, ceil($timeout));
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
     
     curl_setopt($ch, CURLOPT_PROXY, $host . ':' . $port);
     if (!empty($user) && !empty($pass)) {
@@ -6061,8 +6001,8 @@ function fetchAndPingV2raySubscription($subUrl, $proxy = null) {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 12);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayN/6.23 Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
         $data = curl_exec($ch);
         $err = curl_error($ch);
@@ -6074,8 +6014,8 @@ function fetchAndPingV2raySubscription($subUrl, $proxy = null) {
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
             curl_setopt($ch, CURLOPT_USERAGENT, 'v2rayN/6.23 Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
             
             // اعمال پروکسی
@@ -6324,7 +6264,7 @@ function fetchLiveNovinhubSocialStats($token) {
         "Accept: application/json"
     ]);
     curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -6407,7 +6347,7 @@ function getAccessTokenFromServiceAccount($serviceAccountJson) {
         'assertion' => $jwt
     ]));
     curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -6436,7 +6376,7 @@ function getAccessTokenFromRefreshToken($clientId, $clientSecret, $refreshToken)
         'refresh_token' => $refreshToken
     ]));
     curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -6473,7 +6413,7 @@ function fetchRealGoogleSearchConsole($siteUrl, $accessToken, $startDate, $endDa
         "Accept: application/json"
     ]);
     curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -6510,7 +6450,7 @@ function fetchRealGoogleAnalytics4($propertyId, $accessToken, $startDate, $endDa
         "Accept: application/json"
     ]);
     curl_setopt($ch, CURLOPT_TIMEOUT, 15);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -6570,7 +6510,7 @@ function geminiGenerateResponse($prompt, $systemInstruction = '', $customApiKey 
         "Content-Type: application/json"
     ]);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -6610,8 +6550,8 @@ function setTelegramWebhook($token, $webhookUrl, $proxy = null) {
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
     
     applyCurlProxySettings($ch, $proxy);
     
@@ -6650,8 +6590,8 @@ function setBaleWebhook($token, $webhookUrl, $proxy = null) {
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
     
     applyCurlProxySettings($ch, $proxy);
     
@@ -6697,8 +6637,8 @@ function sendChatMessageThroughNovinhub($token, $accountId, $chatId, $message, $
         "Content-Type: application/json"
     ]);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -7582,7 +7522,9 @@ if (PHP_SAPI !== 'cli') {
         if(!empty($_SESSION['project_selection_required'])&&realpath($_SERVER['SCRIPT_FILENAME']??'')!==realpath(__DIR__.'/../../index.php')&&!in_array(basename($_SERVER['SCRIPT_FILENAME']??''),['support.php','logout.php','transfer-payment.php','ai_oauth.php','ai_mcp.php','account.php','account_payment.php','saas-admin.php'],true)){if(($_SERVER['REQUEST_METHOD']??'GET')==='GET')redirect('/panel/workspace.php');RequestSecurity::reject('ابتدا پروژه را انتخاب کنید.');}
         if(!isset($_SESSION['project_id'])&&in_array(basename($_SERVER['SCRIPT_FILENAME']??''),['sale.php','seo.php','prompthub.php','task_manager.php','user_chat.php','chat.php','portal.php','wp-crm.php','backups.php','onboarding.php','insights.php','data-hub.php','ai-connect.php'],true)){if(($_SERVER['REQUEST_METHOD']??'GET')==='GET')redirect('/panel/workspace.php');RequestSecurity::reject('ابتدا پروژه را انتخاب کنید.');}
         $explicit=$_GET['project']??$_GET['switch_project']??$_GET['project_id']??$_POST['project_id']??(basename($_SERVER['SCRIPT_FILENAME']??'')==='seo.php'?($_GET['pid']??null):null);
-        if($explicit==='__support_account__'&&basename($_SERVER['SCRIPT_FILENAME']??'')==='support.php')$explicit=null;
+        // Helpdesk project is a ticket-resource filter, not a request to switch the active workspace.
+        // support.php separately checks project membership and ticket ownership; stale-tab context stays enforced.
+        if(basename($_SERVER['SCRIPT_FILENAME']??'')==='support.php')$explicit=$_GET['switch_project']??$_GET['project_id']??$_POST['project_id']??null;
         if($explicit!==null&&(!is_string($explicit)||$explicit!==($_SESSION['project_id']??'')))RequestSecurity::reject('ابتدا پروژه را از انتخابگر میزکار انتخاب کنید.');
     }
 }

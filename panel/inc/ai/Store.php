@@ -14,7 +14,12 @@ class AiStore {
         try {$file=$this->dir.'/state.json';$data=is_file($file)?json_decode(file_get_contents($file),true):[];if(!is_array($data))throw new RuntimeException('وضعیت اتصال قابل خواندن نیست.');$result=$fn($data);if(!AccessControl::writeJson($file,$data))throw new RuntimeException('ثبت وضعیت اتصال ناموفق بود.');@chmod($file,0600);return $result;}
         finally {flock($lock,LOCK_UN);fclose($lock);}
     }
-    public function read(){return $this->transaction(static fn(&$s)=>$s);}
+    /** A shared read must not rewrite a large credential/credit ledger on every page view. */
+    public function read(){
+        $lock=fopen($this->dir.'/state.lock','c');if(!$lock||!flock($lock,LOCK_SH))throw new RuntimeException('قفل خواندن اتصال در دسترس نیست.');
+        try{$file=$this->dir.'/state.json';if(!is_file($file))return [];$data=json_decode(file_get_contents($file),true);if(!is_array($data))throw new RuntimeException('وضعیت اتصال قابل خواندن نیست.');return $data;}
+        finally{flock($lock,LOCK_UN);fclose($lock);}
+    }
     public function putDocument($project,$id,$data) {
         if(!preg_match('/^[a-f0-9]{32}$/D',$id))throw new RuntimeException('شناسهٔ سند معتبر نیست.');
         $dir=$this->dir.'/p-'.hash('sha256',$project);if(!is_dir($dir))mkdir($dir,0700,true);

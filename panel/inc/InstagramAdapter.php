@@ -161,8 +161,8 @@ class InstagramAdapter {
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($tokenPostData));
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         if (function_exists('applyCurlProxySettings') && $proxy) {
             applyCurlProxySettings($ch, $proxy);
         }
@@ -204,8 +204,8 @@ class InstagramAdapter {
         $ch = curl_init($exchangeUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         if (function_exists('applyCurlProxySettings') && $proxy) {
             applyCurlProxySettings($ch, $proxy);
         }
@@ -250,8 +250,8 @@ class InstagramAdapter {
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 20);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         if (function_exists('applyCurlProxySettings') && $proxy) {
             applyCurlProxySettings($ch, $proxy);
         }
@@ -268,8 +268,8 @@ class InstagramAdapter {
         $chFb = curl_init($urlFb);
         curl_setopt($chFb, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($chFb, CURLOPT_TIMEOUT, 20);
-        curl_setopt($chFb, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($chFb, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($chFb, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($chFb, CURLOPT_SSL_VERIFYHOST, 2);
         if (function_exists('applyCurlProxySettings') && $proxy) {
             applyCurlProxySettings($chFb, $proxy);
         }
@@ -516,8 +516,8 @@ class InstagramAdapter {
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 20);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         if (function_exists('applyCurlProxySettings') && $proxy) {
             applyCurlProxySettings($ch, $proxy);
         }
@@ -538,8 +538,8 @@ class InstagramAdapter {
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 25);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         if (function_exists('applyCurlProxySettings') && $proxy) {
             applyCurlProxySettings($ch, $proxy);
         }
@@ -580,8 +580,8 @@ class InstagramAdapter {
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postFields));
         curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         if (function_exists('applyCurlProxySettings') && $proxy) {
             applyCurlProxySettings($ch, $proxy);
         }
