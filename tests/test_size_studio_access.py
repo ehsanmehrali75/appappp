@@ -69,6 +69,44 @@ class SizeStudioAccess(unittest.TestCase):
             self.assertEqual(self.save(preset_backgrounds=value)[0],422)
             self.assertEqual(self.settings('p'),{})
 
+    def preset_request(self, **fields):
+        defaults={'action':'td_scs_preset_save','name':'شلوار','category':'شلوار','columns':json.dumps(['سایز','قد']),'show_model':'1','illus_url':'uploads/guide.png'}
+        defaults.update(fields)
+        code,body=self.fixture.request(self.opener,'/panel/size/?project=p',defaults,{'X-CSRF-Token':self.token})
+        return code,json.loads(body)
+
+    def presets(self):
+        with sqlite3.connect(self.fixture.database) as db:
+            return json.loads(db.execute('SELECT settings FROM projects WHERE id="p"').fetchone()[0]).get('size_chart_presets',[])
+
+    def test_copy_draft_saves_new_group_without_changing_original(self):
+        code,result=self.preset_request(preset_group='men');self.assertEqual(code,200)
+        original=result['data']['id'];before=self.presets()[0].copy()
+        code,result=self.preset_request(preset_group='women',name='شلوار زنانه');self.assertEqual(code,200)
+        copy=result['data']['id'];self.assertNotEqual(copy,original)
+        presets=self.presets();self.assertEqual(presets[0],before)
+        self.assertEqual(presets[1]['preset_group'],'women');self.assertEqual(presets[1]['columns'],before['columns']);self.assertEqual(presets[1]['illus_url'],before['illus_url'])
+        self.preset_request(id=original,name='شلوار مردانه')
+        self.assertEqual(self.presets()[0]['preset_group'],'men')
+        self.assertEqual(self.settings('q'),{'brand_title':'Second original'})
+
+    def test_invalid_group_or_missing_preset_cannot_save(self):
+        self.assertEqual(self.preset_request(preset_group='unknown')[0],422)
+        self.assertEqual(self.preset_request(id='missing',preset_group='men')[0],422)
+        self.assertEqual(self.presets(),[])
+
+    def test_group_backgrounds_are_scoped_and_legacy_save_keeps_them(self):
+        groups={group:'uploads/'+group+'.png' for group in ['men','women','accessories','shoes']}
+        code,body=self.save(group_backgrounds=json.dumps(groups));self.assertEqual(code,200,body)
+        self.assertEqual(self.settings('p')['group_backgrounds'],groups)
+        self.save();self.assertEqual(self.settings('p')['group_backgrounds'],groups)
+        self.assertEqual(self.settings('q'),{'brand_title':'Second original'})
+
+    def test_invalid_group_backgrounds_do_not_save_other_settings(self):
+        for value in ['broken','{"unknown":"uploads/a.png"}','{"men":"javascript:alert(1)"}']:
+            self.assertEqual(self.save(group_backgrounds=value)[0],422)
+            self.assertEqual(self.settings('p'),{})
+
     def test_products_permission_does_not_grant_studio_access(self):
         opener, _ = self.fixture.login('editor')
         self.assertEqual(self.fixture.request(opener, '/panel/size/?project=p')[0], 403)

@@ -322,6 +322,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $id = $_POST['id'] ?? '';
         $name = trim($_POST['name'] ?? '');
         $category = trim($_POST['category'] ?? '');
+        $existingPreset=null;foreach($presets as $candidate)if(($candidate['id']??'')===$id)$existingPreset=$candidate;
+        $presetGroup=$_POST['preset_group']??($existingPreset['preset_group']??'general');
+        if(!is_string($presetGroup)||!in_array($presetGroup,['general','men','women','accessories','shoes'],true)||($id!==''&&!$existingPreset)){http_response_code(422);echo json_encode(['success'=>false,'message'=>'پریست یا گروه کاربرد معتبر نیست.']);exit;}
         $columns_raw = $_POST['columns'] ?? '[]';
         
         $columns = json_decode($columns_raw, true) ?: [];
@@ -340,10 +343,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         if (!$id) {
-            $id = 'p_' . uniqid();
+            $id = 'p_' . bin2hex(random_bytes(10));
             $presets[] = [
                 'id' => $id,
                 'name' => $name,
+                'preset_group' => $presetGroup,
                 'category' => $category,
                 'columns' => array_values($columns),
                 'show_model' => $show_model,
@@ -355,6 +359,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             foreach ($presets as &$p) {
                 if ($p['id'] === $id) {
                     $p['name'] = $name;
+                    $p['preset_group'] = $presetGroup;
                     $p['category'] = $category;
                     $p['columns'] = array_values($columns);
                     $p['show_model'] = $show_model;
@@ -365,9 +370,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
         }
         $project['settings']['size_chart_presets'] = $presets;
-        saveProject($project);
+        $saved=saveProject($project);
         
-        echo json_encode(['success' => true, 'data' => ['id' => $id]], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['success' => (bool)$saved, 'data' => ['id' => $id]], JSON_UNESCAPED_UNICODE);
         exit;
     }
     
@@ -654,6 +659,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
              if(!$valid){http_response_code(422);echo json_encode(['success'=>false,'message'=>'تنظیم بک‌گراند پریست‌ها معتبر نیست.']);exit;}
          }
 
+         $groupBackgrounds=$scs_settings['group_backgrounds']??[];
+         if(array_key_exists('group_backgrounds',$_POST)) {
+             $groupBackgrounds=is_string($_POST['group_backgrounds'])?json_decode($_POST['group_backgrounds'],true):null;
+             $valid=is_array($groupBackgrounds)&&count($groupBackgrounds)<=4;
+             foreach($valid?$groupBackgrounds:[] as $group=>$url) {
+                 if(!in_array($group,['men','women','accessories','shoes'],true)||!is_string($url)||strlen($url)>2000||
+                    !(WebsiteCatalogSync::url($url)!==''||preg_match('~^(?:\.\./|/panel/|/)?uploads/[a-zA-Z0-9_./-]+$~D',$url))||str_contains($url,'..' . '/..'))$valid=false;
+             }
+             if(!$valid){http_response_code(422);echo json_encode(['success'=>false,'message'=>'بک‌گراند گروه‌ها معتبر نیست.']);exit;}
+         }
+
          $block_order_raw = $_POST['block_order'] ?? '';
          if (is_array($block_order_raw)) {
              $block_order = $block_order_raw;
@@ -700,6 +716,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
              'font_digits' => trim($_POST['font_digits'] ?? 'persian'),
 
              // Background & Canvas Dimensions
+             'group_backgrounds' => $groupBackgrounds,
              'preset_backgrounds' => $backgrounds,
              'bg_image' => trim($_POST['bg_image'] ?? ''),
              'bg_pattern' => trim($_POST['bg_pattern'] ?? 'none'),
@@ -1857,7 +1874,7 @@ if (empty($active_presets)) {
     <script>window.html2canvas || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>')</script>
     <script src="../assets/xlsx.full.min.js"></script>
     <script>window.XLSX || document.write('<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"><\/script>')</script>
-    <script src="../assets/size-backgrounds.js?v=1"></script>
+    <script src="../assets/size-backgrounds.js?v=2"></script>
     <script src="../assets/jszip.min.js"></script>
     <script>window.JSZip || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"><\/script>')</script>
     <script src="../assets/FileSaver.min.js"></script>
@@ -3187,6 +3204,14 @@ if (empty($active_presets)) {
                             </div>
                         </div>
 
+                        <div class="mb-6 p-4 rounded-2xl bg-indigo-50 border border-indigo-100 space-y-2">
+                            <label for="p-group" class="text-xs font-black">گروه کاربرد پریست</label>
+                            <select id="p-group" class="w-full text-xs font-bold border p-3 rounded-xl bg-white">
+                                <option value="general">عمومی / تعیین نشده</option><option value="men">مردانه</option><option value="women">زنانه</option><option value="accessories">اکسسوری</option><option value="shoes">کفش</option>
+                            </select>
+                            <p class="text-xs leading-6">نام دسته مثل «شلوار» ثابت می‌ماند؛ گروه برای انتخاب و بک‌گراند است. برای شلوار مردانه و زنانه، «کپی و ویرایش» را بزنید و گروه نسخهٔ کپی را تغییر دهید.</p>
+                        </div>
+
                         <div class="grid grid-cols-2 gap-6 mb-6">
                             <label class="flex items-center gap-3 p-4 bg-slate-50 border border-slate-150 rounded-2xl cursor-pointer">
                                 <input type="checkbox" id="p-show-model" class="w-4 h-4 text-indigo-600 rounded">
@@ -3223,8 +3248,9 @@ if (empty($active_presets)) {
                             </div>
                         </div>
 
-                        <div class="flex gap-2 pb-4 border-b border-rose-100">
+                        <div class="flex flex-wrap gap-2 pb-4 border-b border-rose-100">
                             <button onclick="saveCategoryPreset()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-md">ذخیره پریست دسته</button>
+                            <button type="button" id="btn-copy-p" onclick="duplicateCategoryPreset()" class="hidden px-5 py-3 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-bold">کپی و ویرایش پریست</button>
                             <button id="btn-delete-p" onclick="deleteCategoryPreset()" class="px-6 py-3 bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-600 text-xs font-bold rounded-xl h-fit hidden">حذف پریست</button>
                         </div>
                     </div>
@@ -3385,6 +3411,20 @@ if (empty($active_presets)) {
                             </div>
                         </div>
 
+                        <div class="space-y-3 p-4 bg-emerald-50 rounded-2xl border border-emerald-100" id="group-background-settings">
+                            <h4 class="text-sm font-black">بک‌گراند مشترک گروه‌ها</h4>
+                            <p class="text-xs leading-6">برای همهٔ پریست‌های یک گروه یک تصویر تعیین کنید؛ پریست‌های جدید آن گروه هم از همین تصویر استفاده می‌کنند. بک‌گراند اختصاصی هر پریست، در صورت تنظیم، اولویت بالاتری دارد.</p>
+                            <label for="background-group-select" class="text-xs font-bold">گروه</label>
+                            <select id="background-group-select" onchange="previewGroupBackground()" class="w-full rounded-xl p-3 border text-xs"><option value="men">مردانه</option><option value="women">زنانه</option><option value="accessories">اکسسوری</option><option value="shoes">کفش</option></select>
+                            <input id="group-background-url" dir="ltr" type="text" placeholder="آدرس بک‌گراند گروه" aria-label="آدرس بک‌گراند گروه" class="w-full rounded-xl p-3 border text-xs">
+                            <div class="flex flex-wrap gap-2 text-xs">
+                                <label class="cursor-pointer p-3 bg-white rounded-xl border">آپلود تصویر گروه<input type="file" accept="image/*" class="hidden" onchange="uploadBgFile(this,'group')"></label>
+                                <button type="button" onclick="assignGroupBackground(false)" class="p-3 bg-emerald-700 text-white rounded-xl">اعمال بک‌گراند گروه</button>
+                                <button type="button" onclick="assignGroupBackground(true)" class="p-3 bg-white rounded-xl border">حذف بک‌گراند گروه</button>
+                            </div>
+                            <p id="group-background-summary" class="text-xs leading-6" aria-live="polite"></p>
+                            <p class="text-xs">در پایان «ذخیره تمامی تنظیمات» را بزنید. پریست عمومی از پیش‌فرض پروژه استفاده می‌کند.</p>
+                        </div>
                         <div class="space-y-3 p-4 bg-indigo-50 rounded-2xl border border-indigo-100" id="preset-background-settings">
                             <h4 class="text-sm font-black">بک‌گراند دسته‌بندی‌های انتخابی</h4>
                             <p class="text-xs leading-6">تصویر بالا پیش‌فرض کل پروژه است. برای استثناها یک یا چند پریست را انتخاب و تصویر اختصاصی تعیین کنید. این تنظیم در پیش‌نمایش و خروجی تکی و گروهی اعمال می‌شود.</p>
@@ -5105,7 +5145,8 @@ if (empty($active_presets)) {
                     } catch(e){}
                     if (res.success) {
                         var uploadedUrl = res.data.url;
-                        if(target==='preset')$('#preset-background-url').val(uploadedUrl);
+                        if(target==='group')$('#group-background-url').val(uploadedUrl);
+                        else if(target==='preset')$('#preset-background-url').val(uploadedUrl);
                         else {$('#setting-bg-image').val(uploadedUrl);onBgImageChanged(uploadedUrl);}
                         showToast('تصویر پس‌زمینه با موفقیت بارگذاری شد. ✨', 'success');
                     } else {
@@ -7292,7 +7333,7 @@ if (empty($active_presets)) {
         }
 
         // Apply branding style & layout engine
-        function applyBrandingStyleToTarget(targetSelector, isMini, presetId) {
+        function applyBrandingStyleToTarget(targetSelector, isMini, presetId, groupOverride) {
             var el = $(targetSelector);
             if (el.length === 0) return;
 
@@ -7324,7 +7365,7 @@ if (empty($active_presets)) {
 
             // 2. Background Image & Patterns
             var bgCss = {};
-            var effectiveBackground = sizeBackgroundForPreset(presetId === undefined ? (isMini ? ($('#background-preset-select').val() || [])[0] : $('#chart-preset-select').val()) : presetId);
+            var effectiveBackground = sizeBackgroundForPreset(presetId === undefined ? (isMini ? ($('#background-preset-select').val() || [])[0] : $('#chart-preset-select').val()) : presetId, groupOverride);
             el.css({'background':'','background-image':'none','background-size':'','background-repeat':'','background-position':''});
             if (effectiveBackground) {
                 var resolvedBg = resolveImageUrl(effectiveBackground);
@@ -8899,6 +8940,7 @@ if (empty($active_presets)) {
                 brand_website: $('#setting-brand-website').val().trim(),
                 image_logo: $('#setting-image-logo').val().trim(),
                 
+                group_backgrounds: JSON.stringify(scs_settings.group_backgrounds || {}),
                 preset_backgrounds: JSON.stringify(scs_settings.preset_backgrounds || {}),
                 bg_image: $('#setting-bg-image').val().trim(),
                 bg_pattern: scs_settings.bg_pattern || 'none',
@@ -9167,14 +9209,14 @@ if (empty($active_presets)) {
                     addedCats.push(p.category);
                     filter.append(`<option value="${p.category}">${p.category}</option>`);
                 }
-                select.append(`<option value="${p.id}">${p.name} (${p.category})</option>`);
+                select.append($('<option>').val(p.id).text(`${p.name} (${p.category}) — ${sizePresetGroupLabel(p.preset_group)}`));
                 
                 // Sidebar item
                 list.append(`
                     <div onclick="loadCategoryPreset('${p.id}')" class="p-4 bg-slate-50 hover:bg-slate-100 rounded-2xl border border-slate-150 cursor-pointer transition-all flex justify-between items-center group">
                         <div>
                             <span class="text-xs font-black text-slate-800">${p.name}</span>
-                            <span class="text-[10px] text-slate-400 block mt-1">دسته: ${p.category}</span>
+                            <span class="text-[10px] text-slate-400 block mt-1">دسته: ${p.category} — ${sizePresetGroupLabel(p.preset_group)}</span>
                         </div>
                         <span class="text-indigo-650 opacity-0 group-hover:opacity-100 transition-all font-black text-xs">←</span>
                     </div>
@@ -9214,6 +9256,8 @@ if (empty($active_presets)) {
         // Create new category preset
         function initNewPreset() {
             $('#p-id').val('');
+            $('#p-group').val('general');
+            $('#btn-copy-p').addClass('hidden');
             $('#p-name').val('');
             $('#p-category').val('');
             $('#p-columns').val('');
@@ -9231,6 +9275,8 @@ if (empty($active_presets)) {
             if (!p) return;
 
             $('#p-id').val(p.id);
+            $('#p-group').val(p.preset_group || 'general');
+            $('#btn-copy-p').removeClass('hidden');
             $('#p-name').val(p.name);
             $('#p-category').val(p.category);
             $('#p-columns').val(p.columns.join("\n"));
@@ -9241,6 +9287,15 @@ if (empty($active_presets)) {
             $('#btn-delete-p').removeClass('hidden');
         }
 
+        function duplicateCategoryPreset() {
+            if (!$('#p-id').val()) return;
+            $('#p-id').val('');
+            $('#p-name').val($('#p-name').val() + ' (کپی)');
+            $('#btn-delete-p,#btn-copy-p').addClass('hidden');
+            $('#p-group').focus();
+            showToast('نسخهٔ کپی آمادهٔ ویرایش است؛ گروه را انتخاب و پریست را ذخیره کنید. اصل پریست تغییر نمی‌کند.', 'info');
+        }
+
         // Save Category Presets
         function saveCategoryPreset() {
             var colText = $('#p-columns').val();
@@ -9248,6 +9303,7 @@ if (empty($active_presets)) {
 
             var postData = {
                 action: 'td_scs_preset_save',
+                preset_group: $('#p-group').val() || 'general',
                 id: $('#p-id').val(),
                 name: $('#p-name').val(),
                 category: $('#p-category').val(),

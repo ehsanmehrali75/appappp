@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import shutil
 import sys
+import tempfile
 from urllib.parse import unquote, urlparse
 
 from playwright.sync_api import sync_playwright
@@ -59,6 +60,32 @@ try:
         page.goto(fixture.base + '/panel/size/?project=p')
         page.wait_for_function('typeof scs_settings !== "undefined" && typeof $ === "function"')
         page.locator('#chart-preset-select option[value="pants_simple"]').wait_for(state='attached')
+        # Edit the real preset, then use the copy draft and save under a new identity/group.
+        page.evaluate("loadCategoryPreset('pants_simple');$('#p-group').val('men')")
+        with page.expect_response(lambda r:r.request.method=='POST' and 'action=td_scs_preset_save' in (r.request.post_data or '')) as saved:
+            page.evaluate('saveCategoryPreset()')
+        check(saved.value.json()['success'],'male group saves through the real preset endpoint')
+        page.wait_for_function("app_presets.some(p=>p.id==='pants_simple'&&p.preset_group==='men')")
+        page.evaluate("loadCategoryPreset('pants_simple');duplicateCategoryPreset();$('#p-group').val('women')")
+        check(page.locator('#p-id').input_value()=='','copy is a draft with a new identity')
+        with page.expect_response(lambda r:r.request.method=='POST' and 'action=td_scs_preset_save' in (r.request.post_data or '')) as copied:
+            page.evaluate('saveCategoryPreset()')
+        female_id=copied.value.json()['data']['id'];check(female_id!='pants_simple','copy gets a distinct stored id')
+        page.wait_for_function("id=>app_presets.some(p=>p.id===id&&p.preset_group==='women')",arg=female_id)
+        page.evaluate("window.femalePresetId="+json.dumps(female_id))
+        check(page.evaluate("app_presets.find(p=>p.id==='pants_simple').preset_group")=='men','copy does not modify the original group')
+        check(page.evaluate("JSON.stringify(app_presets.find(p=>p.id==='pants_simple').columns)===JSON.stringify(app_presets.find(p=>p.id===femalePresetId).columns)"),'copy preserves all sizing columns')
+        page.evaluate("""() => {
+            for(const group of ['men','women','accessories','shoes']){
+                $('#background-group-select').val(group);$('#group-background-url').val('uploads/group-'+group+'.png');assignGroupBackground(false);
+            }
+            $('#chart-preset-select').val(femalePresetId);applyBrandingStyleToTarget('#td-preview',false);
+        }""")
+        check('group-women.png' in page.locator('#td-preview').evaluate('el=>el.style.backgroundImage'),'female preset uses the female group background')
+        check(page.evaluate("sizeBackgroundForPreset('pants_simple')")=='uploads/group-men.png','male preset uses the male group background')
+        page.evaluate("buildOffscreenCanvasForChart({preset_id:femalePresetId,title:'Fixture',columns:['Size'],rows:[['M']]})")
+        check('group-women.png' in page.locator('#scs-batch-canvas').evaluate('el=>el.style.backgroundImage'),'batch output resolves the copied preset group')
+        check('زنانه' in page.locator('#chart-preset-select option[value="'+female_id+'"]').inner_text(),'selection labels distinguish same-category presets by group')
         page.evaluate("""() => {
             $('#setting-bg-image').val('uploads/default.png');applyBrandingChanges();
             $('#background-preset-select').val(['pants_simple','pants_extended']);
@@ -105,10 +132,24 @@ try:
         page.wait_for_function('typeof scs_settings !== "undefined" && typeof $ === "function"')
         for key in ['content_padding_top', 'content_padding_bottom', 'content_padding_x', 'card_border_radius']:
             check(page.evaluate('key=>scs_settings[key]', key) == 0, key + ' remains zero after reload')
+        check(page.evaluate('scs_settings.group_backgrounds.shoes')=='uploads/group-shoes.png','all four group backgrounds persist after real save and reload')
+        check(page.evaluate('id=>app_presets.find(p=>p.id===id)?.preset_group',female_id)=='women','copied preset group persists after reload')
         check(page.evaluate('scs_settings.preset_backgrounds.pants_extended') == 'uploads/women.png', 'preset backgrounds survive real save and reload')
         check(page.evaluate('getIndividualRowColor(0)') == '#123456', 'individual row color survives save and reload')
+        output=Path(tempfile.mkdtemp(prefix='preset-groups-ui-'))
+        for width in [1440,375]:
+            page.set_viewport_size({'width':width,'height':1000})
+            page.evaluate("switchTab('presets')")
+            page.evaluate('id=>loadCategoryPreset(id)',female_id)
+            panel=page.locator('#category-presets-form')
+            check(panel.evaluate('el=>el.scrollWidth<=el.clientWidth+1'),'preset editor fits at '+str(width))
+            panel.screenshot(path=str(output/('presets-'+str(width)+'.png')))
+            page.evaluate("switchTab('branding')")
+            panel=page.locator('#group-background-settings')
+            check(panel.evaluate('el=>el.scrollWidth<=el.clientWidth+1'),'group background controls fit at '+str(width))
+            panel.screenshot(path=str(output/('backgrounds-'+str(width)+'.png')))
         check(not errors, 'no JavaScript exceptions: ' + repr(errors))
         browser.close()
-    print(json.dumps({'checks': len(checks), 'passed': checks, 'javascript_errors': errors}, ensure_ascii=False, indent=2))
+    print(json.dumps({'checks': len(checks), 'passed': checks, 'javascript_errors': errors, 'screenshots': str(output)}, ensure_ascii=False, indent=2))
 finally:
     http_fixture.HttpSecurity.tearDownClass()
