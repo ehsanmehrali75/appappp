@@ -15,10 +15,10 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__.'/panel/inc/ProjectBackups.php';
 require_once __DIR__.'/panel/inc/InventoryVersions.php';
-try{ProjectBackups::weekly();}catch(Throwable $e){error_log('Project backup maintenance could not run; check private storage permissions.');}
-
 require_once __DIR__.'/panel/inc/BackgroundWorker.php';
 BackgroundWorker::begin();
+// Backup maintenance belongs to the same lease, not every competing browser trigger.
+try{ProjectBackups::weekly();}catch(Throwable $e){error_log('Project backup maintenance could not run; check private storage permissions.');}
 
 // Deterministic 48-hour support-quote expiry; independent of scraper outcome.
 try { require_once __DIR__ . '/panel/inc/SupportTickets.php'; (new SupportTickets())->expire(); }

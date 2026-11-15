@@ -84,14 +84,8 @@ if (!$allowed) {
 $managementProductAction=($_SERVER['REQUEST_METHOD']??'GET')==='POST' && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']??'')==='xmlhttprequest' && ($_POST['action']??null)==='create_couple_set' && canAccessManagement();
 if (!canAccessPortal() && !$managementProductAction) { if(canAccessManagement())redirect('admin.php'); AccessControl::deny(); }
 
-// Pre-load all allowed projects for quick switching dropdown
-$user_allowed_projects = [];
-$db_p = getDB();
-foreach ($db_p['projects'] as $p_item) {
-    if (isSuperAdmin()) {
-        $user_allowed_projects[] = $p_item;
-    } else if (SessionIdentity::member($p_item)) $user_allowed_projects[] = $p_item;
-}
+// The shared workspace toolbar supplies the authorized metadata-only chooser.
+$user_allowed_projects=ProjectSelection::projects();
 
 if (!function_exists('is_product_without_image')) {
     function is_product_without_image($p) {

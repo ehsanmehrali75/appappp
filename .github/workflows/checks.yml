@@ -5,6 +5,31 @@ on:
 permissions:
   contents: read
 jobs:
+  mysql-performance:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: ci-fixture-password
+          MARIADB_ROOT_HOST: '%'
+        ports:
+          - 33306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mysqli
+          coverage: none
+      - name: Warm schema and concurrent project reader
+        env:
+          PERFORMANCE_TEST_MYSQL_PORT: '33306'
+          PERFORMANCE_TEST_MYSQL_PASSWORD: ci-fixture-password
+        run: php tests/performance_mysql.php
   isolated-tests:
     runs-on: ubuntu-latest
     strategy:

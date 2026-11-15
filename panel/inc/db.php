@@ -408,9 +408,15 @@ function db_auto_migrate_from_json($conn) {
 }
 
 function db_get_all($withData = true) {
+    global $db_config;
     static $migrationDone = false;
     if (!$migrationDone && isSqlActive()) {
         $conn = getConn();
+        require_once __DIR__.'/DatabaseSchema.php';
+        if(DatabaseSchema::ready($conn)){$migrationDone=true;return $withData?fetchDB():null;}
+        $schemaLock=DatabaseSchema::acquire($conn,$db_config);
+        try {
+        if(DatabaseSchema::ready($conn)){$migrationDone=true;return $withData?fetchDB():null;}
         
         // Ensure tables exist
         $conn->query("CREATE TABLE IF NOT EXISTS super_users (username VARCHAR(50) PRIMARY KEY, password VARCHAR(255))");
@@ -533,7 +539,9 @@ function db_get_all($withData = true) {
         // Auto-migrate from JSON offline backup file if empty
         db_auto_migrate_from_json($conn);
 
+        DatabaseSchema::complete($conn,$cols,$scols);
         $migrationDone = true;
+        } finally {DatabaseSchema::release($conn,$schemaLock);}
     }
     return $withData ? fetchDB() : null;
 }

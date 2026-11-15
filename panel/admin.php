@@ -24,7 +24,7 @@ if(isset($_GET['project'])){
     if(!$selectedProject||!SessionIdentity::select($selectedProject))AccessControl::deny();
 }
 
-$db = getDB();
+$db = (($_GET['tab']??'')==='storage_monitor'&&isMainAdmin())?getDB():getProjectDirectory(($_GET['tab']??'')==='projects'||(isSuperAdmin()&&!isset($_GET['tab'])&&!isset($_SESSION['project_id'])));
 $user = $_SESSION['user'];
 
 // SuperAdmin logic: Select project if not selected
@@ -7310,8 +7310,8 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                                 <div class="flex between mb-8 items-start">
                                     <div class="w-16 h-16 bg-slate-50 rounded-[1.5rem] flex items-center justify-center text-3xl group-hover:bg-primary group-hover:text-white transition-all duration-500 shadow-sm">🚀</div>
                                     <div class="text-left">
-                                        <span class="status-pill <?php echo count($p['products']) > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-300'; ?> mb-2">
-                                            <?php echo count($p['products']); ?> Items
+                                        <span class="status-pill <?php echo ($p['product_count']??count($p['products']??[])) > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-300'; ?> mb-2">
+                                            <?php echo $p['product_count']??count($p['products']??[]); ?> Items
                                         </span>
                                         <p class="text-[9px] font-black text-slate-300 uppercase letter-spacing-1">Activity Rank</p>
                                     </div>

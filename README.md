@@ -33,6 +33,8 @@ These suites use temporary files and synthetic databases. `tests/support_mysql.p
 
 Read [the 2026-11-15 system review](docs/system-review-2026-11-15.fa.md) for verified fixes, limits and prioritized follow-up work. Central administrators can open `/panel/health.php?central=1`; project administrators can inspect `/panel/health.php?project=PROJECT_ID` in their selected workspace. Worker heartbeats and expired external publishing handoffs are maintained by the existing employee/integration CLI workers; the dashboard does not run live API probes or repair balances. External ChatGPT publishing requires an explicit destination; old unbound queues require cancellation and fresh approval rather than automatic replay.
 
+Read [the panel performance review](docs/panel-performance-2026-11-15.fa.md) for schema warm-up, project-directory isolation, measured results and remaining queue work. Core schema migrations now use a durable database revision and a migration lease; increment `DatabaseSchema::VERSION` when changing the bootstrap schema. Warm connections perform no schema DDL. The MySQL concurrency regression runs in CI against a disposable MariaDB database.
+
 ## Production workflow
 
 Each project can independently require an image-production request and a reference image. Work queues distinguish requests, missing references, references ready for production, final-photo approval, publication, descriptions and size charts. Optional references appear alongside the production queue without blocking it. Known zero inventory stays in the archive and leaves execution queues. Website photos are already approved; manually uploaded final photos retain the approval step. Original final-image files remain available in the library.

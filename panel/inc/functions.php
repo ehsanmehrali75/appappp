@@ -481,6 +481,28 @@ function getDB() {
     return db_get_all();
 }
 
+/** Read-only project directory. Does not hydrate product libraries, logs or calendars. */
+function getProjectDirectory($withCounts=false) {
+    if(!isSqlActive())return getJsonDB();
+    $conn=getConn();$projects=[];
+    $rows=$conn->query('SELECT id,name,active_from,active_to,settings FROM projects');
+    if(!$rows)throw new RuntimeException('فهرست پروژه‌ها قابل خواندن نیست.');
+    while($r=$rows->fetch_assoc())if(!ProjectLifecycle::isDeleted($r['id']))$projects[$r['id']]=[
+        'id'=>$r['id'],'name'=>$r['name'],'activeFrom'=>$r['active_from'],'activeTo'=>$r['active_to'],
+        'settings'=>json_decode($r['settings'],true)?:[],'users'=>[],'product_count'=>0];
+    $rows=$conn->query('SELECT * FROM project_users');
+    if(!$rows)throw new RuntimeException('فهرست اعضا قابل خواندن نیست.');
+    while($r=$rows->fetch_assoc())if(isset($projects[$r['project_id']])){
+        $r['permissions']=json_decode($r['permissions']??'[]',true)?:[];
+        if(isset($r['panel_access']))$r['panel_access']=json_decode($r['panel_access'],true);
+        $projects[$r['project_id']]['users'][]=$r;
+    }
+    if($withCounts){$rows=$conn->query('SELECT project_id,COUNT(*) AS total FROM products GROUP BY project_id');
+        if(!$rows)throw new RuntimeException('تعداد محصولات قابل خواندن نیست.');
+        while($r=$rows->fetch_assoc())if(isset($projects[$r['project_id']]))$projects[$r['project_id']]['product_count']=(int)$r['total'];}
+    return ['projects'=>array_values(array_map([SaaSAccounts::class,'decorate'],$projects))];
+}
+
 function saveDB($data) {
     $data['projects']=array_values(array_filter($data['projects']??[],static fn($p)=>!ProjectLifecycle::isDeleted($p['id']??'')));
     if (isSqlActive()) {
@@ -7365,13 +7387,13 @@ function getProjectStorageUsage($projectOrId) {
             }
         }
         
-        $referencedFiles = array_unique(array_filter($referencedFiles));
+        $referencedFiles = array_fill_keys(array_filter($referencedFiles),true);
 
         foreach ($allUploads as $fn) {
             if ($fn === '.' || $fn === '..') continue;
             $filePath = UPLOADS_DIR . $fn;
             if (is_file($filePath)) {
-                if (strpos($fn, $pid) !== false || in_array($fn, $referencedFiles)) {
+                if (strpos($fn, $pid) !== false || isset($referencedFiles[$fn])) {
                     $usedBytes += filesize($filePath);
                 }
             }
