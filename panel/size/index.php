@@ -27,6 +27,12 @@ if (!file_exists($functionsPath)) {
     die('خطای سیستم: فایل توابع یافت نشد.');
 }
 require_once $functionsPath;
+require_once __DIR__.'/../inc/SizeChartImage.php';
+if(($_SERVER['REQUEST_METHOD']??'GET')==='POST'&&empty($_POST)) {
+    $postLimit=ini_get('post_max_size');$postBytes=(float)$postLimit*(['g'=>1073741824,'m'=>1048576,'k'=>1024][strtolower(substr($postLimit,-1))]??1);
+    if($postBytes>0&&(int)($_SERVER['CONTENT_LENGTH']??0)>$postBytes){http_response_code(413);header('Content-Type: application/json; charset=utf-8');echo json_encode(['success'=>false,'message'=>'حجم درخواست از محدودیت هاست بیشتر است؛ تعداد جداول در هر نوبت را کمتر کنید.'],JSON_UNESCAPED_UNICODE);exit;}
+}
+
 
 // User authentication check
 if (!isUser()) {
@@ -793,39 +799,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
     
     // Base64 Client Canvas Img Upload Action
-    if ($action === 'td_scs_chart_image_upload') { $existing_image_path = trim($_POST['existing_image_path'] ?? '');
-         $image_data = $_POST['image_data'] ?? '';
-         if ($image_data) {
-             $image_data = str_replace('data:image/png;base64,', '', $image_data);
-             $image_data = str_replace('data:image/jpeg;base64,', '', $image_data);
-             $image_data = str_replace(' ', '+', $image_data);
-             $decoded = base64_decode($image_data);
-             
-             if ($decoded) {
-                 $dir = __DIR__ . '/../uploads/';
-                 if (!file_exists($dir)) {
-                     mkdir($dir, 0755, true);
-                 }
-                 $filename = '';
-                  if (!empty($existing_image_path)) {
-                      $base = basename($existing_image_path);
-                      if (preg_match('/^(psizechart_|psizechart_g_|scs_asset_)[0-9a-zA-Z_\.-]+\.(jpg|png|jpeg|gif)$/i', $base)) {
-                          $filename = $base;
-                      }
-                  }
-                  if (empty($filename)) {
-                      $filename = 'psizechart_g_' . time() . '_' . uniqid() . '.jpg';
-                  }
-                 file_put_contents($dir . $filename, $decoded);
-                 chmod($dir . $filename, 0644);
-                 
-                 echo json_encode(['success' => true, 'data' => ['url' => 'uploads/' . $filename]], JSON_UNESCAPED_UNICODE);
-                 exit;
-             }
-         }
-         echo json_encode(['success' => false, 'message' => 'بارگذاری تصویر ناموفق بود.']);
-          exit;
-     }
+    if ($action === 'td_scs_chart_image_upload') {
+        try {
+            $result=SizeChartImage::save(__DIR__.'/../uploads',SizeChartImage::decode($_POST['image_data']??''),'psizechart_g_');
+            echo json_encode(['success'=>true,'data'=>$result],JSON_UNESCAPED_UNICODE);
+        } catch(RuntimeException $e) {http_response_code(422);echo json_encode(['success'=>false,'message'=>$e->getMessage()],JSON_UNESCAPED_UNICODE);}
+        exit;
+    }
 
      // Link Size Chart to Product and its sister variants
      if ($action === 'td_scs_link_product_chart') {
@@ -1103,10 +1083,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
          }
          $dir = __DIR__ . '/../uploads/';
          if (!file_exists($dir)) mkdir($dir, 0755, true);
-         $fname = 'size_chart_' . time() . '_' . uniqid() . '.' . $ext;
-         if (move_uploaded_file($_FILES['chart_file']['tmp_name'], $dir . $fname)) {
-             chmod($dir . $fname, 0644);
-             $rel = 'uploads/' . $fname;
+         try {$compressed=SizeChartImage::save($dir,file_get_contents($_FILES['chart_file']['tmp_name']),'size_chart_');}
+         catch(RuntimeException $e){http_response_code(422);echo json_encode(['success'=>false,'message'=>$e->getMessage()],JSON_UNESCAPED_UNICODE);exit;}
+         if ($compressed) {
+             $rel = $compressed['url'];
              $updated = 0;
              foreach ($project['products'] as &$p) {
                  if ($p['id'] === $product_id || (!empty($p['sku']) && $p['sku'] === $product_id)) {
@@ -1549,19 +1529,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                $image_path = trim($item['image_path'] ?? '');
                $rendered_url = trim($item['rendered_image_data_url'] ?? $item['image_data'] ?? '');
                if (empty($image_path) && !empty($rendered_url) && strpos($rendered_url, 'data:image') === 0) {
-                   $img_clean = preg_replace('/^data:image\/(jpeg|jpg|png);base64,/', '', $rendered_url);
-                   $img_clean = str_replace(' ', '+', $img_clean);
-                   $decoded = base64_decode($img_clean);
-                   if ($decoded) {
-                       $dir = __DIR__ . '/../uploads/';
-                       if (!file_exists($dir)) {
-                           mkdir($dir, 0755, true);
-                       }
-                       $fn = 'psizechart_b_' . time() . '_' . uniqid() . '.jpg';
-                       file_put_contents($dir . $fn, $decoded);
-                       chmod($dir . $fn, 0644);
-                       $image_path = 'uploads/' . $fn;
-                   }
+                   try {
+                       $result=SizeChartImage::save(__DIR__.'/../uploads',SizeChartImage::decode($rendered_url),'psizechart_b_');
+                       $image_path=$result['url'];
+                   } catch(RuntimeException $e){http_response_code(422);echo json_encode(['success'=>false,'message'=>$e->getMessage()],JSON_UNESCAPED_UNICODE);exit;}
                }
                $product_notes = trim($item['product_notes'] ?? '');
 
@@ -1875,6 +1846,7 @@ if (empty($active_presets)) {
     <script src="../assets/xlsx.full.min.js"></script>
     <script>window.XLSX || document.write('<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"><\/script>')</script>
     <script src="../assets/size-backgrounds.js?v=2"></script>
+    <script src="../assets/size-chart-compression.js?v=1"></script>
     <script src="../assets/jszip.min.js"></script>
     <script>window.JSZip || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"><\/script>')</script>
     <script src="../assets/FileSaver.min.js"></script>
@@ -10204,7 +10176,7 @@ if (empty($active_presets)) {
             // Set dynamic canvas rendering
             setTimeout(() => {
                 captureCleanChartCanvas(document.querySelector("#td-preview")).then(canvas => {
-                    var base64 = canvas.toDataURL('image/jpeg', 0.92);
+                    var base64 = compressSizeChartCanvas(canvas);
 
                     showToast('در حال بارگذاری تصویر ساخته‌شده روی سرور...', 'info');
                     
@@ -10297,9 +10269,9 @@ if (empty($active_presets)) {
                         } else {
                             showToast(response.message || 'بارگذاری تصویر خروجی با شکست مواجه شد.', 'error');
                         }
-                    });
+                    }).fail(function(xhr) {showToast((xhr.responseJSON && xhr.responseJSON.message) || 'فشرده‌سازی یا ذخیرهٔ تصویر جدول سایز ناموفق بود.', 'error');});
                 }).catch(function(err) {
-                    showToast('خطا در تصویربرداری از بوم سایزبندی.', 'error');
+                    showToast(err.message || 'خطا در تصویربرداری از بوم سایزبندی.', 'error');
                     console.error(err);
                 });
             }, 300);
@@ -10307,16 +10279,16 @@ if (empty($active_presets)) {
 
         function downloadChartAsJpg() {
             var productDesc = $('#chart-product-desc').val().trim() || 'size-chart';
-            showToast('در حال تبدیل جدول سایز به تصویر کیفیت اصلی...', 'info');
+            showToast('در حال تبدیل و فشرده‌سازی جدول سایز تا سقف ۴۰۰ کیلوبایت...', 'info');
             
             captureCleanChartCanvas(document.querySelector('#td-preview')).then(function(canvas) {
                 var link = document.createElement('a');
                 link.download = productDesc + '-size-chart.jpg';
-                link.href = canvas.toDataURL('image/jpeg', 0.95);
+                link.href = compressSizeChartCanvas(canvas);
                 link.click();
                 showToast('تصویر با موفقیت در سیستم شما دانلود شد. 🖼️', 'success');
             }).catch(function(err) {
-                showToast('خطا در تبدیل جدول به تصویر.', 'error');
+                showToast(err.message || 'خطا در تبدیل جدول به تصویر.', 'error');
                 console.error(err);
             });
         }
@@ -13038,28 +13010,21 @@ if (empty($active_presets)) {
          }
 
          // Backend saver helper
-         function saveBatchItemsToProjectPromise() {
-             return new Promise(function(resolve, reject) {
-                 if (!quickBatchCharts || quickBatchCharts.length === 0) {
-                     reject(new Error('لیست جداول خالی است.'));
-                     return;
-                 }
-                 $.post('', {
-                     action: 'td_scs_import_charts_json',
-                     json_data: JSON.stringify(quickBatchCharts)
-                 }, function(res) {
-                     if (res && res.success) {
-                         loadChartsList();
-                         loadPresets();
-                         loadDescPresets();
-                         resolve(res);
-                     } else {
-                         reject(new Error((res && res.message) ? res.message : 'خطا در ثبت جداول در پروژه'));
-                     }
-                 }, 'json').fail(function() {
-                     reject(new Error('خطای شبکه در ذخیره جداول'));
+         async function saveBatchItemsToProjectPromise() {
+             if (!quickBatchCharts || quickBatchCharts.length === 0) throw new Error('لیست جداول خالی است.');
+             var total=0,last={};
+             // A compressed image still grows in base64; keep requests below ordinary PHP POST limits.
+             for(var i=0;i<quickBatchCharts.length;i+=3) {
+                 last=await new Promise(function(resolve,reject) {
+                     $.post('', {action:'td_scs_import_charts_json',json_data:JSON.stringify(quickBatchCharts.slice(i,i+3))},function(res) {
+                         if(res&&res.success)resolve(res);
+                         else reject(new Error((res&&res.message)||'ثبت جداول ناموفق بود.'));
+                     },'json').fail(function(xhr) {reject(new Error((xhr.responseJSON&&xhr.responseJSON.message)||'خطای شبکه یا محدودیت حجم درخواست؛ '+total+' جدول ذخیره شده است.'));});
                  });
-             });
+                 total+=Number(last.imported_count)||0;
+             }
+             loadChartsList();loadPresets();loadDescPresets();
+             return {...last,imported_count:total};
          }
 
          function saveQuickBatchToProjectPermanently() {
@@ -13367,7 +13332,7 @@ if (empty($active_presets)) {
                              logging: false
                          });
 
-                         chart.rendered_image_data_url = snapshot.toDataURL('image/jpeg', 0.95);
+                         chart.rendered_image_data_url = compressSizeChartCanvas(snapshot);
                      }
                  } catch (itemErr) {
                      console.warn(`خطا در رندر جدول ${chart.title}:`, itemErr);

@@ -2,6 +2,7 @@
 require_once __DIR__.'/inc/OutputBuffer.php';
 OutputBuffer::start();
 require_once 'inc/functions.php';
+require_once __DIR__.'/inc/SizeChartImage.php';
 require_once __DIR__.'/inc/ModuleProjectAccess.php';
 require_once __DIR__.'/inc/ProjectPermissions.php';
 require_once __DIR__.'/inc/ProductMediaGallery.php';
@@ -3606,13 +3607,10 @@ if ($project) {
         // Handle size_chart_file (Manual product upload)
         $sizeChart = '';
         if (isset($_FILES['size_chart_file']) && $_FILES['size_chart_file']['error'] == 0) {
-            $ext = strtolower(pathinfo($_FILES['size_chart_file']['name'], PATHINFO_EXTENSION));
-            $newName = $getSafeName("pscm", $safeId, $ext);
-            if (move_uploaded_file($_FILES['size_chart_file']['tmp_name'], UPLOADS_DIR . $newName)) {
-                chmod(UPLOADS_DIR . $newName, 0644);
-                $sizeChart = 'uploads/' . $newName;
-                $uploadCount++;
-            }
+            try {
+                $compressed=SizeChartImage::save(UPLOADS_DIR,file_get_contents($_FILES['size_chart_file']['tmp_name']),'pscm_');
+                $sizeChart=$compressed['url'];$uploadCount++;
+            } catch(RuntimeException $e){http_response_code(422);echo json_encode(['status'=>'failed','success'=>false,'msg'=>$e->getMessage(),'message'=>$e->getMessage()],JSON_UNESCAPED_UNICODE);exit;}
         }
         
         $sizeChartTemplateId = $_POST['selected_designed_size_chart'] ?? '';
@@ -5229,12 +5227,11 @@ if ($project) {
 
                 // Size Chart Image
                 if (isset($_FILES['size_chart_file']) && $_FILES['size_chart_file']['error'] == 0) {
-                    $ext = strtolower(pathinfo($_FILES['size_chart_file']['name'], PATHINFO_EXTENSION));
-                    $newName = "psizechart_{$safePid}_" . time() . '_' . bin2hex(random_bytes(4)) . ".$ext";
-                    if (move_uploaded_file($_FILES['size_chart_file']['tmp_name'], UPLOADS_DIR . $newName)) {
-                        chmod(UPLOADS_DIR . $newName, 0644);
-                        $p['size_chart'] = 'uploads/' . $newName;
-                        $p['newly_uploaded_files'][] = 'uploads/' . $newName;
+                    try {$compressed=SizeChartImage::save(UPLOADS_DIR,file_get_contents($_FILES['size_chart_file']['tmp_name']),'psizechart_');}
+                    catch(RuntimeException $e){http_response_code(422);echo json_encode(['status'=>'failed','success'=>false,'msg'=>$e->getMessage(),'message'=>$e->getMessage()],JSON_UNESCAPED_UNICODE);exit;}
+                    if ($compressed) {
+                        $p['size_chart'] = $compressed['url'];
+                        $p['newly_uploaded_files'][] = $compressed['url'];
                         unset($p['manual_size_chart_requested']);
                         $hasNewUpload = true;
                         $hasManualImageEdit = true;

@@ -59,7 +59,32 @@ try:
         page.goto(fixture.base+'/panel/workspace.php',wait_until='domcontentloaded');page.locator('button[value=p]').click();page.wait_for_load_state('domcontentloaded')
         page.goto(fixture.base + '/panel/size/?project=p')
         page.wait_for_function('typeof scs_settings !== "undefined" && typeof $ === "function"')
+        compression=page.evaluate("""() => {
+            const c=document.createElement('canvas');c.width=1000;c.height=1400;
+            const ctx=c.getContext('2d'),pixels=ctx.createImageData(c.width,c.height),data=new Uint32Array(pixels.data.buffer);
+            let seed=1901;for(let i=0;i<data.length;i++){seed=(Math.imul(seed,1664525)+1013904223)>>>0;data[i]=(seed&0x00ffffff)|0xff000000;}
+            ctx.putImageData(pixels,0,0);window.compressionFixtureCanvas=c;
+            const before=sizeChartDataUrlBytes(c.toDataURL('image/jpeg',1)),compressed=compressSizeChartCanvas(c);window.compressionFixtureData=compressed;
+            return {before,bytes:sizeChartDataUrlBytes(compressed),actual:atob(compressed.split(',')[1]).length,width:c.width,height:c.height};
+        }""")
+        check(compression['before']>400000 and 0<compression['bytes']<=400000 and compression['bytes']==compression['actual'],'noisy canvas is compressed under the exact decoded 400000-byte limit')
+        check((compression['width'],compression['height'])==(1000,1400),'compression does not mutate the original canvas')
+        page.evaluate('window.originalChartCapture=captureCleanChartCanvas;window.captureCleanChartCanvas=()=>Promise.resolve(window.compressionFixtureCanvas)')
+        with page.expect_download() as download:
+            page.evaluate('downloadChartAsJpg()')
+        check(Path(download.value.path()).stat().st_size<=400000,'actual single-chart download obeys the byte limit')
+        page.evaluate('window.captureCleanChartCanvas=window.originalChartCapture')
         page.locator('#chart-preset-select option[value="pants_simple"]').wait_for(state='attached')
+        batch_posts=[]
+        def record_batch(request):
+            if request.method=='POST' and 'action=td_scs_import_charts_json' in (request.post_data or ''):batch_posts.append(request.post_data)
+        page.on('request',record_batch)
+        batch_result=page.evaluate("""async () => {
+            quickBatchCharts=Array.from({length:4},(_,i)=>({title:'Compressed batch '+i,product_desc:'Compressed batch '+i,category:'Fixture',columns:['Size'],rows:[['M']],rendered_image_data_url:window.compressionFixtureData}));
+            return await saveBatchItemsToProjectPromise();
+        }""")
+        check(batch_result['imported_count']==4 and len(batch_posts)==2,'large rendered batch is saved as bounded requests with cumulative counts')
+        page.remove_listener('request',record_batch)
         # Edit the real preset, then use the copy draft and save under a new identity/group.
         page.evaluate("loadCategoryPreset('pants_simple');$('#p-group').val('men')")
         with page.expect_response(lambda r:r.request.method=='POST' and 'action=td_scs_preset_save' in (r.request.post_data or '')) as saved:

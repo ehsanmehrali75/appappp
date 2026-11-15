@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/WebsiteCatalogSync.php';
+require_once __DIR__.'/SizeChartImage.php';
 /** Create website derivatives only. Originals are read and never rewritten. */
 class WebsiteExportPackage {
     private $uploads;
@@ -36,6 +37,7 @@ class WebsiteExportPackage {
         return $map[str_replace('‌',' ',trim($product['color']??''))]??'#cccccc';
     }
     private static function pair($source,$resize) {
+        if(!$resize)return ['jpg'=>SizeChartImage::compress($source,'jpeg'),'webp'=>SizeChartImage::compress($source,'webp')];
         $info=@getimagesizefromstring($source);if(!$info||$info[0]*$info[1]>40000000)throw new RuntimeException('تصویر نامعتبر یا بزرگ‌تر از ظرفیت پردازش است.');
         $memory=ini_get('memory_limit');
         if($memory&&$memory!=='-1'){
