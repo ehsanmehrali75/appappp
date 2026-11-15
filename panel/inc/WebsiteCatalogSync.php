@@ -2,6 +2,7 @@
 /** Website data enriches existing products; ERP remains the product/variant authority. */
 require_once __DIR__.'/ProductSizeChartCatalog.php';
 require_once __DIR__.'/ImageProduction.php';
+require_once __DIR__.'/ProductImageReview.php';
 class WebsiteCatalogSync {
     /** Legacy imports may serialize nested metadata again; malformed values carry no evidence. */
     private static function metadataArray($value,$list=false) {
@@ -102,6 +103,7 @@ class WebsiteCatalogSync {
     /** The website is approval evidence for that URL, never for a different manual image. */
     public static function imageApproved($product,$url) {
         $url=ProductSizeChartCatalog::mediaUrl($url);if(!$url)return false;
+        if(ProductImageReview::enabled($product)&&in_array($url,self::photos($product),true))return (ProductImageReview::rows($product)[ProductImageReview::key($url)]['state']??'pending')==='approved';
         $items=$product['images_list']??[];if(is_string($items))$items=json_decode($items,true);$decision=null;
         foreach(is_array($items)?$items:[] as $item) {
             if(!is_array($item)||ProductSizeChartCatalog::mediaUrl($item['url']??$item['src']??'')!==$url)continue;
@@ -112,6 +114,12 @@ class WebsiteCatalogSync {
         if($decision!==null)return $decision;
         return !in_array($product['status']??'active',['pending','waiting_approval','rejected'],true)&&empty($product['portal_pending']);
     }
+    public static function approvedPhotos($product) {
+        return array_values(array_filter(self::photos($product),fn($url)=>self::imageApproved($product,$url)));
+    }
+    public static function publishable($product) {
+        return ProductImageReview::enabled($product)?(bool)self::approvedPhotos($product):!self::pendingApprovalPhotos($product);
+    }
     public static function pendingApprovalPhotos($product,$includeSocial=false) {
         $urls=self::photos($product);
         if($includeSocial){$social=ProductSizeChartCatalog::mediaUrl($product['social_image']??$product['socialImage']??'');if($social)$urls[]=$social;}
@@ -121,7 +129,8 @@ class WebsiteCatalogSync {
         return hash('sha256',json_encode([$chart['image_url'],$chart['columns'],$chart['rows']],JSON_UNESCAPED_UNICODE));
     }
     public static function photoFingerprint($product) {
-        return hash('sha256',json_encode(self::photos($product,true),JSON_UNESCAPED_UNICODE));
+        $photos=self::photos($product,true);
+        return hash('sha256',json_encode(ProductImageReview::enabled($product)?[$photos,self::approvedPhotos($product)]:$photos,JSON_UNESCAPED_UNICODE));
     }
     /** Online stock is a subset, not an amount to add to total stock. Unknown totals stay unknown. */
     public static function totalStock($product) {
@@ -159,7 +168,7 @@ class WebsiteCatalogSync {
         $localPhotos=self::photos($product,true);$allPhotos=self::photos($product);
         $sitePhotos=($meta['presence']??'')==='missing'?[]:array_values(array_filter($meta['image_urls']??[],fn($url)=>self::url($url)!==''));
         $hasImage=(bool)$allPhotos;
-        $approved=!self::pendingApprovalPhotos($product);
+        $approved=self::publishable($product);
         $newManual=!empty($product['has_new_manual_image'])||($localPhotos&&isset($meta['local_image_fingerprint'])&&!hash_equals($meta['local_image_fingerprint'],self::photoFingerprint($product)));
         $pub=$meta['publication']??'';
         if (($meta['presence']??'')==='missing') {
@@ -479,7 +488,7 @@ class WebsiteCatalogSync {
             if($derived['archived'])throw new RuntimeException('محصول ناموجود در صف انتشار نیست.');
             if(!in_array($derived['publication']??'',['technical_pending','pending_upload'],true)&&!$derived['size_chart_upload_pending']&&!$derived['description_upload_pending'])throw new RuntimeException('این محصول در صف رفع نقص انتشار نیست.');
             if($receipt!==null){
-                if(!is_array($receipt)||!hash_equals($receipt['all_image_fingerprint']??'',hash('sha256',json_encode(self::photos($product))))||!hash_equals($receipt['chart_fingerprint']??'',self::chartFingerprint($derived['chart']))||!hash_equals($receipt['description_fingerprint']??'',hash('sha256',trim((string)($product['description']??'')))))throw new RuntimeException('محتوای محصول بعد از تهیهٔ ZIP تغییر کرده است؛ خروجی تازه بگیرید.');
+                if(!is_array($receipt)||!hash_equals($receipt['all_image_fingerprint']??'',hash('sha256',json_encode(self::approvedPhotos($product))))||!hash_equals($receipt['chart_fingerprint']??'',self::chartFingerprint($derived['chart']))||!hash_equals($receipt['description_fingerprint']??'',hash('sha256',trim((string)($product['description']??'')))))throw new RuntimeException('محتوای محصول بعد از تهیهٔ ZIP تغییر کرده است؛ خروجی تازه بگیرید.');
                 $meta['manual_upload_receipt']=$receipt+['at'=>time(),'by'=>$user];
                 if(in_array('chart',$receipt['assets']??[],true)){$product['size_chart_uploaded']=1;$product['size_chart_uploaded_at']=date('Y-m-d H:i:s');}
             }

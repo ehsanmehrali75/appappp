@@ -2132,6 +2132,7 @@ $sections_json
 
         foreach($project['products'] as &$p) {
             if ($p['id'] == $pid) {
+                if(ProductImageReview::enabled($p)&&in_array($status,['active','rejected'],true)){http_response_code(409);echo json_encode(['status'=>'failed','msg'=>'برای بررسی جداگانهٔ تصاویر، روی عکس محصول کلیک و گالری را باز کنید.']);exit;}
                 if($status==='active'&&($p['status']??'')==='rejected'){http_response_code(403);echo json_encode(['status'=>'failed','msg'=>'تصویر رد شده است؛ ابتدا تصویر اصلاح‌شده را جایگزین کنید.']);exit;}
                 if(ProductApprovalFlow::enabled($project['settings'])&&in_array($status,['active','rejected'],true)){
                     try{ProductApprovalFlow::decide($p,$project,$stage==='stage1'?1:($stage==='stage2'?2:0),$status==='rejected',$reason,$current_user);saveProject($project,[$p]);echo json_encode(['status'=>'success','msg'=>'تصمیم این مرحله ثبت شد.']);}
@@ -2314,6 +2315,7 @@ $sections_json
     }
 
     if ($action === 'bulk_status') {
+        foreach($project['products']??[] as $item)if(in_array($item['id'],is_array($_POST['pids']??null)?$_POST['pids']:[],true)&&ProductImageReview::enabled($item)){http_response_code(409);echo json_encode(['status'=>'failed','msg'=>'محصول دارای بررسی جداگانهٔ تصاویر است؛ روی عکس آن کلیک کنید.']);exit;}
         if (!hasPermission('approve_content')) { echo json_encode(['status' => 'failed', 'msg' => 'دسترسی غیرمجاز']); exit(); }
         $pids = $_POST['pids'] ?? [];
         $status = $_POST['status'];
@@ -6226,6 +6228,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
     <script src="/panel/assets/neo-shell.js?v=<?php echo filemtime(__DIR__.'/assets/neo-shell.js'); ?>" defer></script>
 <?php endif; ?>
 <link rel="stylesheet" href="/panel/assets/product-media.css?v=<?php echo filemtime(__DIR__.'/assets/product-media.css'); ?>"><script defer src="/panel/assets/product-media.js?v=<?php echo filemtime(__DIR__.'/assets/product-media.js'); ?>"></script>
+<script defer src="assets/image-gallery.js?v=1"></script><script defer src="assets/portal-image-review.js?v=1"></script>
 </head>
 <body class="tab-<?php echo htmlspecialchars($tab ?? 'none'); ?><?php echo $neoShell?' maarksho-shell':''; ?><?php echo $neoWorkspace?' neo-workspace':''; ?><?php echo $neoPilot?' maarksho-pilot':''; ?>">
     <div id="global-loader">
@@ -8041,14 +8044,14 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         });
                     } elseif ($filter === 'rejected') {
                         $p_list = array_filter($all_products, function($p) { 
-                            return getProductWorkflowStatus($p) === 'rejected' || (!isProductOutOfStock($p) && ($p['status'] ?? '') === 'rejected'); 
+                            return (ProductImageReview::enabled($p)&&!isProductOutOfStock($p)&&in_array('rejected',array_column(ProductImageReview::rows($p),'state'),true)) || getProductWorkflowStatus($p) === 'rejected' || (!isProductOutOfStock($p) && ($p['status'] ?? '') === 'rejected');
                         });
                     } elseif ($filter === 'all') {
                         $p_list = $all_products;
                     } else {
-                        // Default library view: approved & ready for upload
+                        // Default library view includes approved subsets awaiting sibling reviews.
                         $p_list = array_filter($all_products, function($p) { 
-                            return getProductWorkflowStatus($p) === 'active';
+                            return getProductWorkflowStatus($p) === 'active' || (ProductImageReview::enabled($p)&&!isProductOutOfStock($p)&&in_array('approved',array_column(ProductImageReview::rows($p),'state'),true));
                         });
                     }
 
@@ -24018,6 +24021,8 @@ ${desc2}
 
         function showManualInfo(p) {
             currentManualProduct = p;
+            document.getElementById('m-carousel-wrapper').dataset.productId=String(p.id);
+            document.getElementById('m-carousel-wrapper').dataset.productName=p.name||'';
             
             adminCarouselImages=window.productMediaUrls(p);
             if(!adminCarouselImages.length)adminCarouselImages=['https://placehold.co/400x500?text=No+Image'];

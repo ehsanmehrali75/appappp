@@ -54,6 +54,21 @@ class SizeStudioAccess(unittest.TestCase):
         self.assertEqual(saved['table_row_colors'], {'0': '#123456', '2': '#abcdef'})
         self.assertEqual(self.settings('q'), {'brand_title': 'Second original'})
 
+    def test_preset_backgrounds_save_together_and_survive_legacy_save(self):
+        overrides={'pants_simple':'uploads/women.png','pants_extended':'uploads/women.png','tops_extended':'https://cdn.example/men.jpg'}
+        code,body=self.save(bg_image='uploads/default.png',preset_backgrounds=json.dumps(overrides))
+        self.assertEqual(code,200,body)
+        self.assertEqual(self.settings('p')['preset_backgrounds'],overrides)
+        self.assertEqual(self.settings('p')['bg_image'],'uploads/default.png')
+        self.save()
+        self.assertEqual(self.settings('p')['preset_backgrounds'],overrides)
+        self.assertEqual(self.settings('q'),{'brand_title':'Second original'})
+
+    def test_invalid_background_map_is_rejected_without_saving_branding(self):
+        for value in ['broken','{"x":"javascript:alert(1)"}','{"x":{"url":"uploads/a.png"}}']:
+            self.assertEqual(self.save(preset_backgrounds=value)[0],422)
+            self.assertEqual(self.settings('p'),{})
+
     def test_products_permission_does_not_grant_studio_access(self):
         opener, _ = self.fixture.login('editor')
         self.assertEqual(self.fixture.request(opener, '/panel/size/?project=p')[0], 403)

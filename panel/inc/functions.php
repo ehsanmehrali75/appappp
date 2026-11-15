@@ -804,6 +804,7 @@ function getCurrentProject($id = null, $forceReload = false) {
 
 /** Approval is explicit; ordinary persistence must never approve an image. */
 function approveProductImages(&$product) {
+    if (ProductImageReview::enabled($product)) return; // Individual decisions are authoritative.
     $images=$product['images_list']??[];if(is_string($images))$images=json_decode($images,true)?:[];
     $product['images_list']=is_array($images)?$images:[];
     foreach($product['images_list'] as $key=>$image)if(is_array($image)) {
@@ -1107,6 +1108,12 @@ function getProductWorkflowStatus($p, $project = null) {
     $hasRef = hasProductReferenceImages($p) || !empty($p['waiting_final_photo']);
     $hasSizeChart = hasProductSizeChart($p,$project);
     $hasPriority = !empty($p['content_gen_requested']) || !empty($p['publish_priority']);
+    if(ProductImageReview::enabled($p)){
+        $states=array_column(ProductImageReview::rows($p),'state');
+        if(in_array('pending',$states,true))return 'pending_approval';
+        if(in_array('approved',$states,true))return 'active';
+        if(in_array('rejected',$states,true))return 'rejected';
+    }
     $rawStatus = $p['status'] ?? 'active';
     $hasUnapprovedImages = (bool)WebsiteCatalogSync::pendingApprovalPhotos($p,true);
     
@@ -3271,6 +3278,7 @@ function isQualityCheckPassed($p) {
 }
 
 require_once __DIR__.'/ProductApprovalFlow.php';
+require_once __DIR__.'/ProductImageReview.php';
 function autoApprovePendingProducts(&$project, $advanceSequential = false) {
     $now = time();
     $isSplit = !empty($project['settings']['prod_approval_split_enabled']);
@@ -3309,6 +3317,7 @@ function autoApprovePendingProducts(&$project, $advanceSequential = false) {
     // 1. Process Products
     if (isset($project['products']) && is_array($project['products'])) {
         foreach ($project['products'] as &$p) {
+            if (ProductImageReview::enabled($p)) { ProductImageReview::aggregate($p); continue; }
             if (($p['status'] ?? 'active') === 'pending') {
                 if(!ProductApprovalFlow::hasImage($p))continue;
                 if(ProductApprovalFlow::enabled($project['settings'])){if($advanceSequential)ProductApprovalFlow::autoAdvance($p,$project,$now);continue;}
@@ -5712,6 +5721,7 @@ function cleanupProductApprovedReferenceImages(&$p) {
 }
 
 function refreshProductSplitStatus(&$p, $project) {
+    if (ProductImageReview::enabled($p)) { ProductImageReview::aggregate($p); return; }
     $isSplit = !empty($project['settings']['prod_approval_split_enabled']);
     if (!$isSplit) {
         return;

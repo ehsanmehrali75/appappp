@@ -8,7 +8,7 @@ class ProductMediaGallery {
     }
     public static function render($p){
         $urls=self::urls($p);if(!$urls)$urls=['https://placehold.co/400x500?text=Maarksho'];
-        echo '<div class="product-media-carousel" data-media-gallery dir="ltr"><div class="product-media-track" tabindex="0" aria-label="تصاویر محصول">';
+        echo '<div class="product-media-carousel" data-media-gallery data-gallery-product-id="'.htmlspecialchars((string)($p['id']??''),ENT_QUOTES,'UTF-8').'" data-product-name="'.htmlspecialchars($p['name']??'محصول',ENT_QUOTES,'UTF-8').'" dir="ltr"><div class="product-media-track" tabindex="0" aria-label="تصاویر محصول">';
         foreach($urls as $i=>$url)echo '<img src="'.htmlspecialchars($url,ENT_QUOTES,'UTF-8').'" loading="lazy" referrerpolicy="no-referrer" alt="'.htmlspecialchars(($p['name']??'محصول').' — '.($i===0?'تصویر اصلی':'تصویر '.($i+1)),ENT_QUOTES,'UTF-8').'">';
         echo '</div>';if(count($urls)>1)echo '<div class="product-media-controls"><button type="button" data-media-step="-1" aria-label="تصویر قبلی">‹</button><span data-media-count>۱ / '.count($urls).'</span><button type="button" data-media-step="1" aria-label="تصویر بعدی">›</button></div>';echo '</div>';
     }

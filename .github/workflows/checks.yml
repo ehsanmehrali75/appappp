@@ -47,6 +47,7 @@ jobs:
           python tests/browser_health.py
           python tests/browser_aria.py
           python tests/browser_ehsan.py
+          python tests/browser_image_review.py
           python tests/browser_portal_gallery.py
           python tests/browser_occasions.py
           python tests/browser_transfer_payment.py

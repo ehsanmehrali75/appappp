@@ -134,6 +134,7 @@ if (!isModuleActive('products')) {
 <link rel="stylesheet" href="/panel/assets/portal-workspace.css?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.css'); ?>">
 <script src="/panel/assets/portal-workspace.js?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.js'); ?>" defer></script>
 <link rel="stylesheet" href="/panel/assets/product-media.css?v=<?php echo filemtime(__DIR__.'/assets/product-media.css'); ?>"><script defer src="/panel/assets/product-media.js?v=<?php echo filemtime(__DIR__.'/assets/product-media.js'); ?>"></script>
+<script defer src="assets/image-gallery.js?v=1"></script><script defer src="assets/portal-image-review.js?v=1"></script>
 </head>
             <body class="bg-slate-50 min-h-screen flex items-center justify-center font-sans p-6 select-none">
                 <div class="max-w-md w-full bg-white border border-slate-100 rounded-[3rem] p-10 text-center shadow-2xl shadow-indigo-500/5">
@@ -211,6 +212,8 @@ if ($isAjax && isset($_POST['action'])) {
     header('Content-Type: application/json');
     $response = ['status' => 'error', 'msg' => 'درخواست نامعتبر'];
     
+    if (in_array($_POST['action'], ['image_review_state','review_image'], true)) require __DIR__.'/inc/ProductImageReviewEndpoint.php';
+
     // هندلر اختصاصی ثبت پروفایل کاربری
     if (in_array($_POST['action'],['bulk_manage_products','bulk_request_content_gen'],true)) {
         $bulkLock=null;
@@ -995,6 +998,9 @@ if ($isAjax && isset($_POST['action'])) {
         exit;
     }
     
+    if($productToUpdate&&ProductImageReview::enabled($productToUpdate)&&in_array($_POST['action'],['quick_action','approve','reject'],true)){
+        http_response_code(409);echo json_encode(['status'=>'error','msg'=>'این محصول بررسی جداگانه دارد؛ روی تصویر کلیک کنید و از تأیید هر عکس یا تأیید همه در گالری استفاده کنید.']);exit;
+    }
     if($productToUpdate&&($_POST['action']??'')==='quick_action'&&strpos($_POST['sub']??'','approve')===0&&($productToUpdate['status']??'')==='rejected'){
         http_response_code(403);echo json_encode(['status'=>'error','msg'=>'تصویر رد شده است؛ ابتدا تصویر اصلاح‌شده را جایگزین کنید.']);exit;
     }
@@ -1627,6 +1633,7 @@ if (!PortalAccess::canProducts()) {
 <link rel="stylesheet" href="/panel/assets/portal-workspace.css?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.css'); ?>">
 <script src="/panel/assets/portal-workspace.js?v=<?php echo filemtime(__DIR__.'/assets/portal-workspace.js'); ?>" defer></script>
 <link rel="stylesheet" href="/panel/assets/product-media.css?v=<?php echo filemtime(__DIR__.'/assets/product-media.css'); ?>"><script defer src="/panel/assets/product-media.js?v=<?php echo filemtime(__DIR__.'/assets/product-media.js'); ?>"></script>
+<script defer src="assets/image-gallery.js?v=1"></script><script defer src="assets/portal-image-review.js?v=1"></script>
 </head>
 <body class="portal-workspace" data-portal-tab="<?php echo htmlspecialchars($active_tab,ENT_QUOTES,'UTF-8'); ?>">
 <style id="portal-action-permissions">
@@ -2607,7 +2614,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
         $top_pending = array_filter((array)($project['products'] ?? []), function($p) use ($project) {
             $isNoImg = is_product_without_image($p);
             $isOut = isProductOutOfStock($p);
-            return getProductWorkflowStatus($p)==='pending_approval'&&ProductApprovalFlow::visiblePending($p,$project);
+            return (getProductWorkflowStatus($p)==='pending_approval'||(ProductImageReview::enabled($p)&&in_array('pending',array_column(ProductImageReview::rows($p),'state'),true)))&&ProductApprovalFlow::visiblePending($p,$project);
         });
         $top_pending = array_slice($top_pending, 0, 4);
         if (!empty($top_pending)):
@@ -2658,7 +2665,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
             $pending = array_filter((array)($project['products'] ?? []), function($p) use ($project) {
                 $isNoImg = is_product_without_image($p);
                 $isOut = isProductOutOfStock($p);
-                return getProductWorkflowStatus($p)==='pending_approval'&&ProductApprovalFlow::visiblePending($p,$project);
+                return (getProductWorkflowStatus($p)==='pending_approval'||(ProductImageReview::enabled($p)&&in_array('pending',array_column(ProductImageReview::rows($p),'state'),true)))&&ProductApprovalFlow::visiblePending($p,$project);
             });
             usort($pending, function($a, $b) { return (int)($b['extractedAt'] ?? 0) - (int)($a['extractedAt'] ?? 0); });
             
@@ -3800,6 +3807,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
             <?php 
             $isProdSplit = !empty($project['settings']['prod_approval_split_enabled']);
             $rejected = array_filter((array)($project['products'] ?? []), function($p) use ($isProdSplit) {
+                if(ProductImageReview::enabled($p))return in_array('rejected',array_column(ProductImageReview::rows($p),'state'),true);
                 if (($p['status'] ?? '') === 'rejected') return true;
                 if ($isProdSplit) {
                     $st1_rej = !empty($p['stage1_decision']) && $p['stage1_decision'] === 'rejected';
@@ -5612,6 +5620,7 @@ window.allCatalogProducts = <?php echo json_encode($catalogAnalyticsData, JSON_U
 
     let currentOpenPid = null;
     function openDetail(p) {
+        document.getElementById('pd-carousel-wrapper').dataset.productId=String(p.id);
         currentOpenPid = p.id;
         document.getElementById('pd-title').innerText = p.name;
         document.getElementById('pd-price').innerText = p.price;

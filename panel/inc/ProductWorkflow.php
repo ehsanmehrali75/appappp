@@ -23,6 +23,12 @@ class ProductWorkflow {
         $status=$status??getProductWorkflowStatus($product,$project);
         if($filter==='out_of_stock')return $status==='out_of_stock';
         if($status==='out_of_stock')return false;
+        if(ProductImageReview::enabled($product)){
+            $states=array_column(ProductImageReview::rows($product),'state');
+            if($filter==='ready')return in_array('approved',$states,true);
+            if($filter==='pending_approval')return in_array('pending',$states,true);
+            if($filter==='rejected')return in_array('rejected',$states,true);
+        }
         if($filter==='ready')return $status==='active';
         if($filter==='pending_approval')return $status==='pending_approval';
         if($filter==='rejected')return $status==='rejected';

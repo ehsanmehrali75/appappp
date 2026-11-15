@@ -4,6 +4,7 @@ class ProductApprovalFlow {
     /** Interpret historic partial reviews using the current immediate-rejection rule. */
     public static function normalizeRejections(&$project){
         foreach($project['products']??[] as $index=>$product){
+            if(ProductImageReview::enabled($product)){ProductImageReview::aggregate($project['products'][$index]);continue;}
             if(($product['stage1_decision']??'')==='rejected'||($product['stage2_decision']??'')==='rejected')$project['products'][$index]['status']='rejected';
         }
     }
@@ -52,6 +53,7 @@ class ProductApprovalFlow {
         return !$names||in_array(mb_strtolower($username),$names,true);
     }
     public static function visiblePending($p,$project){
+        if(ProductImageReview::enabled($p)){foreach(ProductImageReview::view($p,$project)['rows'] as $row)if($row['available'])return true;return false;}
         if(!self::enabled($project['settings']))return true;
         if(isMainAdmin()||isProjectAdmin())return true;
         if(!hasPermission('approve_content','use'))return false;
@@ -59,6 +61,7 @@ class ProductApprovalFlow {
         return false;
     }
     public static function decide(&$p,&$project,$stage,$reject,$comment,$username){
+        if(ProductImageReview::enabled($p))throw new RuntimeException('برای این محصول از بررسی جداگانهٔ تصاویر در گالری پورتال استفاده کنید.');
         $settings=$project['settings'];
         if(!hasPermission('approve_content','use'))throw new RuntimeException('دسترسی تأیید تصاویر را ندارید.');
         if(!in_array($stage,[1,2],true)){$state=self::state($p,$settings);$stage=self::allowed($p,$settings,$state['first'])?$state['first']:$state['second'];}
@@ -89,6 +92,7 @@ class ProductApprovalFlow {
         return $html.'</div></details>';
     }
     public static function html($p,$project){
+        if(ProductImageReview::enabled($p)){ $counts=array_count_values(array_column(ProductImageReview::rows($p),'state'));return '<div class="approval-waiting-image">بررسی جداگانهٔ تصاویر: '.($counts['approved']??0).' تأیید، '.($counts['rejected']??0).' رد، '.($counts['pending']??0).' در انتظار؛ برای بررسی روی عکس کلیک کنید.</div>'; }
         if(!self::enabled($project['settings']??[])||($p['status']??'')!=='pending')return '';
         if(!self::hasImage($p))return '<div class="approval-waiting-image">منتظر عکس نهایی</div>';
         $state=self::state($p,$project['settings']);$html='<div class="approval-deadlines" data-approval-product="'.htmlspecialchars((string)($p['id']??''),ENT_QUOTES,'UTF-8').'">';

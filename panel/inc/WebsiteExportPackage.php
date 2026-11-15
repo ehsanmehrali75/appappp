@@ -69,8 +69,8 @@ class WebsiteExportPackage {
                 if($state['archived']){$warnings[]=$sku.': ناموجود؛ از خروجی اجرایی کنار گذاشته شد.';continue;}
                 if($state['production_blocked']){$warnings[]=$sku.': مشکل فنی یا موجودی ثبت شده؛ ابتدا بررسی را تکمیل کنید.';continue;}
                 if($state['image_not_required']){$warnings[]=$sku.': عکس برای این محصول لازم نیست؛ از خروجی تصویر کنار گذاشته شد.';continue;}
-                $photos=WebsiteCatalogSync::photos($product);
-                if(!$photos||WebsiteCatalogSync::pendingApprovalPhotos($product)){$warnings[]=$sku.': عکس نهایی موجود نیست یا هنوز تأیید نشده است.';continue;}
+                $photos=WebsiteCatalogSync::approvedPhotos($product);
+                if(!$photos||!WebsiteCatalogSync::publishable($product)){$warnings[]=$sku.': عکس نهایی موجود نیست یا هنوز تأیید نشده است.';continue;}
                 $folder=self::name($sku).' - '.self::name($product['name']??$id).' - '.self::name($product['color']??'');
                 $folder.=' - '.substr(hash('sha256',$id),0,8);$files=[];$assets=['images'];
                 try{

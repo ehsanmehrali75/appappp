@@ -13,6 +13,8 @@ class PortalAccess {
     }
 
     public static function canAction($action) {
+        if ($action === 'image_review_state') return self::canProducts('view');
+        if ($action === 'review_image') return canAccessFeature('approve_content','use');
         if ($action === 'update_profile') return true;
         if ($action === 'cast_occasion_vote') return canAccessFeature('occasions', 'use');
         if (in_array($action, ['get_pending_browser_relay_posts', 'mark_relay_schedule_status', 'vote_schedule', 'comment_schedule'], true))

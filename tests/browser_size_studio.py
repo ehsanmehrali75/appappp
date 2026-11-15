@@ -58,6 +58,19 @@ try:
         page.goto(fixture.base+'/panel/workspace.php',wait_until='domcontentloaded');page.locator('button[value=p]').click();page.wait_for_load_state('domcontentloaded')
         page.goto(fixture.base + '/panel/size/?project=p')
         page.wait_for_function('typeof scs_settings !== "undefined" && typeof $ === "function"')
+        page.locator('#chart-preset-select option[value="pants_simple"]').wait_for(state='attached')
+        page.evaluate("""() => {
+            $('#setting-bg-image').val('uploads/default.png');applyBrandingChanges();
+            $('#background-preset-select').val(['pants_simple','pants_extended']);
+            $('#preset-background-url').val('uploads/women.png');assignPresetBackground(false);
+            $('#chart-preset-select').val('pants_simple');applyBrandingStyleToTarget('#td-preview',false);
+        }""")
+        check('women.png' in page.locator('#td-preview').evaluate('el=>el.style.backgroundImage'),'selected preset override renders in single canvas')
+        page.evaluate("buildOffscreenCanvasForChart({preset_id:'pants_extended',title:'Fixture',columns:['Size'],rows:[['M']]})")
+        check('women.png' in page.locator('#scs-batch-canvas').evaluate('el=>el.style.backgroundImage'),'batch canvas uses its own preset override')
+        page.evaluate("buildOffscreenCanvasForChart({preset_id:'tops_extended',title:'Fixture',columns:['Size'],rows:[['M']]})")
+        check('default.png' in page.locator('#scs-batch-canvas').evaluate('el=>el.style.backgroundImage'),'batch canvas without override uses project default without leaking last background')
+        check(page.evaluate("JSON.parse(JSON.stringify(scs_settings.preset_backgrounds)).pants_simple")=='uploads/women.png','empty mapping serializes preset assignments correctly')
         for preset in ['persepolis', 'glass', 'minimal', 'dark_luxury', 'navy', 'transparent']:
             page.evaluate('preset => applyCustomThemePreset(preset)', preset)
             check(page.evaluate('scs_settings.style_mode') == 'custom', preset + ' preset callback applies')
@@ -92,6 +105,7 @@ try:
         page.wait_for_function('typeof scs_settings !== "undefined" && typeof $ === "function"')
         for key in ['content_padding_top', 'content_padding_bottom', 'content_padding_x', 'card_border_radius']:
             check(page.evaluate('key=>scs_settings[key]', key) == 0, key + ' remains zero after reload')
+        check(page.evaluate('scs_settings.preset_backgrounds.pants_extended') == 'uploads/women.png', 'preset backgrounds survive real save and reload')
         check(page.evaluate('getIndividualRowColor(0)') == '#123456', 'individual row color survives save and reload')
         check(not errors, 'no JavaScript exceptions: ' + repr(errors))
         browser.close()

@@ -643,6 +643,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     // Save Branding Settings Action
     if ($action === 'td_scs_save_branding_settings') {
+         $backgrounds=$scs_settings['preset_backgrounds']??[];
+         if(array_key_exists('preset_backgrounds',$_POST)) {
+             $backgrounds=is_string($_POST['preset_backgrounds'])?json_decode($_POST['preset_backgrounds'],true):null;
+             $valid=is_array($backgrounds)&&count($backgrounds)<=1000;
+             foreach($valid?$backgrounds:[] as $presetId=>$url) {
+                 if(!is_string($url)||strlen((string)$presetId)>200||$presetId===''||strlen($url)>2000||
+                    !(WebsiteCatalogSync::url($url)!==''||preg_match('~^(?:\.\./|/panel/|/)?uploads/[a-zA-Z0-9_./-]+$~D',$url))||str_contains($url,'..' . '/..'))$valid=false;
+             }
+             if(!$valid){http_response_code(422);echo json_encode(['success'=>false,'message'=>'تنظیم بک‌گراند پریست‌ها معتبر نیست.']);exit;}
+         }
+
          $block_order_raw = $_POST['block_order'] ?? '';
          if (is_array($block_order_raw)) {
              $block_order = $block_order_raw;
@@ -689,6 +700,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
              'font_digits' => trim($_POST['font_digits'] ?? 'persian'),
 
              // Background & Canvas Dimensions
+             'preset_backgrounds' => $backgrounds,
              'bg_image' => trim($_POST['bg_image'] ?? ''),
              'bg_pattern' => trim($_POST['bg_pattern'] ?? 'none'),
              'canvas_preset' => trim($_POST['canvas_preset'] ?? 'catalog_standard'),
@@ -1845,6 +1857,7 @@ if (empty($active_presets)) {
     <script>window.html2canvas || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>')</script>
     <script src="../assets/xlsx.full.min.js"></script>
     <script>window.XLSX || document.write('<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"><\/script>')</script>
+    <script src="../assets/size-backgrounds.js?v=1"></script>
     <script src="../assets/jszip.min.js"></script>
     <script>window.JSZip || document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"><\/script>')</script>
     <script src="../assets/FileSaver.min.js"></script>
@@ -3370,6 +3383,21 @@ if (empty($active_presets)) {
                                     <span>انطباق ۱۰۰٪ اندازه بوم با این تصویر</span>
                                 </button>
                             </div>
+                        </div>
+
+                        <div class="space-y-3 p-4 bg-indigo-50 rounded-2xl border border-indigo-100" id="preset-background-settings">
+                            <h4 class="text-sm font-black">بک‌گراند دسته‌بندی‌های انتخابی</h4>
+                            <p class="text-xs leading-6">تصویر بالا پیش‌فرض کل پروژه است. برای استثناها یک یا چند پریست را انتخاب و تصویر اختصاصی تعیین کنید. این تنظیم در پیش‌نمایش و خروجی تکی و گروهی اعمال می‌شود.</p>
+                            <label class="block text-xs font-bold" for="background-preset-select">پریست‌های دسته‌بندی (انتخاب چندتایی)</label>
+                            <select id="background-preset-select" multiple size="6" class="w-full rounded-xl p-3 border border-indigo-200 text-xs" onchange="previewPresetBackgroundSelection()"></select>
+                            <input id="preset-background-url" type="text" dir="ltr" placeholder="آدرس تصویر اختصاصی" class="w-full rounded-xl p-3 border text-xs" aria-label="آدرس بک‌گراند پریست‌ها">
+                            <div class="flex flex-wrap gap-2 text-xs">
+                                <label class="cursor-pointer p-3 bg-white rounded-xl border">آپلود تصویر اختصاصی<input type="file" accept="image/*" class="hidden" onchange="uploadBgFile(this,'preset')"></label>
+                                <button type="button" class="p-3 bg-indigo-600 text-white rounded-xl" onclick="assignPresetBackground(false)">اعمال به انتخاب‌ها</button>
+                                <button type="button" class="p-3 bg-white rounded-xl border" onclick="assignPresetBackground(true)">بازگشت انتخاب‌ها به پیش‌فرض پروژه</button>
+                            </div>
+                            <p id="preset-background-summary" class="text-xs leading-6" aria-live="polite"></p>
+                            <p class="text-xs">پس از اعمال، «ذخیره تمامی تنظیمات» را بزنید. جدول‌هایی که قبلاً تصویر خروجی گرفته‌اند برای تغییر بک‌گراند باید دوباره خروجی گرفته شوند.</p>
                         </div>
 
                         <!-- Ready Made Natural Patterns -->
@@ -5056,7 +5084,7 @@ if (empty($active_presets)) {
             showToast('تصویر پس‌زمینه با موفقیت حذف شد.', 'info');
         }
 
-        function uploadBgFile(input) {
+        function uploadBgFile(input, target = 'project') {
             if (!input.files || !input.files[0]) return;
             var file = input.files[0];
             var formData = new FormData();
@@ -5077,8 +5105,8 @@ if (empty($active_presets)) {
                     } catch(e){}
                     if (res.success) {
                         var uploadedUrl = res.data.url;
-                        $('#setting-bg-image').val(uploadedUrl);
-                        onBgImageChanged(uploadedUrl);
+                        if(target==='preset')$('#preset-background-url').val(uploadedUrl);
+                        else {$('#setting-bg-image').val(uploadedUrl);onBgImageChanged(uploadedUrl);}
                         showToast('تصویر پس‌زمینه با موفقیت بارگذاری شد. ✨', 'success');
                     } else {
                         showToast(res.message || 'خطا در بارگذاری تصویر پس‌زمینه.', 'error');
@@ -7264,7 +7292,7 @@ if (empty($active_presets)) {
         }
 
         // Apply branding style & layout engine
-        function applyBrandingStyleToTarget(targetSelector, isMini) {
+        function applyBrandingStyleToTarget(targetSelector, isMini, presetId) {
             var el = $(targetSelector);
             if (el.length === 0) return;
 
@@ -7296,8 +7324,10 @@ if (empty($active_presets)) {
 
             // 2. Background Image & Patterns
             var bgCss = {};
-            if (scs_settings.bg_image) {
-                var resolvedBg = resolveImageUrl(scs_settings.bg_image);
+            var effectiveBackground = sizeBackgroundForPreset(presetId === undefined ? (isMini ? ($('#background-preset-select').val() || [])[0] : $('#chart-preset-select').val()) : presetId);
+            el.css({'background':'','background-image':'none','background-size':'','background-repeat':'','background-position':''});
+            if (effectiveBackground) {
+                var resolvedBg = resolveImageUrl(effectiveBackground);
                 bgCss['background-image'] = `url("${resolvedBg}")`;
                 bgCss['background-size'] = scs_settings.bg_fit || 'cover';
                 bgCss['background-position'] = 'center center';
@@ -8869,6 +8899,7 @@ if (empty($active_presets)) {
                 brand_website: $('#setting-brand-website').val().trim(),
                 image_logo: $('#setting-image-logo').val().trim(),
                 
+                preset_backgrounds: JSON.stringify(scs_settings.preset_backgrounds || {}),
                 bg_image: $('#setting-bg-image').val().trim(),
                 bg_pattern: scs_settings.bg_pattern || 'none',
                 canvas_preset: scs_settings.canvas_preset || 'catalog_standard',
@@ -8955,7 +8986,7 @@ if (empty($active_presets)) {
                     applyBrandingChanges();
                     updateLivePreview();
                 } else {
-                    showToast('خطا در ذخیره‌سازی تنظیمات.', 'error');
+                    showToast(res.message || 'خطا در ذخیره‌سازی تنظیمات.', 'error');
                 }
             });
         }
@@ -9123,6 +9154,7 @@ if (empty($active_presets)) {
         function populatePresetsUI() {
             var filter = $('#filter-category');
             var select = $('#chart-preset-select');
+            var selectedPresetBeforeRefresh = select.val();
             var list = $('#presets-list-container');
             
             filter.empty().append('<option value="">همه دسته‌بندی‌ها</option>');
@@ -9148,6 +9180,8 @@ if (empty($active_presets)) {
                     </div>
                 `);
             });
+            if (app_presets.some(p => String(p.id) === String(selectedPresetBeforeRefresh))) select.val(selectedPresetBeforeRefresh);
+            if (typeof refreshPresetBackgroundOptions === 'function') refreshPresetBackgroundOptions();
         }
 
         // Upload custom image assets for presets
@@ -10058,7 +10092,7 @@ if (empty($active_presets)) {
 
                 // Determine background color
                 var bgPattern = (window.scs_settings && scs_settings.bg_pattern) || 'none';
-                var hasBgImage = !!(window.scs_settings && scs_settings.bg_image);
+                var hasBgImage = !!sizeBackgroundForPreset($('#chart-preset-select').val());
                 var bgColor = null;
                 if (!hasBgImage) {
                     if (bgPattern === 'dark') bgColor = '#0f172a';
@@ -13227,7 +13261,7 @@ if (empty($active_presets)) {
              });
 
              if (typeof applyBrandingStyleToTarget === 'function') {
-                 applyBrandingStyleToTarget('#scs-batch-canvas', false);
+                 applyBrandingStyleToTarget('#scs-batch-canvas', false, chart.preset_id || '');
              }
          }
 
@@ -13257,7 +13291,7 @@ if (empty($active_presets)) {
                      var canvasEl = document.getElementById('scs-batch-canvas');
                      if (canvasEl) {
                          var bgPattern = (window.scs_settings && scs_settings.bg_pattern) || 'none';
-                         var hasBgImage = !!(window.scs_settings && scs_settings.bg_image);
+                         var hasBgImage = !!sizeBackgroundForPreset(chart.preset_id || '');
                          var bgColor = null;
                          if (!hasBgImage) {
                              if (bgPattern === 'dark') bgColor = '#0f172a';
