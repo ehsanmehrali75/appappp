@@ -17,6 +17,8 @@ require_once __DIR__.'/panel/inc/ProjectBackups.php';
 require_once __DIR__.'/panel/inc/InventoryVersions.php';
 require_once __DIR__.'/panel/inc/BackgroundWorker.php';
 BackgroundWorker::begin();
+require_once __DIR__.'/panel/inc/WebsiteExportBatch.php';
+try{$exportMaintenance=WebsiteExportBatch::maintain();if($exportMaintenance['errors'])error_log('Export cleanup needs attention; inspect private state.');}catch(Throwable $e){error_log('Export cleanup unavailable; inspect private storage.');}
 // Backup maintenance belongs to the same lease, not every competing browser trigger.
 try{ProjectBackups::weekly();}catch(Throwable $e){error_log('Project backup maintenance could not run; check private storage permissions.');}
 

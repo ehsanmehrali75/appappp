@@ -20,7 +20,7 @@ class ProductSizeChartCatalog {
     }
     public static function forProduct($project,$product) {
         $id=(string)($product['size_chart_template_id']??'');$chart=null;
-        foreach(($project['settings']['size_charts']??[]) as $candidate) {
+        if($id!=='')foreach(($project['settings']['size_charts']??[]) as $candidate) {
             if ($id!=='' && is_array($candidate) && (string)($candidate['id']??'')===$id) {$chart=$candidate;break;}
         }
         $direct=self::mediaUrl($product['size_chart']??$product['sizeChart']??'');

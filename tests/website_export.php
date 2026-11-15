@@ -6,6 +6,13 @@ $dir=sys_get_temp_dir().'/we-test-'.bin2hex(random_bytes(8));mkdir($dir);mkdir($
 $img=imagecreatetruecolor(1800,2400);imagefill($img,0,0,imagecolorallocate($img,60,100,160));imagefilledrectangle($img,0,0,140,140,imagecolorallocate($img,255,0,0));imagepng($img,$dir.'/one/photo.png');imagepng($img,$dir.'/two/photo.png');imagedestroy($img);
 $chart=imagecreatetruecolor(400,600);imagefill($chart,0,0,imagecolorallocate($chart,255,255,255));imagepng($chart,$dir.'/chart.png');imagedestroy($chart);
 $hash=hash_file('sha256',$dir.'/one/photo.png');
+$pairMethod=new ReflectionMethod(WebsiteExportPackage::class,'pairFiles');$temps=[];$cache=[];$source=file_get_contents($dir.'/one/photo.png');
+$first=$pairMethod->invokeArgs(null,[$source,true,&$temps,&$cache]);$second=$pairMethod->invokeArgs(null,[$source,true,&$temps,&$cache]);
+weCheck($first===$second&&count($temps)===2,'identical photos reuse disk derivatives within this build');
+weCheck(array_keys($first)===['jpg','webp'],'cache retains both required image formats');
+$failed=false;try{$pairMethod->invokeArgs(null,['not an image',true,&$temps,&$cache]);}catch(RuntimeException $e){$failed=true;}
+weCheck($failed&&count($cache)===1,'failed conversion never creates a reusable incomplete cache entry');
+foreach($temps as $temporary)unlink($temporary);
 $p=['id'=>'one','sku'=>'A1','name'=>'پیراهن باکیفیت','color'=>'آبی','stock_total'=>3,'status'=>'active','image'=>'uploads/one/photo.png','gallery'=>['uploads/two/photo.png'],'size_chart'=>'uploads/chart.png','description'=>'توضیحات اصلی','images_list'=>[['url'=>'uploads/one/photo.png','source'=>'manual','approved'=>true],['url'=>'uploads/two/photo.png','source'=>'manual','approved'=>true]],'website_sync'=>['presence'=>'missing','has_size_chart'=>false,'has_description'=>false]];
 $archive=array_replace($p,['id'=>'zero','sku'=>'ZERO','stock_total'=>0,'stock_online'=>7]);$pending=array_replace($p,['id'=>'pending','sku'=>'PENDING','status'=>'pending','images_list'=>[['url'=>'uploads/one/photo.png','source'=>'manual','approved'=>false]]]);$broken=array_replace($p,['id'=>'broken','sku'=>'BROKEN','image'=>'uploads/missing.png']);
 $project=['id'=>'project','settings'=>[],'products'=>[$p,$archive,$pending,$broken]];
@@ -45,5 +52,12 @@ $chartFree=$project;$chartFree['products'][0]['categories']=['group'=>'کفش'];
 $chartFreeExport=(new WebsiteExportPackage($dir))->build($chartFree,['one']);
 weCheck(!in_array('chart',$chartFreeExport['receipts']['one']['assets'],true),'chart-exempt categories export images without chart');
 weCheck(!(bool)array_filter($chartFreeExport['warnings'],static fn($message)=>strpos($message,'جدول سایز')!==false),'no missing-chart warnings for exempt category');
+$merged=(new WebsiteExportPackage($dir))->merge([$export['zip_url']]);$mergedZip=new ZipArchive();$mergedZip->open($dir.'/'.basename($merged));
+weCheck(count(json_decode($mergedZip->getFromName('manifest.json'),true)['products'])===1,'valid streamed archive merges with its product manifest');$mergedZip->close();
+$duplicate=false;try{(new WebsiteExportPackage($dir))->merge([$export['zip_url'],$export['zip_url']]);}catch(WebsiteExportSourceInvalid $e){$duplicate=true;}
+weCheck($duplicate,'duplicate product parts cannot silently become a successful merged archive');
+$badName='website_export_'.bin2hex(random_bytes(16)).'.zip';$badZip=new ZipArchive();$badZip->open($dir.'/'.$badName,ZipArchive::CREATE);$badZip->addFromString('manifest.json','invalid JSON');$badZip->close();
+$corrupt=false;try{(new WebsiteExportPackage($dir))->merge(['uploads/'.$badName]);}catch(WebsiteExportSourceInvalid $e){$corrupt=true;}
+weCheck($corrupt,'corrupt part manifest is rejected rather than reported complete');
 $zip->close();foreach(glob($dir.'/*') as $file){if(is_file($file))unlink($file);}unlink($dir.'/one/photo.png');unlink($dir.'/two/photo.png');rmdir($dir.'/one');rmdir($dir.'/two');rmdir($dir);
 echo "$n website export integration checks passed\n";

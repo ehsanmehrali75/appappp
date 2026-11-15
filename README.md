@@ -35,6 +35,8 @@ Read [the 2026-11-15 system review](docs/system-review-2026-11-15.fa.md) for ver
 
 Read [the panel performance review](docs/panel-performance-2026-11-15.fa.md) for schema warm-up, project-directory isolation, measured results and remaining queue work. Core schema migrations now use a durable database revision and a migration lease; increment `DatabaseSchema::VERSION` when changing the bootstrap schema. Warm connections perform no schema DDL. The MySQL concurrency regression runs in CI against a disposable MariaDB database.
 
+The [export and library performance review](docs/system-review-export-performance-2026-11-15.fa.md) covers disk-backed image derivatives, durable resumable batches, session concurrency and bounded export capacity. `MAARKSHO_EXPORT_CONCURRENCY` defaults to two heavy export processes per host. The existing root/panel cron expires temporary export files; unfinished batches last one hour and completed downloads last 24 hours. Browser-driven batches can resume but do not continue independently after the browser closes.
+
 ## Production workflow
 
 Each project can independently require an image-production request and a reference image. Work queues distinguish requests, missing references, references ready for production, final-photo approval, publication, descriptions and size charts. Optional references appear alongside the production queue without blocking it. Known zero inventory stays in the archive and leaves execution queues. Website photos are already approved; manually uploaded final photos retain the approval step. Original final-image files remain available in the library.

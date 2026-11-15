@@ -16,6 +16,8 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__.'/inc/BackgroundWorker.php';
 BackgroundWorker::begin();
+require_once __DIR__.'/inc/WebsiteExportBatch.php';
+try{$exportMaintenance=WebsiteExportBatch::maintain();if($exportMaintenance['errors'])error_log('Export cleanup needs attention; inspect private state.');}catch(Throwable $e){error_log('Export cleanup unavailable; inspect private storage.');}
 
 // Deterministic 48-hour support-quote expiry; independent of scraper outcome.
 try { require_once __DIR__ . '/inc/SupportTickets.php'; (new SupportTickets())->expire(); }

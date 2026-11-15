@@ -1128,7 +1128,6 @@ function getProductWorkflowStatus($p, $project = null) {
     if(ImageProduction::imageExempt($p))return 'image_not_required';
     $hasFinal = (bool)WebsiteCatalogSync::photos($p);
     $hasRef = hasProductReferenceImages($p) || !empty($p['waiting_final_photo']);
-    $hasSizeChart = hasProductSizeChart($p,$project);
     $hasPriority = !empty($p['content_gen_requested']) || !empty($p['publish_priority']);
     if(ProductImageReview::enabled($p)){
         $states=array_column(ProductImageReview::rows($p),'state');
@@ -1149,7 +1148,7 @@ function getProductWorkflowStatus($p, $project = null) {
         $production=ImageProduction::state($context??[],$p,false,false);
         if($production['needs_image_request'])return 'image_request';
         if($production['needs_reference']&&$production['reference_required'])return 'waiting_reference';
-        if($hasRef||$hasSizeChart||$hasPriority)return 'waiting_ai_image';
+        if($hasRef||$hasPriority||hasProductSizeChart($p,$project))return 'waiting_ai_image';
         return 'no_image';
     }
 

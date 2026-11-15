@@ -6,7 +6,11 @@ class WebsiteCatalogQueue {
     public static function entries($project,$filters=[]) {
         $wcSearch=is_string($filters['wc_q']??null)?mb_substr(trim($filters['wc_q']),0,120):'';
         $wcCategory=is_string($filters['wc_category']??null)?$filters['wc_category']:'';
-        if($wcCategory!==''){$knownCategories=$project['settings']['website_catalog']['chart_exempt_categories']??[];foreach($project['products']??[] as $p)$knownCategories=array_merge($knownCategories,WebsiteCatalogSync::categories($p));if(!in_array($wcCategory,$knownCategories,true))$wcCategory='';}
+        if($wcCategory!==''){
+            $known=in_array($wcCategory,$project['settings']['website_catalog']['chart_exempt_categories']??[],true);
+            if(!$known)foreach($project['products']??[] as $p)if(in_array($wcCategory,WebsiteCatalogSync::categories($p),true)){$known=true;break;}
+            if(!$known)$wcCategory='';
+        }
         $wcStock=is_string($filters['wc_stock']??null)?$filters['wc_stock']:'';
         $wcStockStatuses=['in_stock'=>true,'out_of_stock'=>true,'unknown'=>true];
         $wcStockThresholds=['gt_5'=>5,'gt_10'=>10,'gt_15'=>15,'gt_20'=>20];

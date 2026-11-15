@@ -1828,35 +1828,18 @@ $sections_json
         if(!hasPermission('products')){http_response_code(403);echo json_encode(['status'=>'failed','msg'=>'دسترسی غیرمجاز']);exit;}
         try{
             if(!hash_equals($_SESSION['website_catalog_csrf']??'',(string)($_POST['csrf']??''))||empty($_POST['csrf']))throw new RuntimeException('صفحه را تازه کنید و دوباره خروجی بگیرید.');
-            require_once __DIR__.'/inc/WebsiteExportPackage.php';
-            if($action==='export_website_begin'){
-                $ids=json_decode($_POST['product_ids']??'[]',true);if(!is_array($ids)||!$ids||count($ids)>5000||array_filter($ids,fn($id)=>!is_string($id)))throw new RuntimeException('فهرست انتخاب محصولات معتبر نیست.');
-                foreach(($_SESSION['website_export_batch']['parts']??[]) as $oldPart)if(preg_match('/^website_export_[a-f0-9]{32}\.zip$/',basename($oldPart)))@unlink(UPLOADS_DIR.basename($oldPart));
-                $job=['token'=>bin2hex(random_bytes(24)),'project'=>$project['id'],'expires'=>time()+3600,'ids'=>array_values(array_unique($ids)),'offset'=>0,'parts'=>[],'receipts'=>[],'warnings'=>[]];
-                $_SESSION['website_export_batch']=$job;
-                echo json_encode(['status'=>'success','token'=>$job['token'],'total'=>count($job['ids'])]);
-            }else{
-                $job=$_SESSION['website_export_batch']??[];
-                if(($job['project']??'')!==$project['id']||($job['expires']??0)<time()||!hash_equals($job['token']??'',(string)($_POST['token']??'')))throw new RuntimeException('درخواست خروجی منقضی یا متعلق به پروژهٔ دیگری است.');
-                $builder=new WebsiteExportPackage(UPLOADS_DIR,$_SERVER['HTTP_HOST']??'');
-                if($action==='export_website_chunk'){
-                    if($job['offset']<count($job['ids'])){
-                        $batch=array_slice($job['ids'],$job['offset'],5);$fresh=getCurrentProject($project['id'],true);@set_time_limit(120);
-                        $result=$builder->build($fresh,$batch,true);
-                        if($result['zip_url'])$job['parts'][]=$result['zip_url'];
-                        $job['receipts']+=$result['receipts'];$job['warnings']=array_merge($job['warnings'],$result['warnings']);$job['offset']+=count($batch);
-                        $_SESSION['website_export_batch']=$job;
-                    }
-                    echo json_encode(['status'=>'success','processed'=>$job['offset'],'total'=>count($job['ids']),'done'=>$job['offset']>=count($job['ids'])]);
-                }else{
-                    if($job['offset']<count($job['ids']))throw new RuntimeException('ساخت بسته‌ها هنوز تمام نشده است.');
-                    $url=$builder->merge($job['parts'],$job['warnings']);
-                    $_SESSION['website_export_receipt']=['project'=>$project['id'],'expires'=>time()+86400,'products'=>$job['receipts']];
-                    foreach($job['parts'] as $part)@unlink(UPLOADS_DIR.basename($part));unset($_SESSION['website_export_batch']);
-                    echo json_encode(['status'=>'success','zip_url'=>$url,'exported_ids'=>array_keys($job['receipts']),'warnings'=>$job['warnings']],JSON_UNESCAPED_UNICODE);
-                }
-            }
-        }catch(Throwable $e){http_response_code(400);echo json_encode(['status'=>'failed','msg'=>$e instanceof RuntimeException?$e->getMessage():'ساخت بستهٔ خروجی ناموفق بود.'],JSON_UNESCAPED_UNICODE);}
+            require_once __DIR__.'/inc/WebsiteExportBatch.php';
+            $exports=new WebsiteExportBatch($project['id'],hash('sha256',session_id().'|'.($_SESSION['user']['username']??'')),UPLOADS_DIR,$_SERVER['HTTP_HOST']??'');
+            if(session_status()===PHP_SESSION_ACTIVE)session_write_close();
+            @set_time_limit(120);
+            if($action==='export_website_begin')$result=$exports->begin(json_decode($_POST['product_ids']??'[]',true));
+            elseif($action==='export_website_chunk'){
+                $offset=isset($_POST['offset'])?filter_var($_POST['offset'],FILTER_VALIDATE_INT):null;
+                if($offset===false)throw new RuntimeException('نقطهٔ ادامهٔ خروجی معتبر نیست.');
+                $result=$exports->step($_POST['token']??'',$offset);
+            }else $result=$exports->finish($_POST['token']??'');
+            echo json_encode(['status'=>'success']+$result,JSON_UNESCAPED_UNICODE);
+        }catch(Throwable $e){if($e instanceof WebsiteExportInvalid&&isset($exports))try{$exports->cancel($_POST['token']??'');}catch(Throwable $ignored){}http_response_code(400);echo json_encode(['status'=>'failed','restart_required'=>$e instanceof WebsiteExportInvalid,'msg'=>$e instanceof RuntimeException?$e->getMessage():'ساخت بستهٔ خروجی ناموفق بود.'],JSON_UNESCAPED_UNICODE);}
         exit;
     }
 
@@ -1865,12 +1848,15 @@ $sections_json
         try {
             require_once __DIR__.'/inc/WebsiteExportPackage.php';
             $pids=$_POST['product_ids']??[];if(is_string($pids))$pids=json_decode($pids,true);
-            if(!is_array($pids)||!$pids)throw new RuntimeException('محصولی انتخاب نشده است.');
+            if(!is_array($pids)||!$pids||count($pids)>5000)throw new RuntimeException('حداکثر ۵۰۰۰ محصول برای خروجی انتخاب کنید.');
             $pids=array_map('strval',$pids);
+            require_once __DIR__.'/inc/WebsiteExportBatch.php';
+            $exports=new WebsiteExportBatch($project['id'],hash('sha256',session_id().'|'.($_SESSION['user']['username']??'')),UPLOADS_DIR,$_SERVER['HTTP_HOST']??'');
+            if(session_status()===PHP_SESSION_ACTIVE)session_write_close();
             @set_time_limit(300);
             $project=getCurrentProject($project['id'],true);
             $result=(new WebsiteExportPackage(UPLOADS_DIR,$_SERVER['HTTP_HOST']??''))->build($project,$pids);
-            $_SESSION['website_export_receipt']=['project'=>$project['id'],'expires'=>time()+86400,'products'=>$result['receipts']];
+            $exports->record($project,$result['receipts']);
             unset($result['receipts']);echo json_encode(['status'=>'success']+$result,JSON_UNESCAPED_UNICODE);
         } catch (Throwable $e) {echo json_encode(['status'=>'failed','msg'=>$e instanceof RuntimeException?$e->getMessage():'ساخت خروجی وب‌سایت ناموفق بود.'],JSON_UNESCAPED_UNICODE);}
         exit;
@@ -1892,6 +1878,8 @@ $sections_json
             exit();
         }
 
+        require_once __DIR__.'/inc/WebsiteExportBatch.php';
+        $durableExportReceipt=(new WebsiteExportBatch($project['id'],hash('sha256',session_id().'|'.($_SESSION['user']['username']??'')),UPLOADS_DIR))->receipts($project);
         $updatedCount = 0;
         $completedProject = $project;
         try {
@@ -1899,7 +1887,7 @@ $sections_json
                 if (!in_array($p['id'], $pids, true)) continue;
                 $workflow = WebsiteCatalogSync::state($project,$p);
                 if (!$workflow['archived']&&(in_array($workflow['publication']??'', ['technical_pending','pending_upload'], true)||$workflow['size_chart_upload_pending']||$workflow['description_upload_pending'])) {
-                    $receipt=$_SESSION['website_export_receipt']??[];
+                    $receipt=isset($durableExportReceipt['products'][$p['id']])?$durableExportReceipt:($_SESSION['website_export_receipt']??[]);
                     $assets=null;
                     if(($receipt['project']??'')===$project['id']&&($receipt['expires']??0)>=time())$assets=$receipt['products'][$p['id']]??null;
                     WebsiteCatalogSync::resolve($completedProject, $p['id'], $_SESSION['user']['username']??'', $assets);
@@ -8511,6 +8499,7 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         <div>
                             <h2 class="font-black text-2xl text-slate-800">خروجی وب‌سایت (بهینه‌سازی تصاویر)</h2>
                             <p class="text-sm text-slate-500 mt-1">خروجی عکس‌های تأییدشده، جدول سایز، پالت و توضیحات؛ ناموجودها فقط در آرشیو کتابخانه نگهداری می‌شوند.</p>
+                            <p class="text-xs text-slate-500 mt-2">اگر ارتباط قطع شد، تا یک ساعت در همین مرورگر و با همان انتخاب دوباره خروجی بگیرید تا ادامه یابد. فایل دانلود موقت است و تا ۲۴ ساعت نگهداری می‌شود.</p>
                         </div>
                         <div class="flex gap-3 flex-wrap">
                             <button id="btn-sizechart-incomplete-selected" class="btn bg-slate-100 text-slate-400 opacity-60 flex items-center gap-2 py-3 px-5 text-xs rounded-xl font-bold border border-slate-150 transition-all" disabled>
@@ -9285,19 +9274,23 @@ $neoShell = $neoPilot || $neoWorkspace || ($tab === 'landing_builder' && ($_GET[
                         if(!pids.length||websiteExportBusy)return;
                         websiteExportBusy=true;document.getElementById('btn-mark-uploaded-selected').disabled=true;
                         const button=this,original=button.innerHTML;button.disabled=true;
+                        const resumeKey='maarksho-export-'+<?php echo json_encode(hash('sha256',session_id().'|'.$project['id'])); ?>;
+                        const remember=value=>{try{value?localStorage.setItem(resumeKey,JSON.stringify(value)):localStorage.removeItem(resumeKey);}catch{}};
                         const request=async(action,values={})=>{
                             const response=await fetch('admin.php?tab=website_export',{method:'POST',body:new URLSearchParams({ajax_action:action,csrf:websiteCatalogCsrf,...values})});
-                            const result=await response.json();if(!response.ok||result.status!=='success')throw new Error(result.msg||'ساخت خروجی ناموفق بود.');return result;
+                            const result=await response.json();if(!response.ok||result.status!=='success'){const error=new Error(result.msg||'ساخت خروجی ناموفق بود.');error.restartRequired=!!result.restart_required;throw error;}return result;
                         };
                         try{
-                            const job=await request('export_website_begin',{product_ids:JSON.stringify(pids)});let progress;
-                            do{progress=await request('export_website_chunk',{token:job.token});button.textContent=`پردازش ${progress.processed} از ${progress.total} محصول…`;}while(!progress.done);
-                            button.textContent='آماده‌سازی ZIP نهایی…';const result=await request('export_website_finish',{token:job.token});
-                            lastExportedProductIds=result.exported_ids||[];
+                            let job;try{job=JSON.parse(localStorage.getItem(resumeKey));}catch{}
+                            if(!job||JSON.stringify(job.ids)!==JSON.stringify(pids))job={...await request('export_website_begin',{product_ids:JSON.stringify(pids)}),ids:pids,processed:0};
+                            remember(job);let progress={processed:job.processed||0},capacityWait=0;const waitCapacity=()=>new Promise(resolve=>setTimeout(resolve,Math.min(15000,1500*Math.pow(2,Math.min(capacityWait++,4)))+Math.random()*250));
+                            do{progress=await request('export_website_chunk',{token:job.token,offset:progress.processed});job.processed=progress.processed;remember(job);button.textContent=progress.busy?'در صف ظرفیت پردازش…':`پردازش ${progress.processed} از ${progress.total} محصول…`;if(progress.busy)await waitCapacity();else capacityWait=0;}while(!progress.done);
+                            button.textContent='آماده‌سازی ZIP نهایی…';let result;do{result=await request('export_website_finish',{token:job.token});if(result.busy)await waitCapacity();}while(result.busy);
+                            remember(null);lastExportedProductIds=result.exported_ids||[];
                             const link=document.createElement('a');link.href=result.zip_url;link.download='';document.body.append(link);link.click();link.remove();
                             window.websiteExportReport?.(result.warnings||[],lastExportedProductIds.length);
                             setTimeout(()=>showExportConfirmModal(true),500);
-                        }catch(error){alert(error.message);}
+                        }catch(error){if(error.restartRequired)remember(null);alert(error.message);}
                         finally{websiteExportBusy=false;button.innerHTML=original;updateSelectedExportCount();}
                     });
 

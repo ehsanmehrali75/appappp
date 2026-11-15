@@ -70,6 +70,7 @@ jobs:
           PHP_BINARY: php
         run: |
           python tests/browser_health.py
+          python tests/browser_export_batches.py
           python tests/browser_aria.py
           python tests/browser_ehsan.py
           python tests/browser_image_review.py
