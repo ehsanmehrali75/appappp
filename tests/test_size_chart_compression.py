@@ -63,6 +63,10 @@ class SizeChartCompression(unittest.TestCase):
         record=self.case.record();self.assertEqual(record['image'],before);self.assertTrue(record['size_chart'])
         self.assertLessEqual((self.case.app/'panel'/record['size_chart']).stat().st_size,400000)
 
+    def test_chatgpt_content_api_cannot_bypass_the_chart_byte_cap(self):
+        result=self.php("require_once dirname($argv[1]).'/ai/Bootstrap.php';SessionIdentity::beginGlobal('fixture_owner');SessionIdentity::select(getCurrentProject('p',true));$p=getCurrentProject('p',true);$grant=AiAccess::principal($p);$grant['scopes']=['content.write'];$out=(new AiContent(new AiStore()))->save($grant,['product_id'=>'one','kind'=>'size_chart','request_id'=>'audit-chart-byte-cap','base64'=>base64_encode(file_get_contents($argv[2]))]);$p=getCurrentProject('p',true);foreach($p['products'] as $prod)if($prod['id']==='one')$url=$prod['size_chart'];$path=dirname($argv[1]).'/../'.preg_replace('~^/panel/~','',$url);echo json_encode([filesize($path),getimagesize($path)['mime']]);")
+        self.assertLessEqual(result[0],400000);self.assertEqual(result[1],'image/jpeg')
+
     def test_zip_chart_variants_each_obey_limit(self):
         result=self.php("require dirname($argv[1]).'/WebsiteExportPackage.php';$m=new ReflectionMethod('WebsiteExportPackage','pair');$m->setAccessible(true);$out=$m->invoke(null,file_get_contents($argv[2]),false);echo json_encode(array_map('strlen',$out));")
         self.assertEqual(set(result),{'jpg','webp'});self.assertTrue(all(0<n<=400000 for n in result.values()))

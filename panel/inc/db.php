@@ -79,7 +79,7 @@ class SQLite3StmtWrapper {
         try {
             $res = $this->stmt->execute();
             if ($res === false) {
-                $this->parent->error = $this->stmt->lastErrorMsg();
+                $this->parent->error = $this->parent->lastErrorMsg();
                 return false;
             }
             $this->result = $res;
@@ -132,6 +132,8 @@ class SQLite3ToMysqliWrapper {
     public function ping() {
         return $this->db !== null;
     }
+
+    public function lastErrorMsg() { return $this->db ? $this->db->lastErrorMsg() : 'SQLite connection unavailable'; }
 
     public function real_escape_string($string) {
         if (!$this->db) return $string;
@@ -224,8 +226,7 @@ class SQLite3ToMysqliWrapper {
                 if ($execRes === false) {
                     $lastErr = $this->db->lastErrorMsg();
                     if (strpos(strtolower($lastErr), 'duplicate column name') !== false || 
-                        strpos(strtolower($lastErr), 'already exists') !== false ||
-                        strpos(strtolower($lastErr), 'unique constraint failed') !== false) {
+                        strpos(strtolower($lastErr), 'already exists') !== false) {
                         return true;
                     }
                     $this->error = $lastErr;
@@ -235,8 +236,7 @@ class SQLite3ToMysqliWrapper {
             } catch (Exception $e) {
                 $lastErr = $e->getMessage();
                 if (strpos(strtolower($lastErr), 'duplicate column name') !== false || 
-                    strpos(strtolower($lastErr), 'already exists') !== false ||
-                    strpos(strtolower($lastErr), 'unique constraint failed') !== false) {
+                    strpos(strtolower($lastErr), 'already exists') !== false) {
                     return true;
                 }
                 $this->error = $lastErr;
@@ -820,7 +820,7 @@ function db_save_project($project, $onlyProducts = null, $onlySchedules = null, 
             }
             
             if ($manageTransaction) $conn->commit();
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             if ($manageTransaction && isset($conn) && $conn) $conn->rollback();
             error_log("DB SAVE ERR: " . $e->getMessage());
             $success = false;

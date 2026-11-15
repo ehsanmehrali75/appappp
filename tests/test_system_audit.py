@@ -1,5 +1,5 @@
 """Reproductions from the system audit; temporary stores and controlled transports only."""
-import unittest
+import unittest,re,html,sqlite3
 from test_saas_accounts import SaaSAccounts as Base
 from test_aria import Aria as PlanningFixture
 
@@ -22,6 +22,20 @@ class SystemAudit(unittest.TestCase):
     def test_restore_blocks_old_nahal_generation_before_any_paid_call(self):
         r=self.nahal("require $GLOBALS['argv'][1].'/panel/inc/ProjectOnboarding.php';$jobs=$n->enqueue($p,$grant,$input);ProjectOnboarding::mutate('p',function(&$p){$p['settings']['data_recovery_revision']=1;});$calls=0;$worker=new Nahal($svc,function()use(&$calls){$calls++;return ['status'=>401,'body'=>[]];});$worker->runOne();echo json_encode([$calls,$svc->state()['image_jobs'][$jobs[0]]['state'],$svc->account($id)['wallets']['p']]);")
         self.assertEqual(r,[0,'failed',{'balance':100,'reserved':0}])
+    def test_content_api_respects_account_storage_allocation(self):
+        r=self.php("$svc->change(function(&$s)use($id){$s['accounts'][$id]['allocations']['p']=0;});$p=getCurrentProject('p',true);$grant=AiAccess::principal($p);$grant['scopes']=['content.write'];$before=glob($GLOBALS['argv'][1].'/panel/uploads/*');$blocked=false;try{(new AiContent(new AiStore()))->save($grant,['product_id'=>'one','kind'=>'main','request_id'=>'quota-fixture-call','base64'=>base64_encode(file_get_contents($GLOBALS['argv'][1].'/panel/uploads/original.png'))]);}catch(RuntimeException $e){$blocked=true;}echo json_encode([$blocked,$before===glob($GLOBALS['argv'][1].'/panel/uploads/*')]);")
+        self.assertEqual(r,[True,True])
+    def test_content_write_rejects_an_old_recovery_epoch(self):
+        r=self.php("require_once $GLOBALS['argv'][1].'/panel/inc/ProjectOnboarding.php';ProjectOnboarding::mutate('p',function(&$p){$p['settings']['data_recovery_revision']=1;});$p=getCurrentProject('p',true);$grant=AiAccess::principal($p);$grant['scopes']=['content.write'];$blocked=false;try{(new AiContent(new AiStore()))->save($grant,['product_id'=>'one','kind'=>'description','text'=>'Must not apply','request_id'=>'old-epoch-fixture','expected_recovery_revision'=>0]);}catch(RuntimeException $e){$blocked=true;}echo json_encode([$blocked,getCurrentProject('p',true)['products'][0]['description']]);")
+        self.assertEqual(r,[True,''])
+    def test_failed_content_database_write_rolls_back_file_and_product(self):
+        r=self.php("""$p=getCurrentProject('p',true);$grant=AiAccess::principal($p);$grant['scopes']=['content.write'];getConn()->query("CREATE TRIGGER fail_content BEFORE INSERT ON products WHEN NEW.id='one' BEGIN SELECT RAISE(FAIL, 'fixture SQL rollback'); END");$before=glob($GLOBALS['argv'][1].'/panel/uploads/*');$blocked=false;try{(new AiContent(new AiStore()))->save($grant,['product_id'=>'one','kind'=>'main','request_id'=>'rollback-fixture-call','base64'=>base64_encode(file_get_contents($GLOBALS['argv'][1].'/panel/uploads/original.png'))]);}catch(RuntimeException $e){$blocked=true;}getConn()->query('DROP TRIGGER fail_content');$fresh=getCurrentProject('p',true);echo json_encode([$blocked,$before===glob($GLOBALS['argv'][1].'/panel/uploads/*'),$fresh['products'][0]['image']]);""")
+        self.assertEqual(r,[True,True,'uploads/original.png'])
+
+    def test_sqlite_unique_constraint_is_a_failure_not_a_success_receipt(self):
+        r=self.php("$db=getConn();$db->query('CREATE TABLE audit_unique (id INTEGER PRIMARY KEY, value TEXT)');$db->query(\"INSERT INTO audit_unique VALUES (1,'original')\");$ok=$db->query(\"INSERT INTO audit_unique VALUES (1,'duplicate')\");$error=$db->error;$row=$db->query('SELECT value FROM audit_unique WHERE id=1')->fetch_assoc();echo json_encode([$ok,$error!==null,$row['value']]);")
+        self.assertEqual(r,[False,True,'original'])
+
     def test_private_state_read_does_not_rewrite_the_financial_file(self):
         r=self.php("$store=new AiStore($GLOBALS['argv'][1].'/panel/db/audit-read');$raw=base64_decode('eyAic2FtcGxlIiA6IDEgfQo=');file_put_contents($store->directory().'/state.json',$raw);$value=$store->read();echo json_encode([$value['sample'],file_get_contents($store->directory().'/state.json')===$raw]);")
         self.assertEqual(r,[1,True])
@@ -31,6 +45,9 @@ class SystemAudit(unittest.TestCase):
     def test_aria_destination_change_requires_content_reapproval(self):
         r=self.publication("ProjectOnboarding::mutate('p',function(&$p){$p['settings']['connections']['telegram']['chatId']='changed-destination';});$calls=0;$pub=new AriaPublisher($svc,function()use(&$calls){$calls++;return ['status'=>200,'body'=>['ok'=>true,'result'=>['message_id'=>123]]];});$pub->tick();$r=getCurrentProject('p',true)['settings']['aria_calendar']['plans'][$job]['entries'][$entry];echo json_encode([$calls,$r['state']]);")
         self.assertEqual(r,[0,'ready'])
+    def test_aria_external_handoff_rechecks_approval_and_reconciles_cancellation(self):
+        r=self.publication("ProjectOnboarding::mutate('p',function(&$p)use($job,$entry){$p['settings']['connections']['instagram']=['enabled'=>true,'chatgpt_destination'=>'fixture-instagram','proxy'=>['bypass_method'=>'chatgpt']];$r=&$p['settings']['aria_calendar']['plans'][$job]['entries'][$entry];$r['channel']='instagram_post';$r['media']='https://example.test/approved-image.jpg';$r['approval']['destination']=Aria::destinationFingerprint($p,'instagram_post');});$pub=new AriaPublisher($svc,fn()=>throw new RuntimeException('No provider call allowed'));$pub->tick();$fresh=getCurrentProject('p',true);$row=$fresh['settings']['aria_calendar']['plans'][$job]['entries'][$entry];$social=new AiSocial(new AiStore());$grant=AiAccess::principal($fresh);$grant['scopes']=['social.write'];ProjectOnboarding::mutate('p',function(&$p)use($job,$entry){unset($p['settings']['aria_calendar']['plans'][$job]['entries'][$entry]['approval']);});$blocked=false;try{$social->claim($fresh,$grant,$row['receipt']['job']);}catch(RuntimeException $x){$blocked=true;}$social->cancel(getCurrentProject('p',true),$row['receipt']['job']);ProjectOnboarding::mutate('p',function(&$p)use($job){$p['settings']['aria_calendar']['plans'][$job]['state']='approved';});$pub->tick();$final=getCurrentProject('p',true)['settings']['aria_calendar']['plans'][$job]['entries'][$entry];echo json_encode([$row['state'],$blocked,$final['state'],$final['receipt']['verification']]);")
+        self.assertEqual(r,['queued_external',True,'cancelled','cancelled_before_handoff'])
 
     def test_sms_crashed_sending_is_flagged_uncertain_without_retrying(self):
         r=self.sms("$svc->change(function(&$s)use($campaign){$r=&$s['sms_campaigns'][$campaign['id']];$r['state']='sending';$r['approval']=['at'=>time()-600];});$one=$n->reconcileStale();$two=$n->reconcileStale();echo json_encode([$one,$two,$n->campaigns($p)[0]['state'],$smsCalls]);")
@@ -45,6 +62,27 @@ class SystemAudit(unittest.TestCase):
     def test_health_worker_completion_cannot_overwrite_a_newer_running_cycle(self):
         r=self.php("require $GLOBALS['argv'][1].'/panel/inc/OperationalHealth.php';$health=new OperationalHealth($svc);$old=$health->begin('aria');$new=$health->begin('aria');$health->finish('aria',$old,true);$during=$health->workers()['aria'];$health->finish('aria',$new,false);$after=$health->workers()['aria'];echo json_encode([$during['state'],$during['last_success']!==null,$after['state'],$after['last_failure']!==null]);")
         self.assertEqual(r,['running',True,'failed',True])
+    def test_central_health_includes_unmanaged_projects_and_summarizes_private_handoffs(self):
+        r=self.php("require $GLOBALS['argv'][1].'/panel/inc/OperationalHealth.php';$legacy=$p;$legacy['id']='123';$legacy['name']='Unmanaged legacy';$legacy['products']=[];db_save_project($legacy);(new AiStore())->transaction(function(&$s){$s['social_jobs']['fixture']=['project'=>'123','state'=>'claimed','lease_until'=>time()-1,'caption'=>'private-caption-sentinel','lease_hash'=>'private-lease-sentinel'];});$before=$svc->state();$report=(new OperationalHealth($svc))->central();$row=null;foreach($report['projects'] as $item)if($item['project']['id']==='123')$row=$item;echo json_encode([$row['managed'],$row['social']['expired_claims'],in_array('social_handoff_review',array_column($row['issues'],'code')),strpos(json_encode($report),'private-caption-sentinel')===false,strpos(json_encode($report),'private-lease-sentinel')===false,$before===$svc->state()]);")
+        self.assertEqual(r,[False,1,True,True,True,True])
+    def test_text_employee_models_are_visible_without_an_image_model_or_live_success_claim(self):
+        r=self.php("$svc->change(function(&$s)use($id){$s['central_providers']['text']=['enabled'=>true,'ehsan_enabled'=>true,'aria_enabled'=>true,'key'=>'private-model-key'];$s['accounts'][$id]['employees']['ehsan']=1;$s['accounts'][$id]['active_employees']['ehsan']['p']=true;});$rows=(new ProjectConnections(new AiStore()))->catalog(getCurrentProject('p',true))['connections'];$row=null;foreach($rows as $item)if($item['id']==='central_ai')$row=$item;echo json_encode([$row['configured'],$row['authorized'],array_column($row['employees'],'model_available','id'),array_column($row['employees'],'active','id'),strpos(json_encode($rows),'private-model-key')===false]);")
+        self.assertEqual(r,[True,False,{'nahal':False,'ehsan':True,'aria':True},{'nahal':False,'ehsan':True,'aria':False},True])
+    def test_route_settings_reject_blank_destination_and_do_not_rewrite_products(self):
+        def cleanup():
+            with sqlite3.connect(self.case.database) as db:db.execute('DROP TRIGGER IF EXISTS forbid_route_product_write')
+        self.addCleanup(cleanup)
+        self.php("getConn()->query(\"CREATE TRIGGER forbid_route_product_write BEFORE INSERT ON products BEGIN SELECT RAISE(FAIL, 'settings must not rewrite products'); END\");echo json_encode(true);")
+        opener,token=self.case.login()
+        _,page=self.case.request(opener,'/panel/data-hub.php?project=p')
+        context=html.unescape(re.search(r'name="_project_context" value="([^"]+)"',page)[1])
+        fields={'action':'social_route','platform':'telegram','destination':'','app_csrf':token,'_project_context':context}
+        status,body=self.case.request(opener,'/panel/data-hub.php?project=p',fields)
+        self.assertEqual(status,200);self.assertIn('مقصد صریح اکانت یا کانال لازم است',body)
+        fields['destination']='fixture-explicit-channel'
+        status,body=self.case.request(opener,'/panel/data-hub.php?project=p',fields)
+        self.assertEqual(status,200);self.assertIn('روش ChatGPT برای این کانال فعال شد',body)
+        self.assertEqual(self.case.record()['name'],'محصول one')
     def test_health_requires_central_permission_and_explicit_project_selection(self):
         r=self.php("require $GLOBALS['argv'][1].'/panel/inc/OperationalHealth.php';$health=new OperationalHealth($svc);$_SESSION['project_id']='another';$bad=false;try{$health->project($p);}catch(RuntimeException $e){$bad=true;}echo json_encode($bad);")
         self.assertTrue(r)

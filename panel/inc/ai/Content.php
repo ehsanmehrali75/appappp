@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__.'/Http.php';
+require_once dirname(__DIR__).'/SizeChartImage.php';
+require_once dirname(__DIR__).'/InventoryVersions.php';
 class AiContent {
     private $store;
     public function __construct($store){$this->store=$store;}
@@ -19,6 +21,8 @@ class AiContent {
         $request=$input['request_id']??'';if(!is_string($request)||!preg_match('/^[a-zA-Z0-9_-]{8,100}$/D',$request))throw new RuntimeException('شناسهٔ یکتای درخواست لازم است.');
         $fingerprint=hash('sha256',json_encode($input,JSON_UNESCAPED_UNICODE));$receiptKey=hash('sha256',$principal['owner'].'|'.$request);
         $existing=getCurrentProject($principal['project'],true);if(!$existing)throw new RuntimeException('پروژه یافت نشد.');
+        $epoch=$input['expected_recovery_revision']??(int)($existing['settings']['data_recovery_revision']??0);
+        if(!is_int($epoch)||$epoch<0||$epoch!==(int)($existing['settings']['data_recovery_revision']??0))throw new RuntimeException('دادهٔ پروژه بازیابی شده است؛ درخواست محتوای تازه لازم است.');
         $existingProduct=self::find($existing,$input);$previous=$existingProduct['website_sync']['ai_receipts'][$receiptKey]??null;
         if($previous){if(!hash_equals($previous['hash'],$fingerprint))throw new RuntimeException('شناسهٔ تکراری با محتوای متفاوت فرستاده شده است.');return $previous['result'];}
         $bytes=null;
@@ -29,11 +33,19 @@ class AiContent {
             elseif(!empty($input['openaiFileIdRefs'][0]['download_link']))$bytes=AiHttp::image($input['openaiFileIdRefs'][0]['download_link']);
             if(!is_string($bytes)||strlen($bytes)>8*1024*1024)throw new RuntimeException('فایل تصویر یا لینک دانلود مستقیم لازم است. مسیر sandbox قابل دریافت نیست.');
             $info=@getimagesizefromstring($bytes);if(!$info||$info[0]*$info[1]>40000000||!in_array($info[2],[IMAGETYPE_JPEG,IMAGETYPE_PNG,IMAGETYPE_WEBP],true))throw new RuntimeException('فقط تصویر واقعی PNG، JPEG یا WebP تا ۴۰ مگاپیکسل مجاز است.');
+            if($kind==='size_chart'){$bytes=SizeChartImage::compress($bytes);$info=getimagesizefromstring($bytes);}
         }
         $lockDir=sys_get_temp_dir().'/maarksho-website-'.substr(hash('sha256',dirname(__DIR__,2)),0,16);if(!is_dir($lockDir))mkdir($lockDir,0700,true);
-        $lock=fopen($lockDir.'/'.hash('sha256',$principal['project']).'.lock','c');flock($lock,LOCK_EX);$file=null;
+        $lock=fopen($lockDir.'/'.hash('sha256',$principal['project']).'.lock','c');if(!$lock||!flock($lock,LOCK_EX))throw new RuntimeException('قفل ثبت محتوا در دسترس نیست.');$file=null;$db=null;$transaction=false;
         try {
+            $quotaProject=getCurrentProject($principal['project'],true);if(!$quotaProject)throw new RuntimeException('پروژه یافت نشد.');
+            if($epoch!==(int)($quotaProject['settings']['data_recovery_revision']??0))throw new RuntimeException('دادهٔ پروژه بازیابی شده است؛ درخواست تازه لازم است.');
+            $lockedProduct=self::find($quotaProject,$input);$lockedReceipt=$lockedProduct['website_sync']['ai_receipts'][$receiptKey]??null;
+            if($lockedReceipt){if(!hash_equals($lockedReceipt['hash'],$fingerprint))throw new RuntimeException('شناسهٔ تکراری با محتوای متفاوت فرستاده شده است.');return $lockedReceipt['result'];}
+            if($bytes!==null){$usage=getProjectStorageUsage($quotaProject);if($usage['used_bytes']+strlen($bytes)>$usage['quota_bytes'])throw new RuntimeException('فضای تخصیص‌یافتهٔ پروژه برای ذخیرهٔ تصویر کافی نیست.');}
+            if(isSqlActive()){$db=getConn();if(!$db->begin_transaction())throw new RuntimeException('شروع ثبت اتمی محتوا ناموفق بود.');$transaction=true;InventoryVersions::lockProject($principal['project']);}
             $project=getCurrentProject($principal['project'],true);if(!$project)throw new RuntimeException('پروژه یافت نشد.');$product=self::find($project,$input);
+            if($epoch!==(int)($project['settings']['data_recovery_revision']??0))throw new RuntimeException('دادهٔ پروژه هنگام آماده‌سازی محتوا بازیابی شده است؛ درخواست تازه لازم است.');
             $receipt=$product['website_sync']['ai_receipts'][$receiptKey]??null;
             if($receipt){if(!hash_equals($receipt['hash'],$fingerprint))throw new RuntimeException('شناسهٔ تکراری با محتوای متفاوت فرستاده شده است.');return $receipt['result'];}
             $url=null;
@@ -51,9 +63,12 @@ class AiContent {
             $result=['product_id'=>(string)$product['id'],'sku'=>$product['sku']??'','kind'=>$kind,'url'=>$url,'approval_required'=>in_array($kind,['main','gallery','social'],true),'saved'=>true];
             $product['website_sync']['ai_receipts'][$receiptKey]=['hash'=>$fingerprint,'result'=>$result,'at'=>time(),'by'=>$principal['username']];
             if(count($product['website_sync']['ai_receipts'])>100)$product['website_sync']['ai_receipts']=array_slice($product['website_sync']['ai_receipts'],-100,null,true);
-            if(!saveProject($project,[$product]))throw new RuntimeException('ثبت محتوای محصول ناموفق بود.');$file=null;
+            $saved=db_save_project($project,[$product],null,!$transaction);
+            if(!$saved)throw new RuntimeException('ثبت محتوای محصول ناموفق بود.');
+            if($transaction){if(!$db->commit())throw new RuntimeException('ثبت نهایی محتوا ناموفق بود.');$transaction=false;}$file=null;
+            MaarkshoCache::delete('project_full_'.$project['id']);getCurrentProject($project['id'],true);
             $this->store->transaction(static function(&$s)use($principal,$result){AiStore::audit($s,$principal,'content_saved',['product'=>$result['product_id'],'kind'=>$result['kind']]);});return $result;
-        } finally {if($file&&is_file($file))unlink($file);flock($lock,LOCK_UN);fclose($lock);}
+        } finally {try{if($transaction)$db->rollback();if($file&&is_file($file))unlink($file);}finally{flock($lock,LOCK_UN);fclose($lock);}}
     }
     public function report($project,$principal,$input) {
         AiAccess::scope($principal,'reports.write');AiAccess::write();

@@ -14,10 +14,16 @@ class ProjectConnections {
             $rows[]=['id'=>$kind,'title'=>$title,'configured'=>$configured,'authorized'=>false,'last_received'=>$last,'last_complete'=>$complete,'error'=>$error,'sources'=>$found,'note'=>'دریافت موفق از تاریخ و منبع مشخص دیده می‌شود؛ داشتن تنظیمات به‌تنهایی موفقیت دریافت نیست.','url'=>'/panel/data-hub.php'.$base.($kind==='composio'?'#hub-composio':'#hub-google')];}
         if(AiAccess::pageAllowed()){$grants=0;foreach($s['grants']??[] as $g)if(($g['project']??'')===$pid&&empty($g['revoked']))$grants++;$rows[]=['id'=>'chatgpt','title'=>'ChatGPT / MCP مارک‌شو','configured'=>$grants>0,'authorized'=>false,'last_received'=>null,'note'=>$grants?'مجوز اتصال صادر شده است؛ نتیجهٔ فراخوانی واقعی را در ChatGPT بررسی کنید.':'اپ را ثبت کنید و از حساب ChatGPT خودتان مجوز همین پروژه را تأیید کنید.','url'=>'/panel/ai-connect.php'.$base];
             if($account=SaaSAccounts::projectAccount($pid)){
-                $central=SaaSAccounts::snapshot();$configured=false;$last=null;
-                foreach($central['image_models']??[] as $m)if(!empty($m['enabled']))$configured=true;
-                foreach($central['image_jobs']??[] as $j)if(($j['project']??'')===$pid&&!empty($j['completed_at']))$last=max($last??0,$j['completed_at']);
-                $rows[]=['id'=>'central_ai','title'=>'موتور AI مرکزی / نهال','configured'=>$configured,'authorized'=>false,'last_received'=>$last,'note'=>'کلید و مدل با تیم مرکزی است؛ مصرف از کردیت پروژه انجام می‌شود. فعال‌سازی کارمند و اعتبار آزاد را در حساب بررسی کنید.','url'=>'/panel/employees.php'.$base];
+                $central=SaaSAccounts::snapshot();$configured=false;$last=null;$employees=[];
+                foreach(['nahal'=>'نهال','ehsan'=>'احسان','aria'=>'آریا'] as $employee=>$label){
+                    $available=false;$models=$employee==='nahal'?($central['image_models']??[]):($central['central_providers']??[]);
+                    foreach($models as $m)if(!empty($m['enabled'])&&($employee==='nahal'||!empty($m[$employee.'_enabled'])))$available=true;
+                    $received=null;$table=['nahal'=>'image_jobs','ehsan'=>'ehsan_jobs','aria'=>'aria_jobs'][$employee];
+                    foreach($central[$table]??[] as $j)if(($j['project']??'')===$pid&&!empty($j['completed_at'])&&in_array($j['state']??'',['done','review','applying','accepted','rejected'],true))$received=max($received??0,$j['completed_at']);
+                    $employees[]=['id'=>$employee,'name'=>$label,'entitled'=>($account['employees'][$employee]??0)>0,'active'=>!empty($account['active_employees'][$employee][$pid]),'model_available'=>$available,'last_received'=>$received];
+                    $configured=$configured||$available;if($received)$last=max($last??0,$received);
+                }
+                $rows[]=['id'=>'central_ai','title'=>'موتور AI مرکزی و کارمندها','configured'=>$configured,'authorized'=>false,'last_received'=>$last,'employees'=>$employees,'note'=>'مدل آماده، خرید دسترسی و فعال‌سازی پروژه جدا هستند. کلید با تیم مرکزی است و اجرا از کردیت پروژه مصرف می‌کند؛ ثبت مدل، تست زنده یا موجودی سرویس‌دهنده نیست.','url'=>'/panel/my-employees.php'.$base];
             }else{
             $providers=(new AiReports($this->store))->providers(AiAccess::principal($project));$configured=false;$verified=false;foreach($providers as $p){if(!AiReports::eligible($p,AiAccess::principal($project)))continue;$configured=true;$test=$s['provider_tests'][$p['id']]??[];if(!empty($test['success'])&&($test['revision']??'')===($p['revision']??'')&&($test['at']??0)>time()-86400)$verified=true;}$rows[]=['id'=>'openai','title'=>'API هوش مصنوعی پروژه','configured'=>$configured,'authorized'=>$verified,'last_received'=>null,'note'=>'کلید و هزینه متعلق به مالک پروژه است. تست مدل فقط خواندنی است و تولید یا موجودی اعتبار را تأیید نمی‌کند.','url'=>'/panel/ai-connect.php'.$base.'&view=providers'];
             }

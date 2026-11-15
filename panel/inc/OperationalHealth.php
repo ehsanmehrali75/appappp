@@ -24,6 +24,11 @@ class OperationalHealth {
         if($sms['uncertain']||$sms['stale_sending'])$issues[]=['code'=>'sms_review','severity'=>'warning','text'=>'ارسال پیامک متوقف یا نامشخص است؛ بدون بررسی رسید، ارسال دوباره انجام ندهید.'];
         return ['managed'=>$account!==null,'wallet'=>['balance'=>(int)($wallet['balance']??0),'reserved'=>(int)($wallet['reserved']??0),'free'=>(int)($wallet['balance']??0)-(int)($wallet['reserved']??0),'expected_reserved'=>$expected,'uncertain'=>$unknown],'queues'=>$queues,'sms'=>$sms,'issues'=>$issues];
     }
+    private static function socialHealth(&$result,$jobs){
+        $result['social']=AiSocial::summary($jobs);
+        if($result['social']['uncertain']||$result['social']['expired_claims'])$result['issues'][]=['code'=>'social_handoff_review','severity'=>'warning','text'=>'تحویل انتشار به ابزار ChatGPT نامشخص یا منقضی شده است؛ پیش از هر ارسال تازه رسید سرویس بیرونی را بررسی کنید.'];
+        if($result['social']['overdue_external'])$result['issues'][]=['code'=>'social_external_receipt_overdue','severity'=>'warning','text'=>'زمان انتشار ثبت‌شده نزد ابزار بیرونی بیش از یک ساعت گذشته و رسید انتشار برنگشته است؛ این وضعیت اثبات شکست یا مجوز تکرار ارسال نیست.'];
+    }
     public function project($p){
         if(($_SESSION['project_id']??'')!==($p['id']??null))throw new RuntimeException('پروژهٔ انتخاب‌شده با درخواست یکسان نیست.');$member=SessionIdentity::member($p);if(!isMainAdmin()&&($member['role']??'')!=='project_admin')throw new RuntimeException('سلامت پروژه فقط با ادمین اصلی قابل مشاهده است.');AiAccess::need('settings');
         $p=getCurrentProject($p['id'],true);if(!$p)throw new RuntimeException('پروژه موجود نیست.');$result=self::metrics($this->accounts->state(),$p['id']);$result['project']=['id'=>$p['id'],'name'=>$p['name']];$result['restore_paused']=!empty($p['settings']['backup_restore_paused']);$result['blocked_publications']=0;$result['destination_reapproval']=0;
@@ -32,6 +37,7 @@ class OperationalHealth {
         if($result['destination_reapproval'])$result['issues'][]=['code'=>'destination_reapproval','severity'=>'warning','text'=>'محتوا نیازمند تأیید دوبارهٔ مقصد است: '.$result['destination_reapproval']];
         $base=getenv('MAARKSHO_BACKUP_DIR')?:__DIR__.'/../db/project-backups';$file=$base.'/'.hash('sha256',$p['id']).'/status.json';$backup=is_file($file)?json_decode(file_get_contents($file),true):[];$result['backup']=['last_success'=>$backup['last_success']??null,'has_error'=>!empty($backup['error'])];
         if(!$result['backup']['last_success']||$result['backup']['last_success']<time()-8*86400)$result['issues'][]=['code'=>'weekly_backup_unconfirmed','severity'=>'warning','text'=>'بک‌آپ هفتگی موفق در هشت روز اخیر ثبت نشده است؛ Cron و فضای ذخیره‌سازی بررسی شود.'];
+        self::socialHealth($result,array_filter((new AiStore())->read()['social_jobs']??[],static fn($j)=>($j['project']??'')===$p['id']));
         return $result;
     }
     public function central(){
@@ -39,7 +45,13 @@ class OperationalHealth {
         // Central status does not load every product/photo in every project merely to render a name.
         if(isSqlActive()){$rows=getConn()->query('SELECT id,name FROM projects');if(!$rows)throw new RuntimeException('فهرست پروژه‌ها قابل خواندن نیست.');while($r=$rows->fetch_assoc())$names[$r['id']]=$r['name'];}else foreach(getJsonDB()['projects']??[] as $p)$names[$p['id']]=$p['name'];
         $buckets=[];foreach(['image_jobs','ehsan_jobs','aria_jobs','credit_reservations','sms_campaigns'] as $table)foreach($state[$table]??[] as $key=>$value)$buckets[$value['project']??''][$table][$key]=$value;
-        foreach($state['project_accounts']??[] as $pid=>$account){$exists=isset($names[$pid])&&!ProjectLifecycle::isDeleted($pid);$subset=($buckets[$pid]??[])+['accounts'=>[$account=>$state['accounts'][$account]??null],'project_accounts'=>[$pid=>$account]];$row=self::metrics($subset,$pid);$row['project']=['id'=>$pid,'name'=>$exists?$names[$pid]:'پروژهٔ حذف‌شده'];if(!$exists)$row['issues'][]=['code'=>'deleted_project_account_link','severity'=>'warning','text'=>'اتصال حساب به پروژهٔ حذف‌شده باقی است؛ اعتبار و ظرفیت پیش از اصلاح دستی بررسی شود.'];$projects[]=$row;}
+        $socialBuckets=[];foreach((new AiStore())->read()['social_jobs']??[] as $job)$socialBuckets[$job['project']??''][]=$job;
+        foreach(array_unique(array_merge(array_keys($names),array_keys($state['project_accounts']??[]),array_keys($socialBuckets))) as $pid){
+            $pid=(string)$pid;if($pid==='')continue;$account=$state['project_accounts'][$pid]??null;$exists=isset($names[$pid])&&!ProjectLifecycle::isDeleted($pid);
+            $subset=($buckets[$pid]??[])+['accounts'=>$account?[$account=>$state['accounts'][$account]??null]:[],'project_accounts'=>$account?[$pid=>$account]:[]];
+            $row=self::metrics($subset,$pid);self::socialHealth($row,$socialBuckets[$pid]??[]);$row['project']=['id'=>$pid,'name'=>$exists?$names[$pid]:'پروژهٔ حذف‌شده'];
+            if(!$exists)$row['issues'][]=['code'=>'deleted_project_account_link','severity'=>'warning','text'=>'حساب یا صف خصوصی به پروژهٔ حذف‌شده اشاره می‌کند؛ اعتبار و ظرفیت پیش از اصلاح دستی بررسی شود.'];$projects[]=$row;
+        }
         return ['projects'=>$projects,'workers'=>$this->workers(),'runtime'=>['php'=>PHP_VERSION,'extensions'=>array_combine(['mysqli','sqlite3','pdo_sqlite','mbstring','curl','dom','gd','zip','exif'],array_map('extension_loaded',['mysqli','sqlite3','pdo_sqlite','mbstring','curl','dom','gd','zip','exif']))]];
     }
 }

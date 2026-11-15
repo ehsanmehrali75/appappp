@@ -67,3 +67,4 @@ body.maarksho-shell{--neo-surface:var(--ms-surface);--neo-ink:var(--ms-ink);--ne
 .maarksho-shell .neo-drawer-close{display:none}
 @media(max-width:1024px){.maarksho-shell .neo-drawer-close{display:block;min-height:44px;border:0;background:transparent;color:var(--neo-ink);text-align:end;padding:4px 10px;margin-bottom:6px;cursor:pointer}}
 @media(max-width:640px){.maarksho-shell .navbar a.neo-toolbar-primary{padding:9px;font-size:11px}.maarksho-shell .neo-toolbar-more summary{padding:11px 9px;font-size:11px}}
+.maarksho-shell .neo-toolbar-more:not([open])>.neo-toolbar-menu{display:none}

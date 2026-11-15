@@ -42,6 +42,12 @@ try:
         for width in (1440,390):
             page.set_viewport_size({'width':width,'height':900})
             assert page.evaluate('document.documentElement.scrollWidth<=innerWidth'),str(width)
+            more=page.locator('.neo-toolbar-more')
+            assert not more.locator('.neo-toolbar-menu').is_visible()
+            more.locator('summary').click()
+            menu=more.locator('.neo-toolbar-menu').bounding_box()
+            assert menu['x']>=0 and menu['x']+menu['width']<=width+1,menu
+            more.locator('summary').click()
             page.screenshot(path=f'/tmp/occasions-page-{width}.png',full_page=False)
             page.get_by_role('button',name='➕ مناسبت سفارشی جدید',exact=True).click()
             assert page.locator('#add-occasion-modal').is_visible()

@@ -31,7 +31,7 @@ These suites use temporary files and synthetic databases. `tests/support_mysql.p
 
 ## Operational health
 
-Read [the 2026-10-29 system review](docs/system-review-2026-10-29.fa.md) for verified fixes, limits and prioritized follow-up work. Central administrators can open `/panel/health.php?central=1`; project administrators can inspect `/panel/health.php?project=PROJECT_ID` in their selected workspace. Worker heartbeats are recorded by the existing employee/integration CLI workers; the dashboard does not run live API probes or repair balances.
+Read [the 2026-11-15 system review](docs/system-review-2026-11-15.fa.md) for verified fixes, limits and prioritized follow-up work. Central administrators can open `/panel/health.php?central=1`; project administrators can inspect `/panel/health.php?project=PROJECT_ID` in their selected workspace. Worker heartbeats and expired external publishing handoffs are maintained by the existing employee/integration CLI workers; the dashboard does not run live API probes or repair balances. External ChatGPT publishing requires an explicit destination; old unbound queues require cancellation and fresh approval rather than automatic replay.
 
 ## Production workflow
 
