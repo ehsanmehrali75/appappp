@@ -22,6 +22,26 @@ class SaaSAccounts {
         return $target->setDate((int)$target->format('Y'),(int)$target->format('n'),min((int)$d->format('j'),(int)$target->format('t')))->getTimestamp();
     }
     public static function active($a){return ($a['expires_at']??0)>time()&&empty($a['suspended']);}
+    public static function expiryTimestamp($date){
+        if(!is_string($date)||!preg_match('/^[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}$/D',$date))throw new RuntimeException('تاریخ پایان معتبر وارد کنید.');
+        $day=DateTimeImmutable::createFromFormat('!Y-m-d',$date,new DateTimeZone('Asia/Tehran'));
+        if(!$day||$day->format('Y-m-d')!==$date)throw new RuntimeException('تاریخ پایان معتبر وارد کنید.');
+        return $day->setTime(23,59,59)->getTimestamp();
+    }
+    /** Central manual correction; account duration is shared by all its projects. */
+    public function setProjectExpiry($pid,$date,$expected){
+        if(!isMainAdmin())throw new RuntimeException('تغییر دستی مدت اشتراک فقط برای تیم مرکزی مجاز است.');
+        $expires=self::expiryTimestamp($date);
+        if(!is_int($expected))throw new RuntimeException('صفحه را تازه کنید و دوباره تاریخ پایان را ثبت کنید.');
+        return $this->change(function(&$s)use($pid,$expires,$expected){
+            $id=$s['project_accounts'][$pid]??null;
+            if(!$id||empty($s['accounts'][$id]['projects'][$pid]))throw new RuntimeException('حساب این پروژه تغییر کرده است؛ صفحه را تازه کنید.');
+            $a=&$s['accounts'][$id];$old=(int)$a['expires_at'];
+            if($old!==$expected)throw new RuntimeException('مدت اشتراک در درخواست دیگری تغییر کرده است؛ صفحه را تازه کنید.');
+            if($old!==$expires){$a['expires_at']=$expires;self::audit($s,$id,'account_expiry_changed',['project'=>$pid,'old_expires_at'=>$old,'expires_at'=>$expires,'source'=>'project_settings']);}
+            return $expires;
+        });
+    }
     public static function authenticate($username,$password){foreach(self::snapshot()['accounts']??[] as $a){$m=$a['owner_member']??[];if(($a['owner']??'')===$username&&!empty($m['password'])&&password_verify($password,$m['password']))return $a;}return null;}
     public function canOwn($a){if(isMainAdmin())return true;if(SessionIdentity::customerAccount()===($a['id']??null))return true;if(!isUser()||($_SESSION['user']['username']??'')!==$a['owner'])return false;$anchor=getCurrentProject($a['anchor_project'],true);$member=$anchor?SessionIdentity::member($anchor):null;return $member&&($member['username']??'')===$a['owner']&&($member['role']??'')==='project_admin';}
     public function account($id,$owner=true){$a=$this->state()['accounts'][$id]??null;if(!$a||($owner&&!$this->canOwn($a)))throw new RuntimeException('دسترسی به حساب مشتری مجاز نیست.');return $a;}

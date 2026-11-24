@@ -4556,9 +4556,26 @@ if ($project) {
     }
 
     if (isset($_POST['save_settings']) || isset($_POST['save_automation'])) {
+        $accountExpiryChange=null;
+        if(isset($_POST['active_to'])){
+            $date=$_POST['active_to'];$original=$_POST['active_to_original']??($project['activeTo']??'');
+            if($date!==$original){
+                $subscription=SaaSAccounts::projectAccount($project['id']);
+                if($subscription&&!isMainAdmin())AccessControl::deny();
+                try{
+                    SaaSAccounts::expiryTimestamp($date);
+                    if($subscription){
+                        $expected=filter_var($_POST['subscription_expiry_version']??null,FILTER_VALIDATE_INT);
+                        if($expected===false||$expected===null||!isset($_POST['subscription_expiry_version']))throw new RuntimeException('صفحه را تازه کنید و دوباره تاریخ پایان را ثبت کنید.');
+                        if($expected!==(int)$subscription['expires_at'])throw new RuntimeException('مدت اشتراک تغییر کرده است؛ صفحه را تازه کنید.');
+                        $accountExpiryChange=['date'=>$date,'expected'=>$expected];
+                    }elseif(isset($_POST['active_to_original'])&&$original!==($project['activeTo']??''))throw new RuntimeException('تاریخ پایان تغییر کرده است؛ صفحه را تازه کنید.');
+                    $project['activeTo']=$date;
+                }catch(RuntimeException $e){redirect('admin.php?tab=settings&error=1&msg='.urlencode($e->getMessage()));exit;}
+            }
+        }
         if (isset($_POST['project_name'])) $project['name'] = $_POST['project_name'];
         if (isset($_POST['active_from'])) $project['activeFrom'] = $_POST['active_from'];
-        if (isset($_POST['active_to'])) $project['activeTo'] = $_POST['active_to'];
         if (isset($_POST['app_base_url'])) {
             $project['settings']['app_base_url'] = rtrim(trim($_POST['app_base_url']), '/\\');
         }
@@ -4875,7 +4892,12 @@ if ($project) {
             }
         }
 
-        saveProject($project);
+        try{$settingsSaved=saveProject($project);}catch(Throwable $e){$settingsSaved=false;}
+        if(!$settingsSaved){redirect('admin.php?tab=settings&error=1&msg='.urlencode('ذخیرهٔ تنظیمات ناموفق بود؛ تاریخ اشتراک تغییر نکرد.'));exit;}
+        if($accountExpiryChange){
+            try{(new SaaSAccounts())->setProjectExpiry($project['id'],$accountExpiryChange['date'],$accountExpiryChange['expected']);}
+            catch(RuntimeException $e){redirect('admin.php?tab=settings&error=1&msg='.urlencode('تنظیمات ذخیره شد، اما تاریخ اشتراک تغییر نکرد: '.$e->getMessage()));exit;}
+        }
         $target = isset($_POST['save_automation']) ? 'admin.php?tab=extract' : 'admin.php?tab=settings';
         redirect($target . '&msg=تنظیمات با موفقیت ذخیره شد.');
     }
@@ -17951,7 +17973,11 @@ export default function CampaignLanding() {
                                     </div>
                                     <div>
                                         <label class="label font-bold text-xs uppercase text-slate-400">فعال تا تاریخ</label>
-                                        <input type="date" name="active_to" value="<?php echo $project['activeTo'] ?? ''; ?>" class="input text-xs">
+                                        <?php $expiryAccount=SaaSAccounts::projectAccount($project['id']); ?>
+                                        <input type="hidden" name="active_to_original" value="<?php echo htmlspecialchars($project['activeTo']??'',ENT_QUOTES,'UTF-8'); ?>">
+                                        <?php if($expiryAccount): ?><input type="hidden" name="subscription_expiry_version" value="<?php echo (int)$expiryAccount['expires_at']; ?>"><?php endif; ?>
+                                        <input type="date" name="active_to" value="<?php echo htmlspecialchars($project['activeTo']??'',ENT_QUOTES,'UTF-8'); ?>" class="input text-xs" <?php echo $expiryAccount&&!isMainAdmin()?'disabled':''; ?>>
+                                        <?php if($expiryAccount): ?><p class="text-xs text-slate-500 mt-2"><?php if(isMainAdmin()): ?>تاریخ پایان مشترک حساب مشتری؛ تغییر آن برای همهٔ پروژه‌های این حساب اعمال می‌شود و تا پایان روز انتخابی به وقت تهران اعتبار دارد.<?php else: ?>مدت اشتراک بین پروژه‌های حساب مشترک است. <a href="/panel/account.php">تمدید اشتراک حساب</a><?php endif; ?></p><?php endif; ?>
                                     </div>
                                 </div>
                             </div> <!-- End of space-y-4 -->

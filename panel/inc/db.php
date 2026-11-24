@@ -561,10 +561,11 @@ function db_save_project($project, $onlyProducts = null, $onlySchedules = null, 
             // 1. Update/Insert Project basic info & settings (Only on full save)
             if ($onlyProducts === null && $onlySchedules === null) {
                 $chkPrj = $conn->prepare("SELECT id FROM projects WHERE id = ?");
+                if(!$chkPrj)throw new RuntimeException('آماده‌سازی بررسی پروژه ناموفق بود.');
                 $prjExists = false;
                 if ($chkPrj) {
                     $chkPrj->bind_param("s", $project['id']);
-                    $chkPrj->execute();
+                    if(!$chkPrj->execute())throw new RuntimeException('بررسی پروژه ناموفق بود.');
                     $resChk = $chkPrj->get_result();
                     $prjExists = ($resChk && $resChk->num_rows > 0);
                     $chkPrj->close();
@@ -577,16 +578,18 @@ function db_save_project($project, $onlyProducts = null, $onlySchedules = null, 
 
                 if (!$prjExists) {
                     $stmt = $conn->prepare("INSERT INTO projects (id, name, active_from, active_to, settings) VALUES (?, ?, ?, ?, ?)");
+                    if(!$stmt)throw new RuntimeException('آماده‌سازی ثبت پروژه ناموفق بود.');
                     if ($stmt) {
                         $stmt->bind_param("sssss", $project['id'], $name, $activeFrom, $activeTo, $settings);
-                        $stmt->execute();
+                        if(!$stmt->execute())throw new RuntimeException('ثبت اطلاعات پروژه ناموفق بود.');
                         $stmt->close();
                     }
                 } else {
                     $stmt = $conn->prepare("UPDATE projects SET name = ?, active_from = ?, active_to = ?, settings = ? WHERE id = ?");
+                    if(!$stmt)throw new RuntimeException('آماده‌سازی تغییر پروژه ناموفق بود.');
                     if ($stmt) {
                         $stmt->bind_param("sssss", $name, $activeFrom, $activeTo, $settings, $project['id']);
-                        $stmt->execute();
+                        if(!$stmt->execute())throw new RuntimeException('ذخیرهٔ اطلاعات پروژه ناموفق بود.');
                         $stmt->close();
                     }
                 }
@@ -827,7 +830,7 @@ function db_save_project($project, $onlyProducts = null, $onlySchedules = null, 
                 }
             }
             
-            if ($manageTransaction) $conn->commit();
+            if ($manageTransaction&&!$conn->commit())throw new RuntimeException('ثبت نهایی اطلاعات پروژه ناموفق بود.');
         } catch (Throwable $e) {
             if ($manageTransaction && isset($conn) && $conn) $conn->rollback();
             error_log("DB SAVE ERR: " . $e->getMessage());
